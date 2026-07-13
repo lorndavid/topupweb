@@ -1,4 +1,4 @@
-import { HTTP_STATUS, ERROR_MESSAGES } from '../constants';
+import { HTTP_STATUS, ERROR_MESSAGES, ORDER_STATUS } from '../constants';
 import { AppError } from '../middleware/errorHandler';
 import { generateReference } from '../utils/generateReference';
 import { bay2gameService } from './bay2game.service';
@@ -50,7 +50,7 @@ export class OrderService {
       khqr_image: order.khqr_image,
       khqr_data: order.khqr_data,
       transaction_id: order.transaction_id,
-      expires_at: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
+      expires_at: new Date(Date.now() + 5 * 60 * 1000).toISOString(),
     };
   }
 
@@ -159,6 +159,32 @@ export class OrderService {
       created_at: order.created_at.toISOString(),
       updated_at: order.updated_at.toISOString(),
       completed_at: order.completed_at?.toISOString() || null,
+    };
+  }
+
+  /**
+   * Cancel an order that is still awaiting payment.
+   */
+  async cancelOrder(reference: string) {
+    const order = await orderRepository.findByReference(reference);
+    if (!order) {
+      throw new AppError(ERROR_MESSAGES.ORDER_NOT_FOUND, HTTP_STATUS.NOT_FOUND);
+    }
+
+    // Only allow cancellation if still awaiting payment
+    if (order.order_status !== ORDER_STATUS.AWAITING_PAYMENT) {
+      throw new AppError(
+        ERROR_MESSAGES.ORDER_ALREADY_PROCESSED,
+        HTTP_STATUS.UNPROCESSABLE_ENTITY
+      );
+    }
+
+    await orderRepository.markCancelled(reference);
+
+    return {
+      success: true,
+      message: 'Order cancelled successfully',
+      reference,
     };
   }
 

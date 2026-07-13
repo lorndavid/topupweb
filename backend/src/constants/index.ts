@@ -20,6 +20,7 @@ export const ORDER_STATUS = {
   PROCESSING: 'processing',
   COMPLETED: 'completed',
   FAILED: 'failed',
+  CANCELLED: 'cancelled',
 } as const;
 
 export const PAYMENT_STATUS = {
@@ -41,6 +42,8 @@ export const ERROR_MESSAGES = {
   INVALID_PRODUCT: 'Invalid product code',
   INSUFFICIENT_BALANCE: 'Insufficient balance in reseller account',
   ORDER_NOT_FOUND: 'Order not found',
+  ORDER_CANCELLED: 'Order has been cancelled',
+  ORDER_ALREADY_PROCESSED: 'Cannot cancel — order has already been processed',
   PAYMENT_FAILED: 'Payment verification failed',
   PAYMENT_PENDING: 'Payment is still pending',
   INVALID_PLAYER_ID: 'Invalid player ID',

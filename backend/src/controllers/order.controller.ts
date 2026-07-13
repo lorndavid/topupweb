@@ -38,6 +38,30 @@ export async function createOrder(
   }
 }
 
+export async function cancelOrder(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const { reference } = req.params;
+
+    if (!reference) {
+      throw new AppError('Reference is required', HTTP_STATUS.BAD_REQUEST);
+    }
+
+    const result = await orderService.cancelOrder(reference);
+
+    res.status(HTTP_STATUS.OK).json({
+      success: true,
+      message: 'Order cancelled successfully',
+      data: result,
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
 export async function getOrder(
   req: Request,
   res: Response,

@@ -1,6 +1,6 @@
 import { OrderModel, IOrder } from '../models/Order';
 
-type OrderStatus = 'pending' | 'awaiting_payment' | 'paid' | 'processing' | 'completed' | 'failed';
+type OrderStatus = 'pending' | 'awaiting_payment' | 'paid' | 'processing' | 'completed' | 'failed' | 'cancelled';
 type PaymentStatus = 'pending' | 'paid' | 'failed';
 
 /** Plain order data object returned by the repository (no Mongoose methods) */
@@ -98,6 +98,13 @@ export class OrderRepository {
 
   async markFailed(reference: string): Promise<OrderData | null> {
     return this.updateStatus(reference, { order_status: 'failed' });
+  }
+
+  async markCancelled(reference: string): Promise<OrderData | null> {
+    return this.updateStatus(reference, {
+      payment_status: 'failed',
+      order_status: 'cancelled',
+    });
   }
 
   async markPaid(reference: string): Promise<OrderData | null> {

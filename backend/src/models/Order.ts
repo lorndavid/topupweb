@@ -59,6 +59,7 @@ const OrderSchema = new Schema<IOrder>(
         'processing',
         'completed',
         'failed',
+        'cancelled',
       ],
       default: 'awaiting_payment',
     },

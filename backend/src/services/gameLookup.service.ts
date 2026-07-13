@@ -194,6 +194,39 @@ class MLBBLookupProvider implements GameLookupProvider {
     // The official MLBB top-up flow requires both UID + Zone ID
     const zoneId = serverId?.trim() || '';
 
+    // ── Real API: scprogames.com ──────────────────────────
+    // This is a working MLBB verification API that returns real in-game names.
+    // Uses POST with uid + zid, returns { status: { code: 0 }, data: { username } }
+    if (zoneId) {
+      try {
+        const { data } = await axios.post(
+          'https://scprogames.com/api/games/mlbb/verify-user',
+          { uid: playerId, zid: zoneId },
+          {
+            headers: { 'Content-Type': 'application/json' },
+            timeout: 8000,
+          }
+        );
+        const username =
+          data?.data?.username ||
+          data?.username ||
+          data?.nickname ||
+          data?.playerName ||
+          null;
+        if (username && data?.status?.code === 0) {
+          return {
+            verified: true,
+            nickname: String(username),
+            playerId,
+            serverId: zoneId,
+            provider: this.name,
+          };
+        }
+      } catch {
+        // scprogames API failed — fall through to community APIs
+      }
+    }
+
     // Try community APIs (they're often down, but worth a shot)
     const endpoints: Array<{ url: string; parse: (data: any) => string | null }> = [
       {

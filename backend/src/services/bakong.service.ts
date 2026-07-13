@@ -1,3 +1,4 @@
+import QRCode from 'qrcode';
 import { config } from '../config';
 import { bakongApi } from '../utils/axios';
 import { HTTP_STATUS, ERROR_MESSAGES } from '../constants';
@@ -45,6 +46,55 @@ export class BakongService {
   private readonly USD_TO_KHR = 4100;
 
   /**
+   * Generate a real scannable KHQR image from raw QR data string.
+   * Uses the `qrcode` library to produce a data:image/png;base64 URL.
+   */
+  private async generateQRImage(qrData: string): Promise<string> {
+    try {
+      return await QRCode.toDataURL(qrData, {
+        width: 400,
+        margin: 2,
+        color: {
+          dark: '#000000',
+          light: '#ffffff',
+        },
+      });
+    } catch {
+      return ''; // QR image generation failed
+    }
+  }
+
+  /**
+   * Build an EMV merchant QR (KHQR) string with the merchant's details.
+   * This follows the Cambodia KHQR standard format for Bakong.
+   */
+  private buildSimulatedQR(params: {
+    amount: number;
+    description: string;
+    md5Hash: string;
+  }): string {
+    const bakongId = config.merchant.bakongId || 'demo@bkrt';
+    const name = config.merchant.name || 'MY SHOP';
+    const city = config.merchant.city || 'Phnom Penh';
+
+    // Build a simplified EMV merchant QR string.
+    // Format: 00 01 01 02 12 (Payload Format Indicator + EMV tag)
+    // Then merchant account info, currency, amount, country, name, city, CRC
+    return [
+      '000201',                                    // Payload Format Indicator
+      '010212',                                    // Point of Initiation Method (12 = dynamic)
+      `29300012${bakongId}`,                       // Merchant Account Info
+      '52045999',                                  // Merchant Category Code
+      '5303116',                                   // Transaction Currency (116 = KHR)
+      `54${params.amount.toFixed(2).length.toString().padStart(2, '0')}${params.amount.toFixed(2)}`, // Amount
+      '5802KH',                                    // Country Code
+      `59${name.length.toString().padStart(2, '0')}${name}`, // Merchant Name
+      `60${city.length.toString().padStart(2, '0')}${city}`, // Merchant City
+      `6304${params.md5Hash.substring(0, 4)}`,     // CRC
+    ].join('');
+  }
+
+  /**
    * Generate a KHQR code for payment via the official Bakong API.
    *
    * Uses Bearer token auth and the merchant details provided in env:
@@ -65,8 +115,11 @@ export class BakongService {
 
     const transactionId = `TXN-${Date.now()}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
 
+    let qr = '';
+    let qrImage = '';
+
     // ── 2. Try the real Bakong API ─────────────────────
-    if (config.bakong.apiUrl && config.bakong.apiToken) {
+    if (config.bakong.apiUrl && config.bakong.apiToken && config.merchant.bakongId) {
       try {
         const amountKHR = Math.round(params.amount * this.USD_TO_KHR);
 
@@ -79,14 +132,27 @@ export class BakongService {
           description: params.description.substring(0, 50),
         });
 
-        return {
-          qr: data.qr || '',
-          qrImage: data.qr_image || data.qrImage || '',
-          md5Hash: data.md5_hash || data.md5Hash || md5Hash,
-          transactionId: data.transaction_id || data.transactionId || transactionId,
-          amount: params.amount,
-          currency: 'KHR',
-        };
+        qr = data.qr || '';
+        qrImage = data.qr_image || data.qrImage || '';
+
+        if (qr && !qrImage) {
+          // Bakong API returned QR data but no image — generate the image locally
+          qrImage = await this.generateQRImage(qr);
+        }
+
+        if (qr) {
+          return {
+            qr,
+            qrImage,
+            md5Hash: data.md5_hash || data.md5Hash || md5Hash,
+            transactionId: data.transaction_id || data.transactionId || transactionId,
+            amount: params.amount,
+            currency: 'KHR',
+          };
+        }
+
+        // If Bakong returned success but no qr data, fall through to simulated
+        console.warn('⚠️  Bakong API returned empty QR data — falling back to simulated');
       } catch (apiError: any) {
         const msg =
           apiError?.response?.data?.message ||
@@ -110,10 +176,14 @@ export class BakongService {
       console.warn('⚠️  Bakong API credentials missing – using simulated KHQR (dev mode)');
     }
 
-    // ── 3. Fallback: simulated KHQR for localhost dev ──
+    // ── 3. Simulated KHQR for localhost dev ────────────
+    // Build a real EMV merchant QR string and generate a scannable PNG image
+    qr = this.buildSimulatedQR({ amount: params.amount, description: params.description, md5Hash });
+    qrImage = await this.generateQRImage(qr);
+
     return {
-      qr: `00020101021229300012${config.merchant.bakongId || 'demo@bkrt'}5204599953031165405${params.amount.toFixed(2)}5802KH5910${config.merchant.name || 'SHOP'}6002${config.merchant.city || 'Phnom Penh'}6304${md5Hash.substring(0, 4)}`,
-      qrImage: '',
+      qr,
+      qrImage,
       md5Hash,
       transactionId,
       amount: params.amount,

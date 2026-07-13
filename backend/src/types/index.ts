@@ -61,7 +61,7 @@ export interface Bay2GameCheckOrder {
   };
 }
 
-export type OrderStatus = 'pending' | 'awaiting_payment' | 'paid' | 'processing' | 'completed' | 'failed';
+export type OrderStatus = 'pending' | 'awaiting_payment' | 'paid' | 'processing' | 'completed' | 'failed' | 'cancelled';
 
 export interface Order {
   reference: string;

@@ -1,0 +1,63 @@
+import { Request, Response, NextFunction } from 'express';
+import { orderService } from '../services/order.service';
+import { orderCreateSchema } from '../validators';
+import { HTTP_STATUS } from '../constants';
+import { AppError } from '../middleware/errorHandler';
+
+export async function createOrder(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const validation = orderCreateSchema.safeParse(req.body);
+    if (!validation.success) {
+      throw new AppError(
+        validation.error.errors.map((e) => e.message).join(', '),
+        HTTP_STATUS.BAD_REQUEST
+      );
+    }
+
+    const { reference, game_code, product_code, player_id, server_id, amount } = validation.data;
+    const result = await orderService.createOrder({
+      reference,
+      gameCode: game_code,
+      productCode: product_code,
+      playerId: player_id,
+      serverId: server_id,
+      amount,
+    });
+
+    res.status(HTTP_STATUS.CREATED).json({
+      success: true,
+      message: 'Order created and top-up processed',
+      data: result,
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function getOrder(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const { reference } = req.params;
+
+    if (!reference) {
+      throw new AppError('Reference is required', HTTP_STATUS.BAD_REQUEST);
+    }
+
+    const order = await orderService.getOrder(reference);
+
+    res.status(HTTP_STATUS.OK).json({
+      success: true,
+      message: 'Order retrieved successfully',
+      data: order,
+    });
+  } catch (error) {
+    next(error);
+  }
+}

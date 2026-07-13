@@ -9,6 +9,7 @@ import {
 } from '../types';
 import { HTTP_STATUS, ERROR_MESSAGES, isBay2GameSuccess } from '../constants';
 import { AppError } from '../middleware/errorHandler';
+import { gameCacheRepository } from '../repositories/GameCacheRepository';
 
 function getApiParams(): Record<string, string> {
   return { api_key: config.bay2game.apiKey };
@@ -16,21 +17,19 @@ function getApiParams(): Record<string, string> {
 
 export class Bay2GameService {
   /**
-   * Get user profile and balance
+   * Get user profile and balance (no caching — always live)
    */
   async getUserProfile(): Promise<Bay2GameUser> {
     try {
       const { data } = await bay2gameApi.get('/api/profile', {
         params: getApiParams(),
       });
-
       if (!isBay2GameSuccess(data.status)) {
         throw new AppError(
           'Failed to get user profile',
           HTTP_STATUS.SERVICE_UNAVAILABLE
         );
       }
-
       return data.user as Bay2GameUser;
     } catch (error) {
       if (error instanceof AppError) throw error;
@@ -42,14 +41,13 @@ export class Bay2GameService {
   }
 
   /**
-   * Get all available game categories
+   * Get all available game categories (cached — falls back to MongoDB on API failure)
    */
   async getCategories(): Promise<Bay2GameCategory[]> {
     try {
       const { data } = await bay2gameApi.get('/api/categories', {
         params: getApiParams(),
       });
-
       if (!isBay2GameSuccess(data.status)) {
         throw new AppError(
           'Failed to fetch categories',
@@ -57,37 +55,19 @@ export class Bay2GameService {
         );
       }
 
-      return data.categories as Bay2GameCategory[];
+      const categories = data.categories as Bay2GameCategory[];
+
+      // Cache the result asynchronously (non-blocking)
+      gameCacheRepository.setCategories(categories).catch(() => {});
+
+      return categories;
     } catch (error) {
-      if (error instanceof AppError) throw error;
-      throw new AppError(
-        ERROR_MESSAGES.API_FAILURE,
-        HTTP_STATUS.SERVICE_UNAVAILABLE
-      );
-    }
-  }
-
-  /**
-   * Get products for a specific game
-   */
-  async getProducts(gameCode: string): Promise<Bay2GameProduct[]> {
-    try {
-      const { data } = await bay2gameApi.get('/api/products', {
-        params: {
-          ...getApiParams(),
-          game_code: gameCode,
-        },
-      });
-
-      if (!isBay2GameSuccess(data.status)) {
-        throw new AppError(
-          'Failed to fetch products',
-          HTTP_STATUS.SERVICE_UNAVAILABLE
-        );
+      // API failed — try serving from cache for ANY error type
+      const cached = await gameCacheRepository.getCategories();
+      if (cached) {
+        console.warn('⚠️  Serving categories from cache (API unavailable)');
+        return cached;
       }
-
-      return data.products as Bay2GameProduct[];
-    } catch (error) {
       if (error instanceof AppError) throw error;
       throw new AppError(
         ERROR_MESSAGES.API_FAILURE,
@@ -97,7 +77,7 @@ export class Bay2GameService {
   }
 
   /**
-   * Get products AND game details in a single API call
+   * Get products + game details (cached — falls back to MongoDB on API failure)
    */
   async getProductsWithGame(gameCode: string): Promise<{
     game: { game_code: string; name: string; description: string; image_url: string };
@@ -118,11 +98,24 @@ export class Bay2GameService {
         );
       }
 
-      return {
+      const result = {
         game: data.game,
         products: data.products as Bay2GameProduct[],
       };
+
+      // Cache the result asynchronously (non-blocking)
+      gameCacheRepository.setProducts(gameCode, result).catch(() => {});
+
+      return result;
     } catch (error) {
+      // API failed — try serving from cache for ANY error type
+      const cached = await gameCacheRepository.getProducts(gameCode);
+      if (cached) {
+        console.warn(
+          `⚠️  Serving products for "${gameCode}" from cache (API unavailable)`
+        );
+        return cached;
+      }
       if (error instanceof AppError) throw error;
       throw new AppError(
         ERROR_MESSAGES.API_FAILURE,
@@ -132,7 +125,15 @@ export class Bay2GameService {
   }
 
   /**
-   * Create a new order (top-up)
+   * Get products for a specific game (delegates to getProductsWithGame internally)
+   */
+  async getProducts(gameCode: string): Promise<Bay2GameProduct[]> {
+    const { products } = await this.getProductsWithGame(gameCode);
+    return products;
+  }
+
+  /**
+   * Create a new order (top-up) — no caching
    */
   async createOrder(params: {
     productCode: string;
@@ -181,7 +182,7 @@ export class Bay2GameService {
   }
 
   /**
-   * Check order status by reference
+   * Check order status by reference — no caching
    */
   async checkOrder(reference: string): Promise<Bay2GameCheckOrder> {
     try {

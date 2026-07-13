@@ -3,7 +3,7 @@ import { AppError } from '../middleware/errorHandler';
 import { generateReference } from '../utils/generateReference';
 import { bay2gameService } from './bay2game.service';
 import { bakongService } from './bakong.service';
-import { OrderModel, IOrder } from '../models/Order';
+import { orderRepository } from '../repositories/OrderRepository';
 
 export class OrderService {
   /**
@@ -25,7 +25,7 @@ export class OrderService {
       description: `Top-up ${params.productName} - ${params.gameName} - ${params.playerId}`,
     });
 
-    const order = await OrderModel.create({
+    const order = await orderRepository.create({
       reference,
       game_code: params.gameCode,
       product_code: params.productCode,
@@ -58,7 +58,7 @@ export class OrderService {
    * Check payment status (called by frontend polling)
    */
   async checkPaymentStatus(reference: string) {
-    const order = await OrderModel.findOne({ reference });
+    const order = await orderRepository.findByReference(reference);
     if (!order) {
       throw new AppError(ERROR_MESSAGES.ORDER_NOT_FOUND, HTTP_STATUS.NOT_FOUND);
     }
@@ -66,14 +66,18 @@ export class OrderService {
     if (order.payment_status === 'pending') {
       const elapsed = Date.now() - new Date(order.created_at).getTime();
       if (elapsed > 15000) {
-        order.payment_status = 'paid';
-        order.order_status = 'paid';
-        await order.save();
+        const updated = await orderRepository.markPaid(reference);
 
         // Process the top-up via Bay2Game (non-blocking)
         this.processTopUp(reference).catch((err) =>
           console.error('Top-up processing error:', err)
         );
+
+        return {
+          reference,
+          payment_status: updated?.payment_status || 'paid',
+          order_status: updated?.order_status || 'paid',
+        };
       }
     }
 
@@ -88,7 +92,7 @@ export class OrderService {
    * Process top-up via Bay2Game after payment confirmed
    */
   async processTopUp(reference: string) {
-    const order = await OrderModel.findOne({ reference });
+    const order = await orderRepository.findByReference(reference);
     if (!order) {
       throw new AppError(ERROR_MESSAGES.ORDER_NOT_FOUND, HTTP_STATUS.NOT_FOUND);
     }
@@ -100,8 +104,7 @@ export class OrderService {
       );
     }
 
-    order.order_status = 'processing';
-    await order.save();
+    await orderRepository.markProcessing(reference);
 
     try {
       const result = await bay2gameService.createOrder({
@@ -111,12 +114,11 @@ export class OrderService {
         gameZoneId: order.server_id || undefined,
       });
 
-      order.order_status = 'completed';
-      order.payment_status = 'paid';
-      order.completed_at = result.completed_at
+      const completedAt = result.completed_at
         ? new Date(result.completed_at)
         : new Date();
-      await order.save();
+
+      await orderRepository.markCompleted(reference, completedAt);
 
       return {
         success: true,
@@ -125,11 +127,10 @@ export class OrderService {
         product_name: result.product_name,
         game_name: result.game_name,
         amount: result.amount,
-        completed_at: order.completed_at?.toISOString(),
+        completed_at: completedAt.toISOString(),
       };
     } catch (error) {
-      order.order_status = 'failed';
-      await order.save();
+      await orderRepository.markFailed(reference);
       throw error;
     }
   }
@@ -138,7 +139,7 @@ export class OrderService {
    * Get order details by reference
    */
   async getOrder(reference: string) {
-    const order = await OrderModel.findOne({ reference });
+    const order = await orderRepository.findByReference(reference);
     if (!order) {
       throw new AppError(ERROR_MESSAGES.ORDER_NOT_FOUND, HTTP_STATUS.NOT_FOUND);
     }
@@ -170,24 +171,16 @@ export class OrderService {
     status: string;
     reference?: string;
   }) {
-    let order: IOrder | null = null;
-
-    if (payload.reference) {
-      order = await OrderModel.findOne({ reference: payload.reference });
-    } else {
-      order = await OrderModel.findOne({
-        transaction_id: payload.transactionId,
-      });
-    }
+    let order = payload.reference
+      ? await orderRepository.findByReference(payload.reference)
+      : await orderRepository.findByTransactionId(payload.transactionId);
 
     if (!order) {
       throw new AppError(ERROR_MESSAGES.ORDER_NOT_FOUND, HTTP_STATUS.NOT_FOUND);
     }
 
     if (payload.status === 'PAID' || payload.status === 'SUCCESS') {
-      order.payment_status = 'paid';
-      order.order_status = 'paid';
-      await order.save();
+      await orderRepository.markPaid(order.reference);
       await this.processTopUp(order.reference);
     }
 
@@ -205,18 +198,16 @@ export class OrderService {
     serverId?: string;
     amount: number;
   }) {
-    const order = await OrderModel.findOne({ reference: params.reference });
+    const order = await orderRepository.findByReference(params.reference);
     if (!order) {
       throw new AppError(ERROR_MESSAGES.ORDER_NOT_FOUND, HTTP_STATUS.NOT_FOUND);
     }
-
     if (order.payment_status !== 'paid') {
       throw new AppError(
         ERROR_MESSAGES.PAYMENT_PENDING,
         HTTP_STATUS.UNPROCESSABLE_ENTITY
       );
     }
-
     return this.processTopUp(params.reference);
   }
 }

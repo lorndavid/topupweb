@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { useI18nStore } from '@/stores/i18n'
+const i18n = useI18nStore()
 </script>
 
 <template>
@@ -16,7 +18,7 @@
             <span class="font-semibold text-surface-900 dark:text-surface-100">GameTopUp</span>
           </div>
           <p class="text-sm text-surface-500 dark:text-surface-400">
-            Premium game top-up services. Fast, secure, and affordable.
+            {{ i18n.t('footer.tagline') }}
           </p>
         </div>
 
@@ -26,17 +28,17 @@
           <ul class="space-y-2">
             <li>
               <router-link to="/" class="text-sm text-surface-500 dark:text-surface-400 hover:text-primary-500 dark:hover:text-primary-400 transition-colors">
-                Home
+                {{ i18n.t('footer.home') }}
               </router-link>
             </li>
             <li>
               <a href="#" class="text-sm text-surface-500 dark:text-surface-400 hover:text-primary-500 dark:hover:text-primary-400 transition-colors">
-                Support
+                {{ i18n.t('footer.support') }}
               </a>
             </li>
             <li>
               <a href="#" class="text-sm text-surface-500 dark:text-surface-400 hover:text-primary-500 dark:hover:text-primary-400 transition-colors">
-                FAQ
+                {{ i18n.t('footer.faq') }}
               </a>
             </li>
           </ul>
@@ -58,7 +60,7 @@
 
       <div class="mt-8 pt-6 border-t border-surface-200 dark:border-surface-700">
         <p class="text-center text-xs text-surface-400 dark:text-surface-500">
-          &copy; {{ new Date().getFullYear() }} GameTopUp. All rights reserved. This is a local development project.
+          &copy; {{ new Date().getFullYear() }} GameTopUp. {{ i18n.t('footer.copyright') }}
         </p>
       </div>
     </div>

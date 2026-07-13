@@ -2,10 +2,12 @@
 import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useGameStore } from '@/stores/game'
+import { useI18nStore } from '@/stores/i18n'
 import { useToastStore } from '@/stores/toast'
 
 const router = useRouter()
 const gameStore = useGameStore()
+const i18n = useI18nStore()
 const toast = useToastStore()
 const processing = ref(false)
 
@@ -22,7 +24,7 @@ async function proceedToPayment() {
   try {
     router.push('/payment')
   } catch (err) {
-    toast.error('Failed to proceed to payment')
+    toast.error(i18n.t('checkout.toast.proceedError'))
     processing.value = false
   }
 }
@@ -44,8 +46,8 @@ async function proceedToPayment() {
     <div class="animate-fade-in" v-if="order">
       <!-- Header -->
       <div class="mb-8">
-        <h1 class="text-3xl font-bold text-surface-900 dark:text-surface-100">Order Summary</h1>
-        <p class="mt-1 text-surface-500 dark:text-surface-400">Please review your order before proceeding to payment.</p>
+        <h1 class="text-3xl font-bold text-surface-900 dark:text-surface-100">{{ i18n.t('checkout.title') }}</h1>
+        <p class="mt-1 text-surface-500 dark:text-surface-400">{{ i18n.t('checkout.subtitle') }}</p>
       </div>
 
       <!-- Order Details -->
@@ -59,7 +61,7 @@ async function proceedToPayment() {
             </svg>
           </div>
           <div>
-            <p class="text-sm text-surface-500 dark:text-surface-400">Game</p>
+            <p class="text-sm text-surface-500 dark:text-surface-400">{{ i18n.t('checkout.game') }}</p>
             <p class="font-semibold text-surface-900 dark:text-surface-100">{{ order.gameName }}</p>
           </div>
         </div>
@@ -67,7 +69,7 @@ async function proceedToPayment() {
         <!-- Package -->
         <div class="flex items-center justify-between pb-5 border-b border-surface-200 dark:border-surface-700">
           <div>
-            <p class="text-sm text-surface-500 dark:text-surface-400">Package</p>
+            <p class="text-sm text-surface-500 dark:text-surface-400">{{ i18n.t('checkout.package') }}</p>
             <p class="font-semibold text-surface-900 dark:text-surface-100">{{ order.productName }}</p>
           </div>
           <span class="text-lg font-bold text-primary-500 dark:text-primary-400">
@@ -78,25 +80,25 @@ async function proceedToPayment() {
         <!-- Player ID -->
         <div class="flex items-center justify-between pb-5 border-b border-surface-200 dark:border-surface-700">
           <div>
-            <p class="text-sm text-surface-500 dark:text-surface-400">Player ID</p>
+            <p class="text-sm text-surface-500 dark:text-surface-400">{{ i18n.t('checkout.playerId') }}</p>
             <p class="font-mono font-semibold text-surface-900 dark:text-surface-100">{{ order.playerId }}</p>
           </div>
           <button class="text-xs text-primary-500 hover:text-primary-600 font-medium">
-            Edit
+            {{ i18n.t('checkout.edit') }}
           </button>
         </div>
 
         <!-- Server ID (if present) -->
         <div v-if="order.serverId" class="flex items-center justify-between pb-5 border-b border-surface-200 dark:border-surface-700">
           <div>
-            <p class="text-sm text-surface-500 dark:text-surface-400">Server ID</p>
+            <p class="text-sm text-surface-500 dark:text-surface-400">{{ i18n.t('checkout.serverId') }}</p>
             <p class="font-mono font-semibold text-surface-900 dark:text-surface-100">{{ order.serverId }}</p>
           </div>
         </div>
 
         <!-- Total -->
         <div class="flex items-center justify-between pt-2">
-          <p class="text-lg font-semibold text-surface-900 dark:text-surface-100">Total</p>
+          <p class="text-lg font-semibold text-surface-900 dark:text-surface-100">{{ i18n.t('checkout.total') }}</p>
           <p class="text-2xl font-bold text-primary-500 dark:text-primary-400">
             ${{ order.amount.toFixed(2) }}
           </p>
@@ -107,7 +109,7 @@ async function proceedToPayment() {
           <svg class="w-4 h-4 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M12 2a10 10 0 100 20 10 10 0 000-20z" />
           </svg>
-          <p>Payment is processed through Bakong KHQR. You'll scan the QR code with your banking app to complete the payment.</p>
+          <p>{{ i18n.t('checkout.paymentInfo') }}</p>
         </div>
       </div>
 
@@ -117,7 +119,7 @@ async function proceedToPayment() {
           @click="router.back()"
           class="btn-secondary flex-1"
         >
-          Cancel
+          {{ i18n.t('checkout.cancel') }}
         </button>
         <button
           @click="proceedToPayment"
@@ -128,7 +130,7 @@ async function proceedToPayment() {
             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
           </svg>
-          {{ processing ? 'Processing...' : 'Proceed to Payment' }}
+          {{ processing ? i18n.t('checkout.processing') : i18n.t('checkout.proceedPayment') }}
         </button>
       </div>
     </div>

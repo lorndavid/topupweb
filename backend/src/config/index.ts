@@ -8,6 +8,11 @@ export const config = {
   nodeEnv: process.env.NODE_ENV || 'development',
   frontendUrl: process.env.FRONTEND_URL || 'http://localhost:5173',
 
+  mongodb: {
+    uri: process.env.MONGODB_URI || '',
+    dbName: process.env.MONGODB_DB_NAME || 'gametopup',
+  },
+
   bay2game: {
     apiUrl: process.env.BAY2GAME_API_URL || 'https://api.bay2game.xyz',
     apiKey: process.env.BAY2GAME_API_KEY || '',
@@ -39,7 +44,10 @@ export function validateConfig(): void {
     ['BAY2GAME_API_KEY', config.bay2game.apiKey],
     ['BAKONG_API_TOKEN', config.bakong.apiToken],
     ['MERCHANT_BAKONG_ID', config.merchant.bakongId],
+    ['MONGODB_URI', config.mongodb.uri],
   ];
+
+
 
   const missing = required.filter(([, value]) => !value).map(([key]) => key);
 

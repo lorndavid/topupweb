@@ -1,0 +1,301 @@
+export type Locale = 'en' | 'km'
+
+export type TranslationKey = keyof typeof en
+
+export const en = {
+  // Navbar
+  'nav.home': 'Home',
+  'nav.langToggle': 'KH',
+  'nav.darkMode': 'Switch to dark mode',
+  'nav.lightMode': 'Switch to light mode',
+
+  // Home - Hero
+  'hero.badge': '+ Games Available',
+  'hero.title': 'Top Up Your',
+  'hero.titleHighlight': 'Favorite Games',
+  'hero.subtitle': 'Fast, secure, and affordable game top-up services. Support for 204+ games across all regions and servers.',
+  'hero.instantDelivery': 'Instant Delivery',
+  'hero.securePayment': 'Secure Payment',
+  'hero.bestPrices': 'Best Prices',
+
+  // Home - Search & Filter
+  'search.placeholder': 'Search games...',
+  'search.all': 'All',
+  'search.games': 'games',
+  'search.of': 'of',
+  'search.noResults': 'No games found for',
+  'search.clearSearch': 'Clear search',
+  'search.noGames': 'No games available at the moment.',
+
+  // Home - Section titles
+  'home.popularGames': 'Popular Games',
+  'home.games': 'Games',
+
+  // Home - Features
+  'features.instantDelivery.title': 'Instant Delivery',
+  'features.instantDelivery.desc': 'Get your items delivered instantly after payment confirmation.',
+  'features.securePayment.title': 'Secure Payment',
+  'features.securePayment.desc': 'Payments processed through Bakong KHQR with bank-grade security.',
+  'features.bestPrices.title': 'Best Prices',
+  'features.bestPrices.desc': 'Competitive prices with regular promotions and discounts.',
+
+  // Game Detail
+  'detail.back': 'Back',
+  'detail.selectPackage': 'Select a Package',
+  'detail.playerInfo': 'Player Information',
+  'detail.playerId': 'Player ID',
+  'detail.playerIdPlaceholder': 'Enter your Player ID',
+  'detail.playerIdHint': 'Usually found in your game profile',
+  'detail.serverId': 'Server ID',
+  'detail.serverIdPlaceholder': 'Enter your Server ID',
+  'detail.serverIdHint': 'Required for this game',
+  'detail.selectedPackage': 'Selected Package',
+  'detail.selectPackageHint': 'Select a package to continue',
+  'detail.continueCheckout': 'Continue to Checkout',
+  'detail.toast.selectPackage': 'Please select a package first',
+  'detail.toast.enterPlayerId': 'Please enter your Player ID',
+  'detail.toast.enterServerId': 'Please enter your Server ID',
+  'detail.tryAgain': 'Try Again',
+  'detail.available': 'Available',
+  'detail.topUp': 'Top Up',
+
+  // Checkout
+  'checkout.title': 'Order Summary',
+  'checkout.subtitle': 'Please review your order before proceeding to payment.',
+  'checkout.game': 'Game',
+  'checkout.package': 'Package',
+  'checkout.playerId': 'Player ID',
+  'checkout.serverId': 'Server ID',
+  'checkout.total': 'Total',
+  'checkout.edit': 'Edit',
+  'checkout.cancel': 'Cancel',
+  'checkout.proceedPayment': 'Proceed to Payment',
+  'checkout.processing': 'Processing...',
+  'checkout.paymentInfo': "Payment is processed through Bakong KHQR. You'll scan the QR code with your banking app to complete the payment.",
+  'checkout.toast.proceedError': 'Failed to proceed to payment',
+
+  // Payment
+  'payment.scanToPay': 'Scan to Pay',
+  'payment.scanHint': 'Scan the QR code with your Bakong app to complete payment',
+  'payment.expiresIn': 'Payment expires in',
+  'payment.amountToPay': 'Amount to Pay',
+  'payment.reference': 'Reference',
+  'payment.copyReference': 'Copy reference',
+  'payment.status': 'Payment Status',
+  'payment.waiting': 'Waiting for payment...',
+  'payment.awaiting': 'Awaiting',
+  'payment.generatingQR': 'Generating payment QR code...',
+  'payment.tryAgain': 'Try Again',
+  'payment.toast.copySuccess': 'Reference copied to clipboard',
+  'payment.toast.copyFailed': 'Failed to copy',
+  'payment.toast.paymentReceived': 'Payment received! Processing your top-up...',
+  'payment.toast.paymentFailed': 'Payment failed. Please try again.',
+  'payment.toast.timeExpired': 'Payment time expired. Please try again.',
+  'payment.toast.createFailed': 'Failed to create payment',
+
+  // Payment Instructions
+  'payment.instruction1': 'Open your Bakong or mobile banking app',
+  'payment.instruction2': 'Select "Scan QR" or "KHQR" payment option',
+  'payment.instruction3': 'Scan the QR code above and confirm payment',
+  'payment.instruction4': 'Wait for automatic confirmation. Your top-up will be processed instantly.',
+
+  // Payment Success
+  'success.title': 'Payment Successful!',
+  'success.message': 'Your payment has been received. Redirecting to order status...',
+  'success.reference': 'Reference',
+  'success.toast.message': 'Payment successful! Redirecting to order status...',
+
+  // Order Status
+  'order.loading': 'Loading order details...',
+  'order.backToHome': 'Back to Home',
+  'order.topUpPrefix': 'Top-Up',
+  'order.game': 'Game',
+  'order.package': 'Package',
+  'order.playerId': 'Player ID',
+  'order.server': 'Server',
+  'order.amount': 'Amount',
+  'order.payment': 'Payment',
+  'order.status': 'Status',
+  'order.completed': 'Completed',
+  'order.topUpAgain': 'Top Up Again',
+  'order.refreshStatus': 'Refresh Status',
+  'order.tryAgain': 'Try Again',
+  'order.noReference': 'No reference provided',
+  'order.fetchError': 'Failed to fetch order',
+  'order.reference': 'Reference',
+
+  // Order Status Labels
+  'order.status.awaiting_payment': 'Awaiting Payment',
+  'order.status.paid': 'Payment Received - Processing',
+  'order.status.processing': 'Processing Top-Up',
+  'order.status.completed': 'Completed',
+  'order.status.failed': 'Failed',
+  'order.status.unknown': 'Unknown',
+
+  // Footer
+  'footer.tagline': 'Premium game top-up services. Fast, secure, and affordable.',
+  'footer.quickLinks': 'Quick Links',
+  'footer.home': 'Home',
+  'footer.support': 'Support',
+  'footer.faq': 'FAQ',
+  'footer.paymentMethods': 'Payment Methods',
+  'footer.copyright': 'All rights reserved. This is a local development project.',
+
+  // Common
+  'common.tryAgain': 'Try Again',
+  'common.back': 'Back',
+  'common.edit': 'Edit',
+  'common.cancel': 'Cancel',
+  'common.confirm': 'Confirm',
+  'common.loading': 'Loading...',
+}
+
+export const km: Record<TranslationKey, string> = {
+  // Navbar
+  'nav.home': 'ទំព័រដើម',
+  'nav.langToggle': 'EN',
+  'nav.darkMode': 'ប្តូរទៅរបៀបងងឹត',
+  'nav.lightMode': 'ប្តូរទៅរបៀបភ្លឺ',
+
+  // Home - Hero
+  'hero.badge': '+ ហ្គេមដែលអាចប្រើបាន',
+  'hero.title': 'បញ្ចូលទឹកប្រាក់ហ្គេម',
+  'hero.titleHighlight': 'ហ្គេមដែលអ្នកចូលចិត្ត',
+  'hero.subtitle': 'សេវាកម្មបញ្ចូលទឹកប្រាក់ហ្គេមលឿន មានសុវត្ថិភាព និងតម្លៃសមរម្យ។ គាំទ្រហ្គេមជាង ២០៤ នៅគ្រប់តំបន់ និងម៉ាស៊ីនមេ។',
+  'hero.instantDelivery': 'បញ្ជូនភ្លាមៗ',
+  'hero.securePayment': 'ការទូទាត់សុវត្ថិភាព',
+  'hero.bestPrices': 'តម្លៃល្អបំផុត',
+
+  // Home - Search & Filter
+  'search.placeholder': 'ស្វែងរកហ្គេម...',
+  'search.all': 'ទាំងអស់',
+  'search.games': 'ហ្គេម',
+  'search.of': 'ក្នុងចំណោម',
+  'search.noResults': 'រកមិនឃើញហ្គេមសម្រាប់',
+  'search.clearSearch': 'សម្អាតការស្វែងរក',
+  'search.noGames': 'មិនមានហ្គេមនៅពេលនេះទេ។',
+
+  // Home - Section titles
+  'home.popularGames': 'ហ្គេមពេញនិយម',
+  'home.games': 'ហ្គេម',
+
+  // Home - Features
+  'features.instantDelivery.title': 'បញ្ជូនភ្លាមៗ',
+  'features.instantDelivery.desc': 'ទទួលបានរបស់របររបស់អ្នកភ្លាមៗបន្ទាប់ពីការទូទាត់ត្រូវបានបញ្ជាក់។',
+  'features.securePayment.title': 'ការទូទាត់សុវត្ថិភាព',
+  'features.securePayment.desc': 'ការទូទាត់ត្រូវបានដំណើរការតាមរយៈ Bakong KHQR ជាមួយនឹងសុវត្ថិភាពកម្រិតធនាគារ។',
+  'features.bestPrices.title': 'តម្លៃល្អបំផុត',
+  'features.bestPrices.desc': 'តម្លៃប្រកួតប្រជែងជាមួយការផ្តល់ជូនពិសេស និងបញ្ចុះតម្លៃជាប្រចាំ។',
+
+  // Game Detail
+  'detail.back': 'ត្រឡប់ក្រោយ',
+  'detail.selectPackage': 'ជ្រើសរើសកញ្ចប់',
+  'detail.playerInfo': 'ព័ត៌មានអ្នកលេង',
+  'detail.playerId': 'លេខសម្គាល់អ្នកលេង',
+  'detail.playerIdPlaceholder': 'បញ្ចូលលេខសម្គាល់អ្នកលេង',
+  'detail.playerIdHint': 'ជាទូទៅរកឃើញនៅក្នុងប្រវត្តិរូបហ្គេមរបស់អ្នក។',
+  'detail.serverId': 'លេខសម្គាល់ម៉ាស៊ីនមេ',
+  'detail.serverIdPlaceholder': 'បញ្ចូលលេខសម្គាល់ម៉ាស៊ីនមេ',
+  'detail.serverIdHint': 'តម្រូវសម្រាប់ហ្គេមនេះ',
+  'detail.selectedPackage': 'កញ្ចប់ដែលបានជ្រើសរើស',
+  'detail.selectPackageHint': 'ជ្រើសរើសកញ្ចប់ដើម្បីបន្ត',
+  'detail.continueCheckout': 'បន្តទៅការទូទាត់',
+  'detail.toast.selectPackage': 'សូមជ្រើសរើសកញ្ចប់ជាមុនសិន',
+  'detail.toast.enterPlayerId': 'សូមបញ្ចូលលេខសម្គាល់អ្នកលេង',
+  'detail.toast.enterServerId': 'សូមបញ្ចូលលេខសម្គាល់ម៉ាស៊ីនមេ',
+  'detail.tryAgain': 'ព្យាយាមម្តងទៀត',
+  'detail.available': 'មាន',
+  'detail.topUp': 'បញ្ចូលទឹកប្រាក់',
+
+  // Checkout
+  'checkout.title': 'សេចក្តីសង្ខេបការបញ្ជាទិញ',
+  'checkout.subtitle': 'សូមពិនិត្យមើលការបញ្ជាទិញរបស់អ្នកមុនពេលបន្តការទូទាត់។',
+  'checkout.game': 'ហ្គេម',
+  'checkout.package': 'កញ្ចប់',
+  'checkout.playerId': 'លេខសម្គាល់អ្នកលេង',
+  'checkout.serverId': 'លេខសម្គាល់ម៉ាស៊ីនមេ',
+  'checkout.total': 'សរុប',
+  'checkout.edit': 'កែសម្រួល',
+  'checkout.cancel': 'បោះបង់',
+  'checkout.proceedPayment': 'បន្តការទូទាត់',
+  'checkout.processing': 'កំពុងដំណើរការ...',
+  'checkout.paymentInfo': 'ការទូទាត់ត្រូវបានដំណើរការតាមរយៈ Bakong KHQR។ អ្នកនឹងស្កេន QR កូដជាមួយកម្មវិធីធនាគាររបស់អ្នកដើម្បីបញ្ចប់ការទូទាត់។',
+  'checkout.toast.proceedError': 'បរាជ័យក្នុងការបន្តការទូទាត់',
+
+  // Payment
+  'payment.scanToPay': 'ស្កេនដើម្បីទូទាត់',
+  'payment.scanHint': 'ស្កេន QR កូដជាមួយកម្មវិធី Bakong របស់អ្នកដើម្បីបញ្ចប់ការទូទាត់',
+  'payment.expiresIn': 'ផុតកំណត់ក្នុងរយៈពេល',
+  'payment.amountToPay': 'ចំនួនទឹកប្រាក់ត្រូវទូទាត់',
+  'payment.reference': 'អត្តលេខ',
+  'payment.copyReference': 'ចម្លងអត្តលេខ',
+  'payment.status': 'ស្ថានភាពការទូទាត់',
+  'payment.waiting': 'កំពុងរង់ចាំការទូទាត់...',
+  'payment.awaiting': 'កំពុងរង់ចាំ',
+  'payment.generatingQR': 'កំពុងបង្កើត QR កូដទូទាត់...',
+  'payment.tryAgain': 'ព្យាយាមម្តងទៀត',
+  'payment.toast.copySuccess': 'បានចម្លងអត្តលេខទៅក្ដារតម្បៀតខ្ទាស់',
+  'payment.toast.copyFailed': 'បរាជ័យក្នុងការចម្លង',
+  'payment.toast.paymentReceived': 'ទទួលបានការទូទាត់ហើយ! កំពុងដំណើរការបញ្ចូលទឹកប្រាក់របស់អ្នក...',
+  'payment.toast.paymentFailed': 'ការទូទាត់បរាជ័យ។ សូមព្យាយាមម្តងទៀត។',
+  'payment.toast.timeExpired': 'ពេលវេលាទូទាត់បានផុតកំណត់ហើយ។ សូមព្យាយាមម្តងទៀត។',
+  'payment.toast.createFailed': 'បរាជ័យក្នុងការបង្កើតការទូទាត់',
+
+  // Payment Instructions
+  'payment.instruction1': 'បើកកម្មវិធី Bakong ឬកម្មវិធីធនាគាររបស់អ្នក',
+  'payment.instruction2': 'ជ្រើសរើសជម្រើស "ស្កេន QR" ឬ "KHQR"',
+  'payment.instruction3': 'ស្កេន QR កូដខាងលើ ហើយបញ្ជាក់ការទូទាត់',
+  'payment.instruction4': 'រង់ចាំការបញ្ជាក់ដោយស្វ័យប្រវត្តិ។ ការបញ្ចូលទឹកប្រាក់របស់អ្នកនឹងត្រូវបានដំណើរការភ្លាមៗ។',
+
+  // Payment Success
+  'success.title': 'ការទូទាត់បានជោគជ័យ!',
+  'success.message': 'ការទូទាត់របស់អ្នកត្រូវបានទទួលហើយ។ កំពុងបញ្ជូនទៅកាន់ស្ថានភាពការបញ្ជាទិញ...',
+  'success.reference': 'អត្តលេខ',
+  'success.toast.message': 'ការទូទាត់បានជោគជ័យ! កំពុងបញ្ជូនទៅកាន់ស្ថានភាពការបញ្ជាទិញ...',
+
+  // Order Status
+  'order.loading': 'កំពុងផ្ទុកព័ត៌មានលម្អិតនៃការបញ្ជាទិញ...',
+  'order.backToHome': 'ត្រឡប់ទៅទំព័រដើម',
+  'order.topUpPrefix': 'បញ្ចូលទឹកប្រាក់',
+  'order.game': 'ហ្គេម',
+  'order.package': 'កញ្ចប់',
+  'order.playerId': 'លេខសម្គាល់អ្នកលេង',
+  'order.server': 'ម៉ាស៊ីនមេ',
+  'order.amount': 'ចំនួនទឹកប្រាក់',
+  'order.payment': 'ការទូទាត់',
+  'order.status': 'ស្ថានភាព',
+  'order.completed': 'បានបញ្ចប់',
+  'order.topUpAgain': 'បញ្ចូលទឹកប្រាក់ម្តងទៀត',
+  'order.refreshStatus': 'ធ្វើឱ្យស្ថានភាពស្រស់',
+  'order.tryAgain': 'ព្យាយាមម្តងទៀត',
+  'order.noReference': 'គ្មានអត្តលេខ',
+  'order.fetchError': 'បរាជ័យក្នុងការទាញយកការបញ្ជាទិញ',
+  'order.reference': 'អត្តលេខ',
+
+  // Order Status Labels
+  'order.status.awaiting_payment': 'កំពុងរង់ចាំការទូទាត់',
+  'order.status.paid': 'ទទួលបានការទូទាត់ - កំពុងដំណើរការ',
+  'order.status.processing': 'កំពុងដំណើរការបញ្ចូលទឹកប្រាក់',
+  'order.status.completed': 'បានបញ្ចប់',
+  'order.status.failed': 'បរាជ័យ',
+  'order.status.unknown': 'មិនស្គាល់',
+
+  // Footer
+  'footer.tagline': 'សេវាកម្មបញ្ចូលទឹកប្រាក់ហ្គេមកម្រិតខ្ពស់។ លឿន មានសុវត្ថិភាព និងតម្លៃសមរម្យ។',
+  'footer.quickLinks': 'តំណរភ្ជាប់រហ័ស',
+  'footer.home': 'ទំព័រដើម',
+  'footer.support': 'ជំនួយ',
+  'footer.faq': 'សំណួរគេសួរញឹកញាប់',
+  'footer.paymentMethods': 'វិធីសាស្រ្តទូទាត់',
+  'footer.copyright': 'រក្សាសិទ្ធិគ្រប់យ៉ាង។ នេះជាគម្រោងអភិវឌ្ឍន៍ក្នុងមូលដ្ឋាន។',
+
+  // Common
+  'common.tryAgain': 'ព្យាយាមម្តងទៀត',
+  'common.back': 'ត្រឡប់ក្រោយ',
+  'common.edit': 'កែសម្រួល',
+  'common.cancel': 'បោះបង់',
+  'common.confirm': 'បញ្ជាក់',
+  'common.loading': 'កំពុងផ្ទុក...',
+}
+
+export const translations = { en, km }

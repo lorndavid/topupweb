@@ -1,17 +1,19 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { useI18nStore } from '@/stores/i18n'
 import { useToastStore } from '@/stores/toast'
 
 const route = useRoute()
 const router = useRouter()
+const i18n = useI18nStore()
 const toast = useToastStore()
 
 const reference = ref(route.query.reference as string || '')
 
 onMounted(() => {
   if (reference.value) {
-    toast.success('Payment successful! Redirecting to order status...')
+    toast.success(i18n.t('success.toast.message'))
     setTimeout(() => {
       router.push(`/order/${reference.value}`)
     }, 2000)
@@ -26,13 +28,13 @@ onMounted(() => {
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
       </svg>
     </div>
-    <h1 class="text-3xl font-bold text-surface-900 dark:text-surface-100 mb-3">Payment Successful!</h1>
+    <h1 class="text-3xl font-bold text-surface-900 dark:text-surface-100 mb-3">{{ i18n.t('success.title') }}</h1>
     <p class="text-surface-500 dark:text-surface-400 mb-6">
-      Your payment has been received. Redirecting to order status...
+      {{ i18n.t('success.message') }}
     </p>
     <div class="w-8 h-8 mx-auto border-2 border-primary-200 border-t-primary-500 rounded-full animate-spin"></div>
     <p v-if="reference" class="mt-4 text-sm text-surface-400 dark:text-surface-500 font-mono">
-      Reference: {{ reference }}
+      {{ i18n.t('success.reference') }}: {{ reference }}
     </p>
   </div>
 </template>

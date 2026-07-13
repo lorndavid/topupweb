@@ -2,6 +2,7 @@
 import { onMounted, ref, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useGameStore } from '@/stores/game'
+import { useI18nStore } from '@/stores/i18n'
 import { useToastStore } from '@/stores/toast'
 import ProductCard from '@/components/ProductCard.vue'
 import LoadingSkeleton from '@/components/LoadingSkeleton.vue'
@@ -10,6 +11,7 @@ import type { GameProduct } from '@/types'
 const route = useRoute()
 const router = useRouter()
 const gameStore = useGameStore()
+const i18n = useI18nStore()
 const toast = useToastStore()
 
 const gameCode = computed(() => route.params.gameCode as string)
@@ -28,15 +30,15 @@ function selectProduct(product: GameProduct) {
 
 function proceedToCheckout() {
   if (!selectedProduct.value) {
-    toast.warning('Please select a package first')
+    toast.warning(i18n.t('detail.toast.selectPackage'))
     return
   }
   if (!playerId.value.trim()) {
-    toast.warning('Please enter your Player ID')
+    toast.warning(i18n.t('detail.toast.enterPlayerId'))
     return
   }
   if (needsServerId.value && !serverId.value.trim()) {
-    toast.warning('Please enter your Server ID')
+    toast.warning(i18n.t('detail.toast.enterServerId'))
     return
   }
 
@@ -70,7 +72,7 @@ onMounted(() => {
       <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
       </svg>
-      Back
+      {{ i18n.t('detail.back') }}
     </button>
 
     <!-- Loading State -->
@@ -100,7 +102,7 @@ onMounted(() => {
         @click="gameStore.fetchProducts(gameCode)"
         class="btn-primary text-sm"
       >
-        Try Again
+        {{ i18n.t('detail.tryAgain') }}
       </button>
     </div>
 
@@ -132,7 +134,7 @@ onMounted(() => {
         <!-- Products List -->
         <div class="lg:col-span-2 space-y-6">
           <h2 class="text-lg font-semibold text-surface-900 dark:text-surface-100">
-            Select a Package
+            {{ i18n.t('detail.selectPackage') }}
           </h2>
           <div class="space-y-3">
             <ProductCard
@@ -149,51 +151,51 @@ onMounted(() => {
         <div class="lg:col-span-1">
           <div class="card p-6 sticky top-24 space-y-5">
             <h3 class="font-semibold text-surface-900 dark:text-surface-100">
-              Player Information
+              {{ i18n.t('detail.playerInfo') }}
             </h3>
 
             <!-- Player ID -->
             <div>
               <label class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1.5">
-                Player ID <span class="text-red-500">*</span>
+                {{ i18n.t('detail.playerId') }} <span class="text-red-500">*</span>
               </label>
               <input
                 v-model="playerId"
                 type="text"
-                placeholder="Enter your Player ID"
+                :placeholder="i18n.t('detail.playerIdPlaceholder')"
                 class="input-field"
               />
               <p class="mt-1 text-xs text-surface-400 dark:text-surface-500">
-                Usually found in your game profile
+                {{ i18n.t('detail.playerIdHint') }}
               </p>
             </div>
 
             <!-- Server ID (conditional) -->
             <div v-if="needsServerId">
               <label class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1.5">
-                Server ID <span class="text-red-500">*</span>
+                {{ i18n.t('detail.serverId') }} <span class="text-red-500">*</span>
               </label>
               <input
                 v-model="serverId"
                 type="text"
-                placeholder="Enter your Server ID"
+                :placeholder="i18n.t('detail.serverIdPlaceholder')"
                 class="input-field"
               />
               <p class="mt-1 text-xs text-surface-400 dark:text-surface-500">
-                Required for this game
+                {{ i18n.t('detail.serverIdHint') }}
               </p>
             </div>
 
             <!-- Selected Package -->
             <div v-if="selectedProduct" class="p-3 bg-surface-50 dark:bg-surface-800 rounded-xl">
-              <p class="text-xs text-surface-500 dark:text-surface-400 uppercase tracking-wider">Selected Package</p>
+              <p class="text-xs text-surface-500 dark:text-surface-400 uppercase tracking-wider">{{ i18n.t('detail.selectedPackage') }}</p>
               <p class="mt-1 font-semibold text-surface-900 dark:text-surface-100">{{ selectedProduct.name }}</p>
               <p class="text-lg font-bold text-primary-500 dark:text-primary-400">
                 ${{ selectedProduct.sell_price.toFixed(2) }}
               </p>
             </div>
             <p v-else class="text-sm text-surface-400 dark:text-surface-500 text-center py-3">
-              Select a package to continue
+              {{ i18n.t('detail.selectPackageHint') }}
             </p>
 
             <!-- Proceed Button -->
@@ -202,7 +204,7 @@ onMounted(() => {
               :disabled="!selectedProduct || !playerId.trim()"
               class="btn-primary w-full"
             >
-              Continue to Checkout
+              {{ i18n.t('detail.continueCheckout') }}
               <svg class="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
               </svg>

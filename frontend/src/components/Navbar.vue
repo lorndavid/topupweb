@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { useI18nStore } from '@/stores/i18n'
 
 const props = defineProps<{
   isDark: boolean
@@ -12,11 +13,7 @@ const emit = defineEmits<{
 
 const router = useRouter()
 const mobileMenuOpen = ref(false)
-const currentLang = ref<'en' | 'km'>('en')
-
-function toggleLang() {
-  currentLang.value = currentLang.value === 'en' ? 'km' : 'en'
-}
+const i18n = useI18nStore()
 </script>
 
 <template>
@@ -38,7 +35,7 @@ function toggleLang() {
         <!-- Desktop Nav -->
         <nav class="hidden md:flex items-center gap-1">
           <router-link to="/" class="px-4 py-2 text-sm font-medium text-surface-600 dark:text-surface-400 hover:text-surface-900 dark:hover:text-surface-100 rounded-lg hover:bg-surface-100 dark:hover:bg-surface-800 transition-all duration-200">
-            {{ currentLang === 'en' ? 'Home' : 'ទំព័រដើម' }}
+            {{ i18n.t('nav.home') }}
           </router-link>
         </nav>
 
@@ -46,17 +43,17 @@ function toggleLang() {
         <div class="flex items-center gap-2">
           <!-- Language Toggle -->
           <button
-            @click="toggleLang"
-            class="px-3 py-1.5 text-xs font-medium rounded-lg border border-surface-200 dark:border-surface-700 text-surface-600 dark:text-surface-400 hover:bg-surface-100 dark:hover:bg-surface-800 transition-all duration-200"
+            @click="i18n.toggleLocale()"
+            class="px-3 py-1.5 text-xs font-medium rounded-lg border border-surface-200 dark:border-surface-700 text-surface-600 dark:text-surface-400 hover:bg-surface-100 dark:hover:bg-surface-800 transition-all duration-200 font-khmer"
           >
-            {{ currentLang === 'en' ? 'KH' : 'EN' }}
+            {{ i18n.t('nav.langToggle') }}
           </button>
 
           <!-- Dark Mode Toggle -->
           <button
             @click="emit('toggle-dark')"
             class="p-2 rounded-lg text-surface-500 dark:text-surface-400 hover:bg-surface-100 dark:hover:bg-surface-800 transition-all duration-200"
-            :title="isDark ? 'Switch to light mode' : 'Switch to dark mode'"
+            :title="isDark ? i18n.t('nav.lightMode') : i18n.t('nav.darkMode')"
           >
             <!-- Sun icon -->
             <svg v-if="isDark" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -93,7 +90,7 @@ function toggleLang() {
           @click="mobileMenuOpen = false"
           class="block px-4 py-2 text-sm font-medium text-surface-600 dark:text-surface-400 hover:text-surface-900 dark:hover:text-surface-100 rounded-lg hover:bg-surface-100 dark:hover:bg-surface-800 transition-all duration-200"
         >
-          {{ currentLang === 'en' ? 'Home' : 'ទំព័រដើម' }}
+          {{ i18n.t('nav.home') }}
         </router-link>
       </div>
     </div>

@@ -2,11 +2,13 @@
 import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useGameStore } from '@/stores/game'
+import { useI18nStore } from '@/stores/i18n'
 import { useToastStore } from '@/stores/toast'
 import { createPayment, getPaymentStatus } from '@/services/api'
 
 const router = useRouter()
 const gameStore = useGameStore()
+const i18n = useI18nStore()
 const toast = useToastStore()
 
 const order = computed(() => gameStore.currentOrder)
@@ -59,7 +61,7 @@ async function initPayment() {
     startPolling()
     startTimer()
   } catch (err) {
-    error.value = err instanceof Error ? err.message : 'Failed to create payment'
+    error.value = err instanceof Error ? err.message : i18n.t('payment.toast.createFailed')
     toast.error(error.value)
   } finally {
     loading.value = false
@@ -76,12 +78,12 @@ function startPolling() {
 
       if (status.payment_status === 'paid') {
         stopPolling()
-        toast.success('Payment received! Processing your top-up...')
+        toast.success(i18n.t('payment.toast.paymentReceived'))
         gameStore.clearOrder()
         router.push(`/order/${paymentRef.value}`)
       } else if (status.payment_status === 'failed') {
         stopPolling()
-        toast.error('Payment failed. Please try again.')
+        toast.error(i18n.t('payment.toast.paymentFailed'))
       }
     } catch {
       // Silently retry on error
@@ -105,7 +107,7 @@ function startTimer() {
     timeLeft.value--
     if (timeLeft.value <= 0) {
       stopPolling()
-      toast.error('Payment time expired. Please try again.')
+      toast.error(i18n.t('payment.toast.timeExpired'))
       router.push('/')
     }
   }, 1000)
@@ -113,9 +115,9 @@ function startTimer() {
 
 function copyReference() {
   navigator.clipboard.writeText(paymentRef.value).then(() => {
-    toast.success('Reference copied to clipboard')
+    toast.success(i18n.t('payment.toast.copySuccess'))
   }).catch(() => {
-    toast.error('Failed to copy')
+    toast.error(i18n.t('payment.toast.copyFailed'))
   })
 }
 
@@ -133,7 +135,7 @@ onUnmounted(() => {
     <!-- Loading State -->
     <div v-if="loading" class="text-center py-16 space-y-4">
       <div class="w-16 h-16 mx-auto rounded-full border-4 border-primary-200 dark:border-primary-800 border-t-primary-500 animate-spin"></div>
-      <p class="text-surface-500 dark:text-surface-400">Generating payment QR code...</p>
+      <p class="text-surface-500 dark:text-surface-400">{{ i18n.t('payment.generatingQR') }}</p>
     </div>
 
     <!-- Error State -->
@@ -144,21 +146,21 @@ onUnmounted(() => {
         </svg>
       </div>
       <p class="text-surface-500 dark:text-surface-400 mb-4">{{ error }}</p>
-      <button @click="initPayment" class="btn-primary text-sm">Try Again</button>
+      <button @click="initPayment" class="btn-primary text-sm">{{ i18n.t('payment.tryAgain') }}</button>
     </div>
 
     <!-- Payment QR -->
     <div v-else class="animate-fade-in">
       <div class="text-center mb-8">
-        <h1 class="text-2xl font-bold text-surface-900 dark:text-surface-100">Scan to Pay</h1>
-        <p class="mt-1 text-surface-500 dark:text-surface-400">Scan the QR code with your Bakong app to complete payment</p>
+        <h1 class="text-2xl font-bold text-surface-900 dark:text-surface-100">{{ i18n.t('payment.scanToPay') }}</h1>
+        <p class="mt-1 text-surface-500 dark:text-surface-400">{{ i18n.t('payment.scanHint') }}</p>
       </div>
 
       <div class="card p-6 sm:p-8">
         <!-- Timer -->
         <div class="mb-6">
           <div class="flex items-center justify-between mb-2">
-            <span class="text-sm text-surface-500 dark:text-surface-400">Payment expires in</span>
+            <span class="text-sm text-surface-500 dark:text-surface-400">{{ i18n.t('payment.expiresIn') }}</span>
             <span :class="[
               'text-lg font-mono font-bold',
               timeLeft < 60 ? 'text-red-500 animate-pulse' : 'text-surface-900 dark:text-surface-100'
@@ -197,7 +199,7 @@ onUnmounted(() => {
 
         <!-- Amount -->
         <div class="text-center mb-6">
-          <p class="text-sm text-surface-500 dark:text-surface-400">Amount to Pay</p>
+          <p class="text-sm text-surface-500 dark:text-surface-400">{{ i18n.t('payment.amountToPay') }}</p>
           <p class="text-3xl font-bold text-surface-900 dark:text-surface-100">
             ${{ amount.toFixed(2) }}
           </p>
@@ -210,13 +212,13 @@ onUnmounted(() => {
         <div class="p-3 bg-surface-50 dark:bg-surface-800 rounded-xl">
           <div class="flex items-center justify-between">
             <div>
-              <p class="text-xs text-surface-500 dark:text-surface-400">Reference</p>
+              <p class="text-xs text-surface-500 dark:text-surface-400">{{ i18n.t('payment.reference') }}</p>
               <p class="text-sm font-mono font-medium text-surface-900 dark:text-surface-100">{{ paymentRef }}</p>
             </div>
             <button
               @click="copyReference"
               class="p-2 text-surface-400 hover:text-surface-600 dark:hover:text-surface-300 hover:bg-surface-200 dark:hover:bg-surface-700 rounded-lg transition-all"
-              title="Copy reference"
+              :title="i18n.t('payment.copyReference')"
             >
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
@@ -230,12 +232,12 @@ onUnmounted(() => {
       <div class="mt-6 card p-4">
         <div class="flex items-center gap-3">
           <div class="flex-1">
-            <p class="text-sm font-medium text-surface-900 dark:text-surface-100">Payment Status</p>
-            <p class="text-xs text-surface-500 dark:text-surface-400">Waiting for payment...</p>
+            <p class="text-sm font-medium text-surface-900 dark:text-surface-100">{{ i18n.t('payment.status') }}</p>
+            <p class="text-xs text-surface-500 dark:text-surface-400">{{ i18n.t('payment.waiting') }}</p>
           </div>
           <div class="flex items-center gap-2">
             <span class="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
-            <span class="text-sm text-amber-600 dark:text-amber-400 font-medium">Awaiting</span>
+            <span class="text-sm text-amber-600 dark:text-amber-400 font-medium">{{ i18n.t('payment.awaiting') }}</span>
           </div>
         </div>
       </div>
@@ -244,19 +246,19 @@ onUnmounted(() => {
       <div class="mt-4 p-4 bg-surface-50 dark:bg-surface-800 rounded-xl space-y-2">
         <div class="flex items-start gap-3">
           <span class="w-6 h-6 rounded-full bg-primary-100 dark:bg-primary-900/20 text-primary-500 text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">1</span>
-          <p class="text-sm text-surface-600 dark:text-surface-400">Open your Bakong or mobile banking app</p>
+          <p class="text-sm text-surface-600 dark:text-surface-400">{{ i18n.t('payment.instruction1') }}</p>
         </div>
         <div class="flex items-start gap-3">
           <span class="w-6 h-6 rounded-full bg-primary-100 dark:bg-primary-900/20 text-primary-500 text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">2</span>
-          <p class="text-sm text-surface-600 dark:text-surface-400">Select "Scan QR" or "KHQR" payment option</p>
+          <p class="text-sm text-surface-600 dark:text-surface-400">{{ i18n.t('payment.instruction2') }}</p>
         </div>
         <div class="flex items-start gap-3">
           <span class="w-6 h-6 rounded-full bg-primary-100 dark:bg-primary-900/20 text-primary-500 text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">3</span>
-          <p class="text-sm text-surface-600 dark:text-surface-400">Scan the QR code above and confirm payment</p>
+          <p class="text-sm text-surface-600 dark:text-surface-400">{{ i18n.t('payment.instruction3') }}</p>
         </div>
         <div class="flex items-start gap-3">
           <span class="w-6 h-6 rounded-full bg-primary-100 dark:bg-primary-900/20 text-primary-500 text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">4</span>
-          <p class="text-sm text-surface-600 dark:text-surface-400">Wait for automatic confirmation. Your top-up will be processed instantly.</p>
+          <p class="text-sm text-surface-600 dark:text-surface-400">{{ i18n.t('payment.instruction4') }}</p>
         </div>
       </div>
     </div>

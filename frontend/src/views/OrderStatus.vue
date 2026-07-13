@@ -64,6 +64,15 @@ const statusConfig = computed(() => {
         pulse: false,
         badge: 'badge-error',
       }
+    case 'cancelled':
+      return {
+        color: 'text-surface-500 dark:text-surface-400',
+        bg: 'bg-surface-100 dark:bg-surface-800',
+        icon: 'M6 18L18 6M6 6l12 12',
+        label: i18n.t('order.status.cancelled'),
+        pulse: false,
+        badge: 'badge-error',
+      }
     default:
       return {
         color: 'text-surface-600 dark:text-surface-400',

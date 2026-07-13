@@ -4,7 +4,7 @@ import { useRouter } from 'vue-router'
 import { useGameStore } from '@/stores/game'
 import { useI18nStore } from '@/stores/i18n'
 import { useToastStore } from '@/stores/toast'
-import { createPayment, getPaymentStatus } from '@/services/api'
+import { createPayment, getPaymentStatus, cancelOrder } from '@/services/api'
 
 const router = useRouter()
 const gameStore = useGameStore()
@@ -19,9 +19,16 @@ const amount = ref(0)
 const loading = ref(true)
 const error = ref<string | null>(null)
 const paymentStatus = ref<'pending' | 'paid' | 'failed'>('pending')
-const timeLeft = ref(30 * 60) // 30 minutes in seconds
+const timeLeft = ref(5 * 60) // 5 minutes in seconds
+const showCancelDialog = ref(false)
+const cancelling = ref(false)
+const showSuccessOverlay = ref(false)
+const redirectCountdown = ref(3)
 let pollInterval: ReturnType<typeof setInterval> | null = null
 let timerInterval: ReturnType<typeof setInterval> | null = null
+let redirectInterval: ReturnType<typeof setInterval> | null = null
+
+const isUrgent = computed(() => timeLeft.value < 60)
 
 const formattedTime = computed(() => {
   const mins = Math.floor(timeLeft.value / 60)
@@ -30,7 +37,7 @@ const formattedTime = computed(() => {
 })
 
 const timeoutPercentage = computed(() => {
-  return (timeLeft.value / (30 * 60)) * 100
+  return (timeLeft.value / (5 * 60)) * 100
 })
 
 async function initPayment() {
@@ -77,10 +84,7 @@ function startPolling() {
       paymentStatus.value = status.payment_status as 'pending' | 'paid' | 'failed'
 
       if (status.payment_status === 'paid') {
-        stopPolling()
-        toast.success(i18n.t('payment.toast.paymentReceived'))
-        gameStore.clearOrder()
-        router.push(`/order/${paymentRef.value}`)
+        onPaymentReceived()
       } else if (status.payment_status === 'failed') {
         stopPolling()
         toast.error(i18n.t('payment.toast.paymentFailed'))
@@ -100,6 +104,10 @@ function stopPolling() {
     clearInterval(timerInterval)
     timerInterval = null
   }
+  if (redirectInterval) {
+    clearInterval(redirectInterval)
+    redirectInterval = null
+  }
 }
 
 function startTimer() {
@@ -109,6 +117,96 @@ function startTimer() {
       stopPolling()
       toast.error(i18n.t('payment.toast.timeExpired'))
       router.push('/')
+    }
+  }, 1000)
+}
+
+async function handleCancelOrder() {
+  if (!paymentRef.value) return
+
+  cancelling.value = true
+  try {
+    await cancelOrder(paymentRef.value)
+    showCancelDialog.value = false
+    stopPolling()
+    toast.success(i18n.t('payment.toast.cancelSuccess'))
+    router.push('/')
+  } catch (err) {
+    showCancelDialog.value = false
+    const message = err instanceof Error ? err.message : ''
+    if (message.toLowerCase().includes('already processed') || message.toLowerCase().includes('cancelled')) {
+      toast.error(i18n.t('payment.toast.cannotCancel'))
+    } else {
+      toast.error(i18n.t('payment.toast.cancelFailed'))
+    }
+  } finally {
+    cancelling.value = false
+  }
+}
+
+function playSuccessSound() {
+  try {
+    const ctx = new (window.AudioContext || (window as any).webkitAudioContext)()
+
+    // Ascending chime: two quick notes going up
+    const now = ctx.currentTime
+
+    // First note — C5 (523 Hz)
+    const osc1 = ctx.createOscillator()
+    const gain1 = ctx.createGain()
+    osc1.type = 'sine'
+    osc1.frequency.setValueAtTime(523, now)
+    gain1.gain.setValueAtTime(0.25, now)
+    gain1.gain.exponentialRampToValueAtTime(0.01, now + 0.35)
+    osc1.connect(gain1)
+    gain1.connect(ctx.destination)
+    osc1.start(now)
+    osc1.stop(now + 0.35)
+
+    // Second note — E5 (659 Hz) — slightly overlapping
+    const osc2 = ctx.createOscillator()
+    const gain2 = ctx.createGain()
+    osc2.type = 'sine'
+    osc2.frequency.setValueAtTime(659, now + 0.12)
+    gain2.gain.setValueAtTime(0.25, now + 0.12)
+    gain2.gain.exponentialRampToValueAtTime(0.01, now + 0.5)
+    osc2.connect(gain2)
+    gain2.connect(ctx.destination)
+    osc2.start(now + 0.12)
+    osc2.stop(now + 0.5)
+
+    // Third note — G5 (784 Hz) — for a full major chord
+    const osc3 = ctx.createOscillator()
+    const gain3 = ctx.createGain()
+    osc3.type = 'sine'
+    osc3.frequency.setValueAtTime(784, now + 0.24)
+    gain3.gain.setValueAtTime(0.2, now + 0.24)
+    gain3.gain.exponentialRampToValueAtTime(0.01, now + 0.6)
+    osc3.connect(gain3)
+    gain3.connect(ctx.destination)
+    osc3.start(now + 0.24)
+    osc3.stop(now + 0.6)
+  } catch {
+    // Audio not available — silence is fine
+  }
+}
+
+function onPaymentReceived() {
+  stopPolling()
+
+  // Play sound
+  playSuccessSound()
+
+  // Show celebration overlay
+  showSuccessOverlay.value = true
+
+  // Countdown + auto-redirect
+  gameStore.clearOrder()
+  redirectInterval = setInterval(() => {
+    redirectCountdown.value--
+    if (redirectCountdown.value <= 0) {
+      if (redirectInterval) clearInterval(redirectInterval)
+      router.push(`/order/${paymentRef.value}`)
     }
   }, 1000)
 }
@@ -163,7 +261,7 @@ onUnmounted(() => {
             <span class="text-sm text-surface-500 dark:text-surface-400">{{ i18n.t('payment.expiresIn') }}</span>
             <span :class="[
               'text-lg font-mono font-bold',
-              timeLeft < 60 ? 'text-red-500 animate-pulse' : 'text-surface-900 dark:text-surface-100'
+              isUrgent ? 'text-red-500 animate-pulse' : 'text-surface-900 dark:text-surface-100'
             ]">
               {{ formattedTime }}
             </span>
@@ -171,10 +269,21 @@ onUnmounted(() => {
           <div class="w-full h-2 bg-surface-100 dark:bg-surface-800 rounded-full overflow-hidden">
             <div
               class="h-full rounded-full transition-all duration-1000"
-              :class="timeLeft < 60 ? 'bg-red-500' : timeLeft < 300 ? 'bg-amber-500' : 'bg-primary-500'"
+              :class="isUrgent ? 'bg-red-500' : timeLeft < 120 ? 'bg-amber-500' : 'bg-emerald-500'"
               :style="{ width: `${timeoutPercentage}%` }"
             ></div>
           </div>
+        </div>
+
+        <!-- Urgent Warning -->
+        <div
+          v-if="isUrgent"
+          class="flex items-center justify-center gap-2 mb-4 text-red-500 dark:text-red-400 animate-pulse"
+        >
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <span class="text-xs font-semibold">{{ i18n.t('payment.urgentWarning') }}</span>
         </div>
 
         <!-- QR Code -->
@@ -242,6 +351,16 @@ onUnmounted(() => {
         </div>
       </div>
 
+      <!-- Cancel Order -->
+      <div class="mt-6">
+        <button
+          @click="showCancelDialog = true"
+          class="w-full py-3 px-4 rounded-xl border-2 border-red-200 dark:border-red-900/50 text-red-600 dark:text-red-400 font-medium text-sm hover:bg-red-50 dark:hover:bg-red-900/10 transition-all duration-200"
+        >
+          {{ i18n.t('payment.cancelOrder') }}
+        </button>
+      </div>
+
       <!-- Instructions -->
       <div class="mt-4 p-4 bg-surface-50 dark:bg-surface-800 rounded-xl space-y-2">
         <div class="flex items-start gap-3">
@@ -262,5 +381,135 @@ onUnmounted(() => {
         </div>
       </div>
     </div>
+
+    <!-- Cancel Confirmation Dialog -->
+    <Teleport to="body">
+      <div
+        v-if="showCancelDialog"
+        class="fixed inset-0 z-50 flex items-center justify-center p-4"
+        @click.self="showCancelDialog = false"
+      >
+        <!-- Backdrop -->
+        <div class="absolute inset-0 bg-black/50 dark:bg-black/70 backdrop-blur-sm"></div>
+
+        <!-- Dialog -->
+        <div class="relative bg-white dark:bg-surface-800 rounded-2xl shadow-2xl max-w-sm w-full p-6 animate-fade-in">
+          <div class="text-center">
+            <!-- Warning Icon -->
+            <div class="inline-flex items-center justify-center w-14 h-14 rounded-full bg-red-100 dark:bg-red-900/20 mb-4">
+              <svg class="w-7 h-7 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+
+            <h3 class="text-lg font-bold text-surface-900 dark:text-surface-100 mb-2">
+              {{ i18n.t('payment.cancelConfirmTitle') }}
+            </h3>
+            <p class="text-sm text-surface-500 dark:text-surface-400 mb-6">
+              {{ i18n.t('payment.cancelConfirmMessage') }}
+            </p>
+
+            <div class="flex flex-col gap-3">
+              <button
+                @click="handleCancelOrder"
+                :disabled="cancelling"
+                class="w-full py-2.5 px-4 rounded-xl bg-red-500 hover:bg-red-600 disabled:bg-red-300 dark:disabled:bg-red-800 text-white font-medium text-sm transition-all duration-200"
+              >
+                <svg v-if="cancelling" class="w-4 h-4 animate-spin inline mr-2" fill="none" viewBox="0 0 24 24">
+                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                {{ cancelling ? i18n.t('payment.cancelling') : i18n.t('payment.cancelConfirmYes') }}
+              </button>
+              <button
+                @click="showCancelDialog = false"
+                :disabled="cancelling"
+                class="w-full py-2.5 px-4 rounded-xl border-2 border-surface-200 dark:border-surface-700 text-surface-700 dark:text-surface-300 font-medium text-sm hover:bg-surface-50 dark:hover:bg-surface-700/50 disabled:opacity-50 transition-all duration-200"
+              >
+                {{ i18n.t('payment.cancelConfirmNo') }}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
+    <!-- Celebration Overlay -->
+    <Teleport to="body">
+      <div
+        v-if="showSuccessOverlay"
+        class="fixed inset-0 z-50 flex items-center justify-center p-4"
+      >
+        <!-- Backdrop with gradient -->
+        <div class="absolute inset-0 bg-gradient-to-br from-emerald-500/90 via-emerald-600/85 to-teal-700/90 backdrop-blur-md"></div>
+
+        <!-- Confetti Particles -->
+        <div class="absolute inset-0 overflow-hidden pointer-events-none" aria-hidden="true">
+          <div
+            v-for="i in 30"
+            :key="i"
+            class="absolute w-2.5 h-2.5 rounded-sm animate-confetti"
+            :style="{
+              left: `${Math.random() * 100}%`,
+              top: `-${Math.random() * 20}%`,
+              backgroundColor: ['#10B981', '#34D399', '#6EE7B7', '#FCD34D', '#F472B6', '#818CF8', '#FBBF24'][i % 7],
+              animationDelay: `${Math.random() * 2}s`,
+              animationDuration: `${2 + Math.random() * 2}s`,
+              width: `${8 + Math.random() * 8}px`,
+              height: `${8 + Math.random() * 8}px`,
+              borderRadius: Math.random() > 0.5 ? '50%' : '2px',
+            }"
+          ></div>
+        </div>
+
+        <!-- Content -->
+        <div class="relative text-center animate-scale-in">
+          <!-- Animated Checkmark -->
+          <div class="inline-flex items-center justify-center w-24 h-24 rounded-full bg-white/20 backdrop-blur-sm mb-8 animate-bounce-in">
+            <svg class="w-14 h-14 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="3">
+              <path
+                class="animate-draw-check"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                d="M5 13l4 4L19 7"
+              />
+            </svg>
+          </div>
+
+          <h2 class="text-3xl font-bold text-white mb-2">
+            {{ i18n.t('payment.successTitle') }}
+          </h2>
+          <p class="text-emerald-100 text-lg mb-2">
+            {{ i18n.t('payment.successMessage') }}
+          </p>
+
+          <!-- Amount -->
+          <p class="text-2xl font-bold text-white mb-6">
+            ${{ amount.toFixed(2) }}
+          </p>
+
+          <!-- Reference -->
+          <div class="inline-flex items-center gap-2 px-4 py-2 bg-white/10 backdrop-blur-sm rounded-xl text-emerald-100 text-sm font-mono mb-8">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+            </svg>
+            {{ paymentRef }}
+          </div>
+
+          <!-- Countdown Bar -->
+          <div class="max-w-xs mx-auto">
+            <div class="w-full h-1.5 bg-white/20 rounded-full overflow-hidden mb-3">
+              <div
+                class="h-full bg-white rounded-full transition-all duration-1000 ease-linear"
+                :style="{ width: `${(redirectCountdown / 3) * 100}%` }"
+              ></div>
+            </div>
+            <p class="text-emerald-200 text-sm">
+              {{ i18n.t('payment.redirectingIn') }} {{ redirectCountdown }}...
+            </p>
+          </div>
+        </div>
+      </div>
+    </Teleport>
   </div>
 </template>

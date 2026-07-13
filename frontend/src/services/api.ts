@@ -99,4 +99,12 @@ export async function getOrder(reference: string): Promise<OrderResponse> {
   return data.data
 }
 
+export async function cancelOrder(reference: string): Promise<{ success: boolean; message: string; reference: string }> {
+  const { data } = await api.post<ApiResponse<{ success: boolean; message: string; reference: string }>>(`/order/${reference}/cancel`)
+  if (!data.success || !data.data) {
+    throw new Error(data.message || 'Failed to cancel order')
+  }
+  return data.data
+}
+
 export default api

@@ -29,9 +29,13 @@ export const PAYMENT_STATUS = {
 } as const;
 
 export const BAY2GAME_STATUS = {
-  SUCCESS: 'SUCCESS',
-  FAILED: 'FAILED',
+  SUCCESS: 'success',
+  FAILED: 'failed',
 } as const;
+
+export function isBay2GameSuccess(status: string): boolean {
+  return status.toLowerCase() === BAY2GAME_STATUS.SUCCESS;
+}
 
 export const ERROR_MESSAGES = {
   INVALID_PRODUCT: 'Invalid product code',

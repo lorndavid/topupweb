@@ -7,7 +7,7 @@ import {
   Bay2GameOrder,
   Bay2GameCheckOrder,
 } from '../types';
-import { HTTP_STATUS, BAY2GAME_STATUS, ERROR_MESSAGES } from '../constants';
+import { HTTP_STATUS, ERROR_MESSAGES, isBay2GameSuccess } from '../constants';
 import { AppError } from '../middleware/errorHandler';
 
 function getApiParams(): Record<string, string> {
@@ -24,7 +24,7 @@ export class Bay2GameService {
         params: getApiParams(),
       });
 
-      if (data.status !== BAY2GAME_STATUS.SUCCESS) {
+      if (!isBay2GameSuccess(data.status)) {
         throw new AppError(
           'Failed to get user profile',
           HTTP_STATUS.SERVICE_UNAVAILABLE
@@ -50,7 +50,7 @@ export class Bay2GameService {
         params: getApiParams(),
       });
 
-      if (data.status !== BAY2GAME_STATUS.SUCCESS) {
+      if (!isBay2GameSuccess(data.status)) {
         throw new AppError(
           'Failed to fetch categories',
           HTTP_STATUS.SERVICE_UNAVAILABLE
@@ -79,7 +79,7 @@ export class Bay2GameService {
         },
       });
 
-      if (data.status !== BAY2GAME_STATUS.SUCCESS) {
+      if (!isBay2GameSuccess(data.status)) {
         throw new AppError(
           'Failed to fetch products',
           HTTP_STATUS.SERVICE_UNAVAILABLE
@@ -97,9 +97,12 @@ export class Bay2GameService {
   }
 
   /**
-   * Get game details
+   * Get products AND game details in a single API call
    */
-  async getGameDetails(gameCode: string) {
+  async getProductsWithGame(gameCode: string): Promise<{
+    game: { game_code: string; name: string; description: string; image_url: string };
+    products: Bay2GameProduct[];
+  }> {
     try {
       const { data } = await bay2gameApi.get('/api/products', {
         params: {
@@ -108,14 +111,17 @@ export class Bay2GameService {
         },
       });
 
-      if (data.status !== BAY2GAME_STATUS.SUCCESS) {
+      if (!isBay2GameSuccess(data.status)) {
         throw new AppError(
-          'Failed to fetch game details',
+          'Failed to fetch products',
           HTTP_STATUS.SERVICE_UNAVAILABLE
         );
       }
 
-      return data.game;
+      return {
+        game: data.game,
+        products: data.products as Bay2GameProduct[],
+      };
     } catch (error) {
       if (error instanceof AppError) throw error;
       throw new AppError(
@@ -145,7 +151,7 @@ export class Bay2GameService {
         },
       });
 
-      if (data.status !== BAY2GAME_STATUS.SUCCESS) {
+      if (!isBay2GameSuccess(data.status)) {
         if (data.message?.toLowerCase().includes('balance')) {
           throw new AppError(
             ERROR_MESSAGES.INSUFFICIENT_BALANCE,
@@ -186,7 +192,7 @@ export class Bay2GameService {
         },
       });
 
-      if (data.status !== BAY2GAME_STATUS.SUCCESS) {
+      if (!isBay2GameSuccess(data.status)) {
         throw new AppError(
           ERROR_MESSAGES.ORDER_NOT_FOUND,
           HTTP_STATUS.NOT_FOUND

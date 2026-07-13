@@ -26,10 +26,7 @@ export async function getProductsByGame(
 ): Promise<void> {
   try {
     const { gameCode } = req.params;
-    const [products, game] = await Promise.all([
-      bay2gameService.getProducts(gameCode),
-      bay2gameService.getGameDetails(gameCode),
-    ]);
+    const { game, products } = await bay2gameService.getProductsWithGame(gameCode);
 
     res.status(HTTP_STATUS.OK).json({
       success: true,

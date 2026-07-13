@@ -4,6 +4,7 @@ import { config } from '../config';
 
 export const bay2gameApi = axios.create({
   timeout: API_TIMEOUT,
+  baseURL: config.bay2game.apiUrl,
   headers: {
     Accept: 'application/json',
   },

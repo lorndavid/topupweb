@@ -13,11 +13,16 @@ export const config = {
     apiKey: process.env.BAY2GAME_API_KEY || '',
   },
 
+  merchant: {
+    bakongId: process.env.MERCHANT_BAKONG_ID || '',
+    name: process.env.MERCHANT_NAME || 'MY SHOP',
+    city: process.env.MERCHANT_CITY || 'Phnom Penh',
+    defaultCurrency: process.env.DEFAULT_CURRENCY || 'USD',
+  },
+
   bakong: {
-    apiUrl: process.env.BAKONG_API_URL || '',
-    apiKey: process.env.BAKONG_API_KEY || '',
-    accountId: process.env.BAKONG_ACCOUNT_ID || '',
-    merchantId: process.env.BAKONG_MERCHANT_ID || '',
+    apiUrl: process.env.BAKONG_API_URL || 'https://api-bakong.nbc.gov.kh',
+    apiToken: process.env.BAKONG_API_TOKEN || '',
     callbackUrl:
       process.env.BAKONG_CALLBACK_URL ||
       'http://localhost:3001/api/payment/callback',
@@ -32,9 +37,8 @@ export const config = {
 export function validateConfig(): void {
   const required = [
     ['BAY2GAME_API_KEY', config.bay2game.apiKey],
-    ['BAKONG_API_KEY', config.bakong.apiKey],
-    ['BAKONG_ACCOUNT_ID', config.bakong.accountId],
-    ['BAKONG_MERCHANT_ID', config.bakong.merchantId],
+    ['BAKONG_API_TOKEN', config.bakong.apiToken],
+    ['MERCHANT_BAKONG_ID', config.merchant.bakongId],
   ];
 
   const missing = required.filter(([, value]) => !value).map(([key]) => key);
@@ -44,5 +48,6 @@ export function validateConfig(): void {
       `⚠️  Missing environment variables: ${missing.join(', ')}`
     );
     console.warn('The app will start but some features may not work.');
+    console.warn('Set them in the .env file at backend/.env');
   }
 }

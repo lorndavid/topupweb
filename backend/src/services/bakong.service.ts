@@ -2,8 +2,13 @@ import { config } from '../config';
 import { bakongApi } from '../utils/axios';
 import { HTTP_STATUS, ERROR_MESSAGES } from '../constants';
 import { AppError } from '../middleware/errorHandler';
+import crypto from 'crypto';
 
-interface KHQRResponse {
+/* ───────────────────────────────────────────
+ *  Types
+ * ─────────────────────────────────────────── */
+
+export interface KHQRResponse {
   qr: string;
   qrImage: string;
   md5Hash: string;
@@ -12,7 +17,7 @@ interface KHQRResponse {
   currency: string;
 }
 
-interface PaymentCheckResponse {
+export interface PaymentCheckResponse {
   status: string;
   transactionId: string;
   amount: number;
@@ -21,7 +26,7 @@ interface PaymentCheckResponse {
   timestamp?: string;
 }
 
-interface CallbackPayload {
+export interface CallbackPayload {
   transactionId: string;
   amount: number;
   currency: string;
@@ -31,128 +36,170 @@ interface CallbackPayload {
   hash: string;
 }
 
+/* ───────────────────────────────────────────
+ *  Service
+ * ─────────────────────────────────────────── */
+
 export class BakongService {
+  /** Exchange rate: 1 USD ≈ 4 100 KHR (approximate) */
+  private readonly USD_TO_KHR = 4100;
+
   /**
-   * Generate KHQR code for payment
+   * Generate a KHQR code for payment via the official Bakong API.
+   *
+   * Uses Bearer token auth and the merchant details provided in env:
+   *   MERCHANT_BAKONG_ID  – e.g. "lorn_davit@bkrt"
+   *   MERCHANT_NAME       – e.g. "MY SHOP"
+   *   MERCHANT_CITY       – e.g. "Phnom Penh"
+   *   BAKONG_API_TOKEN    – Bearer token from developer portal
    */
   async generateKHQR(params: {
     amount: number;
     description: string;
   }): Promise<KHQRResponse> {
-    try {
-      // In production, this would call the Bakong API
-      // For localhost development, we simulate the KHQR generation
-      const reference = `KHQR-${Date.now()}`;
-      const simulatedResponse: KHQRResponse = {
-        qr: `00020101021229300012${config.bakong.merchantId}5204599953031165405${params.amount.toFixed(2)}5802KH5910${config.bakong.merchantId}6002KH6304${reference}`,
-        qrImage: `data:image/png;base64,simulated_qr_${reference}`,
-        md5Hash: reference,
-        transactionId: `TXN-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`,
-        amount: params.amount,
-        currency: 'KHR',
-      };
+    // ── 1. Generate a local reference ──────────────────
+    const md5Hash = crypto
+      .createHash('md5')
+      .update(`${params.amount}:${params.description}:${Date.now()}`)
+      .digest('hex');
 
-      // Attempt real API call if configured
-      if (config.bakong.apiUrl && config.bakong.apiKey) {
-        try {
-          const { data } = await bakongApi.post('/v1/generate_qr', {
-            account_id: config.bakong.accountId,
-            merchant_id: config.bakong.merchantId,
-            amount: params.amount * 4100, // Convert USD to KHR (approximate)
-            currency: 'KHR',
-            description: params.description,
-          });
+    const transactionId = `TXN-${Date.now()}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
 
-          return {
-            qr: data.qr || simulatedResponse.qr,
-            qrImage: data.qr_image || simulatedResponse.qrImage,
-            md5Hash: data.md5_hash || simulatedResponse.md5Hash,
-            transactionId: data.transaction_id || simulatedResponse.transactionId,
-            amount: params.amount,
-            currency: 'KHR',
-          };
-        } catch {
-          // Fallback to simulated response
-          console.warn('Bakong API unavailable, using simulated KHQR');
+    // ── 2. Try the real Bakong API ─────────────────────
+    if (config.bakong.apiUrl && config.bakong.apiToken) {
+      try {
+        const amountKHR = Math.round(params.amount * this.USD_TO_KHR);
+
+        const { data } = await bakongApi.post('/v1/generate_qr', {
+          account_id: config.merchant.bakongId,
+          merchant_name: config.merchant.name,
+          merchant_city: config.merchant.city,
+          amount: amountKHR,
+          currency: 'KHR',
+          description: params.description.substring(0, 50),
+        });
+
+        return {
+          qr: data.qr || '',
+          qrImage: data.qr_image || data.qrImage || '',
+          md5Hash: data.md5_hash || data.md5Hash || md5Hash,
+          transactionId: data.transaction_id || data.transactionId || transactionId,
+          amount: params.amount,
+          currency: 'KHR',
+        };
+      } catch (apiError: any) {
+        const msg =
+          apiError?.response?.data?.message ||
+          apiError?.response?.data?.error ||
+          apiError.message ||
+          'Unknown Bakong API error';
+
+        console.warn(`⚠️  Bakong API generate KHQR failed: ${msg}`);
+
+        // For localhost dev we fall through to simulation
+        if (config.isProd) {
+          throw new AppError(
+            `Bakong payment service error: ${msg}`,
+            HTTP_STATUS.SERVICE_UNAVAILABLE
+          );
         }
-      }
 
-      return simulatedResponse;
-    } catch (error) {
-      if (error instanceof AppError) throw error;
-      throw new AppError(
-        ERROR_MESSAGES.BAKONG_ERROR,
-        HTTP_STATUS.SERVICE_UNAVAILABLE
-      );
+        console.warn('   → Falling back to simulated KHQR (dev mode only)');
+      }
+    } else {
+      console.warn('⚠️  Bakong API credentials missing – using simulated KHQR (dev mode)');
     }
+
+    // ── 3. Fallback: simulated KHQR for localhost dev ──
+    return {
+      qr: `00020101021229300012${config.merchant.bakongId || 'demo@bkrt'}5204599953031165405${params.amount.toFixed(2)}5802KH5910${config.merchant.name || 'SHOP'}6002${config.merchant.city || 'Phnom Penh'}6304${md5Hash.substring(0, 4)}`,
+      qrImage: '',
+      md5Hash,
+      transactionId,
+      amount: params.amount,
+      currency: 'KHR',
+    };
   }
 
   /**
-   * Check payment status
+   * Check the status of a payment transaction via the Bakong API.
    */
   async checkPaymentStatus(transactionId: string): Promise<PaymentCheckResponse> {
-    try {
-      // Simulate payment check for localhost
-      const simulatedResponse: PaymentCheckResponse = {
-        status: 'PAID',
-        transactionId,
-        amount: 0,
-        currency: 'KHR',
-        timestamp: new Date().toISOString(),
-      };
+    if (config.bakong.apiUrl && config.bakong.apiToken) {
+      try {
+        const { data } = await bakongApi.post('/v1/check_transaction', {
+          transaction_id: transactionId,
+        });
 
-      if (config.bakong.apiUrl && config.bakong.apiKey) {
-        try {
-          const { data } = await bakongApi.post('/v1/check_payment', {
-            transaction_id: transactionId,
-          });
+        return {
+          status: data.status || 'PENDING',
+          transactionId: data.transaction_id || transactionId,
+          amount: data.amount || 0,
+          currency: data.currency || 'KHR',
+          senderAccount: data.sender_account,
+          timestamp: data.timestamp,
+        };
+      } catch (apiError: any) {
+        const msg =
+          apiError?.response?.data?.message ||
+          apiError?.response?.data?.error ||
+          apiError.message ||
+          'Unknown Bakong API error';
 
-          return {
-            status: data.status || simulatedResponse.status,
-            transactionId: data.transaction_id || transactionId,
-            amount: data.amount || 0,
-            currency: data.currency || 'KHR',
-            senderAccount: data.sender_account,
-            timestamp: data.timestamp,
-          };
-        } catch {
-          console.warn('Bakong API unavailable, using simulated payment check');
+        console.warn(`⚠️  Bakong API check payment failed: ${msg}`);
+
+        if (config.isProd) {
+          throw new AppError(
+            `Bakong payment check error: ${msg}`,
+            HTTP_STATUS.SERVICE_UNAVAILABLE
+          );
         }
-      }
 
-      return simulatedResponse;
-    } catch (error) {
-      if (error instanceof AppError) throw error;
-      throw new AppError(
-        ERROR_MESSAGES.BAKONG_ERROR,
-        HTTP_STATUS.SERVICE_UNAVAILABLE
-      );
+        console.warn('   → Falling back to simulated payment status (dev mode)');
+      }
     }
+
+    // Simulated response for localhost dev
+    return {
+      status: 'PAID',
+      transactionId,
+      amount: 0,
+      currency: 'KHR',
+      timestamp: new Date().toISOString(),
+    };
   }
 
   /**
-   * Verify callback from Bakong
+   * Verify the authenticity of a callback/webhook from Bakong.
+   *
+   * In production the hash is an HMAC-SHA256 over the payload signed
+   * with the merchant's API token.
    */
   verifyCallback(payload: CallbackPayload): boolean {
-    // In production, verify the hash with the merchant secret
-    // For localhost, we trust the callback
+    if (!config.bakong.apiToken) {
+      // Without a token we trust the callback (dev mode)
+      return true;
+    }
+
     const expectedHash = this.generateCallbackHash(payload);
-    return payload.hash === expectedHash;
+    const isValid = payload.hash === expectedHash;
+
+    if (!isValid) {
+      console.warn('⚠️  Bakong callback hash mismatch – possible forgery');
+    }
+
+    return isValid;
   }
 
   /**
-   * Generate callback hash for verification
+   * Generate an HMAC-SHA256 callback hash for verification.
    */
   private generateCallbackHash(payload: Omit<CallbackPayload, 'hash'>): string {
-    // Simple hash simulation - in production use HMAC-SHA256
-    const str = `${payload.transactionId}:${payload.amount}:${payload.timestamp}:${config.bakong.apiKey}`;
-    let hash = 0;
-    for (let i = 0; i < str.length; i++) {
-      const char = str.charCodeAt(i);
-      hash = (hash << 5) - hash + char;
-      hash |= 0;
-    }
-    return Math.abs(hash).toString(16);
+    const data = `${payload.transactionId}:${payload.amount}:${payload.currency}:${payload.timestamp}`;
+    return crypto
+      .createHmac('sha256', config.bakong.apiToken)
+      .update(data)
+      .digest('hex');
   }
 }
 

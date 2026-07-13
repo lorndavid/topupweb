@@ -31,9 +31,14 @@ export interface Bay2GameConfig {
 
 export interface BakongConfig {
   apiUrl: string;
-  apiKey: string;
-  accountId: string;
-  merchantId: string;
+  apiToken: string;
   callbackUrl: string;
   returnUrl: string;
+}
+
+export interface MerchantConfig {
+  bakongId: string;
+  name: string;
+  city: string;
+  defaultCurrency: string;
 }

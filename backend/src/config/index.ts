@@ -18,6 +18,11 @@ export const config = {
     apiKey: process.env.BAY2GAME_API_KEY || '',
   },
 
+  gameApis: {
+    riotApiKey: process.env.RIOT_API_KEY || '',
+    gameskinboApiKey: process.env.GAMESKINBO_API_KEY || '',
+  },
+
   merchant: {
     bakongId: process.env.MERCHANT_BAKONG_ID || '',
     name: process.env.MERCHANT_NAME || 'MY SHOP',

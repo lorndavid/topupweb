@@ -79,6 +79,18 @@ export async function createOrder(params: {
   return data.data
 }
 
+export async function verifyPlayer(params: {
+  game_code: string
+  player_id: string
+  server_id?: string
+}): Promise<{ verified: boolean; nickname?: string; playerId: string; provider?: string }> {
+  const { data } = await api.post<ApiResponse<{ verified: boolean; nickname?: string; playerId: string; provider?: string }>>('/verify-player', params)
+  if (!data.success || !data.data) {
+    throw new Error(data.message || 'Player verification failed')
+  }
+  return data.data
+}
+
 export async function getOrder(reference: string): Promise<OrderResponse> {
   const { data } = await api.get<ApiResponse<OrderResponse>>(`/order/${reference}`)
   if (!data.success || !data.data) {

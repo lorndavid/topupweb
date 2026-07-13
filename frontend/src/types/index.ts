@@ -83,4 +83,5 @@ export interface OrderSummary {
   amount: number
   playerId: string
   serverId?: string
+  verifyProvider?: string
 }

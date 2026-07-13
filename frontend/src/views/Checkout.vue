@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import { useGameStore } from '@/stores/game'
 import { useI18nStore } from '@/stores/i18n'
 import { useToastStore } from '@/stores/toast'
+import type { TranslationKey } from '@/i18n/translations'
 
 const router = useRouter()
 const gameStore = useGameStore()
@@ -12,6 +13,25 @@ const toast = useToastStore()
 const processing = ref(false)
 
 const order = computed(() => gameStore.currentOrder)
+
+// Helper functions (shared with GameDetail.vue)
+function providerLabel(provider: string): string {
+  const key = `verify.provider.${provider}` as TranslationKey
+  const label = i18n.t(key)
+  return label === key ? provider : label
+}
+
+function providerTooltip(provider: string): string {
+  const tooltipKey = `verify.provider.tooltip.${provider}` as TranslationKey
+  const tooltip = i18n.t(tooltipKey)
+  return tooltip === tooltipKey
+    ? `${i18n.t('verify.provider.prefix')} ${providerLabel(provider)}`
+    : tooltip
+}
+
+function isRealProvider(provider: string | null | undefined): boolean {
+  return !!provider && provider !== 'simulated'
+}
 
 if (!order.value) {
   router.replace('/')
@@ -79,11 +99,44 @@ async function proceedToPayment() {
 
         <!-- Player ID -->
         <div class="flex items-center justify-between pb-5 border-b border-surface-200 dark:border-surface-700">
-          <div>
+          <div class="min-w-0">
             <p class="text-sm text-surface-500 dark:text-surface-400">{{ i18n.t('checkout.playerId') }}</p>
             <p class="font-mono font-semibold text-surface-900 dark:text-surface-100">{{ order.playerId }}</p>
+            <!-- Provider badge -->
+            <span
+              v-if="order.verifyProvider"
+              :title="providerTooltip(order.verifyProvider)"
+              class="group inline-flex items-center gap-1 mt-1.5 px-2 py-0.5 text-[10px] font-medium rounded-full cursor-help"
+              :class="isRealProvider(order.verifyProvider)
+                ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300'
+                : 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300'"
+            >
+              <!-- Dot indicator -->
+              <span
+                class="w-1.5 h-1.5 rounded-full shrink-0"
+                :class="isRealProvider(order.verifyProvider)
+                  ? 'bg-emerald-500'
+                  : 'bg-amber-500'"
+              ></span>
+              {{ i18n.t('verify.provider.prefix') }} {{ providerLabel(order.verifyProvider) }}
+              <!-- Info icon -->
+              <svg
+                class="w-3 h-3 shrink-0 transition-colors duration-200"
+                :class="isRealProvider(order.verifyProvider)
+                  ? 'text-emerald-400 dark:text-emerald-500 group-hover:text-emerald-600 dark:group-hover:text-emerald-300'
+                  : 'text-amber-400 dark:text-amber-500 group-hover:text-amber-600 dark:group-hover:text-amber-300'"
+                fill="currentColor"
+                viewBox="0 0 20 20"
+              >
+                <path
+                  fill-rule="evenodd"
+                  d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
+                  clip-rule="evenodd"
+                />
+              </svg>
+            </span>
           </div>
-          <button class="text-xs text-primary-500 hover:text-primary-600 font-medium">
+          <button class="text-xs text-primary-500 hover:text-primary-600 font-medium shrink-0">
             {{ i18n.t('checkout.edit') }}
           </button>
         </div>

@@ -9,7 +9,30 @@
 
   body {
     @apply bg-surface-50 dark:bg-surface-950 text-surface-900 dark:text-surface-100;
-    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    font-family: 'Inter', 'Battambang', system-ui, -apple-system, sans-serif;
+  }
+
+  /* Khmer typography */
+  .font-khmer-heading {
+    font-family: 'Moul', 'Battambang', serif;
+  }
+
+  .font-khmer-body {
+    font-family: 'Battambang', 'Inter', system-ui, sans-serif;
+  }
+
+  /* Apply Khmer fonts when locale is Khmer */
+  :lang(km) body,
+  [lang="km"] body,
+  .locale-km {
+    font-family: 'Battambang', 'Inter', system-ui, -apple-system, sans-serif;
+  }
+
+  .locale-km h1,
+  .locale-km h2,
+  .locale-km h3,
+  .locale-km .font-heading {
+    font-family: 'Moul', 'Battambang', serif;
   }
 
   ::selection {

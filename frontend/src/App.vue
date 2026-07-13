@@ -1,9 +1,11 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { onMounted, ref, watch } from 'vue'
 import Navbar from '@/components/Navbar.vue'
 import Footer from '@/components/Footer.vue'
 import ToastContainer from '@/components/ToastContainer.vue'
+import { useI18nStore } from '@/stores/i18n'
 
+const i18n = useI18nStore()
 const isDark = ref(false)
 
 function toggleDark() {
@@ -12,12 +14,25 @@ function toggleDark() {
   localStorage.setItem('theme', isDark.value ? 'dark' : 'light')
 }
 
+function applyLocaleClasses(locale: string) {
+  // Update html lang attribute for :lang() CSS selectors
+  document.documentElement.lang = locale
+  // Toggle body class for explicit font overrides
+  document.body.classList.toggle('locale-km', locale === 'km')
+}
+
+// Watch locale changes to apply Khmer fonts
+watch(() => i18n.locale, (newLocale) => {
+  applyLocaleClasses(newLocale)
+}, { immediate: true })
+
 onMounted(() => {
   const saved = localStorage.getItem('theme')
   if (saved === 'dark' || (!saved && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
     isDark.value = true
     document.documentElement.classList.add('dark')
   }
+
 })
 </script>
 

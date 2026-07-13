@@ -19,6 +19,12 @@ export const orderCreateSchema = z.object({
   amount: z.number().positive('Amount must be positive'),
 });
 
+export const verifyPlayerSchema = z.object({
+  game_code: z.string().min(1, 'Game code is required'),
+  player_id: z.string().min(1, 'Player ID is required'),
+  server_id: z.string().optional(),
+});
+
 export const paymentCallbackSchema = z.object({
   transactionId: z.string().min(1),
   amount: z.number(),

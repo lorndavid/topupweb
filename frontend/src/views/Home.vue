@@ -1,15 +1,20 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, nextTick } from 'vue'
 import { useGameStore } from '@/stores/game'
 import { useI18nStore } from '@/stores/i18n'
 import GameCard from '@/components/GameCard.vue'
 import LoadingSkeleton from '@/components/LoadingSkeleton.vue'
+import gsap from 'gsap'
 
 const gameStore = useGameStore()
 const i18n = useI18nStore()
 
 const searchQuery = ref('')
 const selectedFilter = ref<string | null>(null)
+const heroRef = ref<HTMLElement | null>(null)
+const searchRef = ref<HTMLElement | null>(null)
+const gridRef = ref<HTMLElement | null>(null)
+const featuresRef = ref<HTMLElement | null>(null)
 
 const popularFilters = [
   { label: 'Mobile Legends', code: 'mlbb' },
@@ -51,27 +56,87 @@ function clearSearch() {
   selectedFilter.value = null
 }
 
+async function animateEntrance() {
+  const tl = gsap.timeline({ defaults: { ease: 'power3.out' } })
+
+  // Hero section stagger
+  if (heroRef.value) {
+    const heroChildren = heroRef.value.querySelectorAll('.hero-anim')
+    tl.fromTo(
+      heroChildren,
+      { opacity: 0, y: 30 },
+      { opacity: 1, y: 0, duration: 0.5, stagger: 0.1 }
+    )
+  }
+
+  // Search section
+  if (searchRef.value) {
+    tl.fromTo(
+      searchRef.value,
+      { opacity: 0, y: 20 },
+      { opacity: 1, y: 0, duration: 0.4 },
+      '-=0.2'
+    )
+  }
+
+  // Wait for categories to be fully rendered
+  await nextTick()
+  await nextTick() // Double nextTick for DOM to settle
+
+  if (gridRef.value) {
+    const cards = gridRef.value.querySelectorAll('.game-card-wrapper')
+    if (cards.length > 0) {
+      tl.fromTo(
+        cards,
+        { opacity: 0, y: 30, scale: 0.95 },
+        {
+          opacity: 1,
+          y: 0,
+          scale: 1,
+          duration: 0.4,
+          stagger: 0.04,
+          ease: 'back.out(1.4)',
+        },
+        '-=0.1'
+      )
+    }
+  }
+
+  if (featuresRef.value) {
+    const featureCards = featuresRef.value.querySelectorAll('.feature-card')
+    if (featureCards.length > 0) {
+      tl.fromTo(
+        featureCards,
+        { opacity: 0, y: 20 },
+        { opacity: 1, y: 0, duration: 0.4, stagger: 0.08 },
+        '-=0.1'
+      )
+    }
+  }
+}
+
 onMounted(() => {
   gameStore.fetchCategories()
+  animateEntrance()
 })
 </script>
 
 <template>
   <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
     <!-- Hero Section -->
-    <div class="text-center mb-10 animate-fade-in">
-      <div class="inline-flex items-center gap-2 px-3 py-1.5 bg-primary-50 dark:bg-primary-900/20 rounded-full text-xs font-medium text-primary-600 dark:text-primary-400 mb-4">
+    <div ref="heroRef" class="text-center mb-10">
+      <div class="hero-anim inline-flex items-center gap-2 px-3 py-1.5 bg-primary-50 dark:bg-primary-900/20 rounded-full text-xs font-medium text-primary-600 dark:text-primary-400 mb-4">
         <span class="w-2 h-2 rounded-full bg-primary-500 animate-pulse"></span>
         {{ gameStore.categories.length || '204' }}+ {{ i18n.t('hero.badge') }}
       </div>
-      <h1 class="text-4xl sm:text-5xl lg:text-6xl font-extrabold text-surface-900 dark:text-surface-50 tracking-tight">
+      <h1 class="hero-anim text-4xl sm:text-5xl lg:text-6xl font-extrabold text-surface-900 dark:text-surface-50 tracking-tight">
         {{ i18n.t('hero.title') }}
         <span class="bg-gradient-to-r from-primary-400 to-primary-600 bg-clip-text text-transparent">{{ i18n.t('hero.titleHighlight') }}</span>
       </h1>
-      <p class="mt-4 text-lg text-surface-500 dark:text-surface-400 max-w-2xl mx-auto">
+      <p class="hero-anim mt-4 text-lg text-surface-500 dark:text-surface-400 max-w-2xl mx-auto">
         {{ i18n.t('hero.subtitle') }}
       </p>
-      <div class="mt-6 flex items-center justify-center gap-6 text-sm text-surface-400 dark:text-surface-500">
+      <div class="hero-anim mt-6 flex items-center justify-center gap-6 text-sm text-surface-400 dark:text-surface-500">
         <span class="flex items-center gap-1.5">
           <svg class="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
@@ -86,7 +151,7 @@ onMounted(() => {
         </span>
         <span class="flex items-center gap-1.5">
           <svg class="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.11 0-2.08.402-2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
           Best Prices
         </span>
@@ -94,7 +159,7 @@ onMounted(() => {
     </div>
 
     <!-- Search & Filter -->
-    <div class="mb-8 space-y-4">
+    <div ref="searchRef" class="mb-8 space-y-4">
       <div class="relative max-w-md mx-auto">
         <svg class="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-surface-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -200,8 +265,8 @@ onMounted(() => {
           <button @click="clearSearch" class="text-sm text-primary-500 hover:text-primary-600 font-medium">{{ i18n.t('search.clearSearch') }}</button>
         </div>
 
-        <div v-else class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          <div v-for="game in filteredGames" :key="game.game_code" class="animate-fade-in">
+        <div v-else ref="gridRef" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div v-for="game in filteredGames" :key="game.game_code" class="game-card-wrapper">
             <GameCard :game="game" />
           </div>
         </div>
@@ -209,9 +274,9 @@ onMounted(() => {
     </div>
 
     <!-- Features Section -->
-    <div class="mt-20 mb-8">
+    <div ref="featuresRef" class="mt-20 mb-8">
       <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
-        <div class="text-center p-6 rounded-2xl bg-white dark:bg-surface-900 border border-surface-200 dark:border-surface-700">
+        <div class="feature-card text-center p-6 rounded-2xl bg-white dark:bg-surface-900 border border-surface-200 dark:border-surface-700 hover:shadow-lg hover:-translate-y-1 transition-all duration-300">
           <div class="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-primary-100 dark:bg-primary-900/20 text-primary-500 mb-4">
             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
@@ -220,7 +285,7 @@ onMounted(() => {
           <h3 class="font-semibold text-surface-900 dark:text-surface-100 mb-2">{{ i18n.t('features.instantDelivery.title') }}</h3>
           <p class="text-sm text-surface-500 dark:text-surface-400">{{ i18n.t('features.instantDelivery.desc') }}</p>
         </div>
-        <div class="text-center p-6 rounded-2xl bg-white dark:bg-surface-900 border border-surface-200 dark:border-surface-700">
+        <div class="feature-card text-center p-6 rounded-2xl bg-white dark:bg-surface-900 border border-surface-200 dark:border-surface-700 hover:shadow-lg hover:-translate-y-1 transition-all duration-300">
           <div class="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-emerald-100 dark:bg-emerald-900/20 text-emerald-500 mb-4">
             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
@@ -229,7 +294,7 @@ onMounted(() => {
           <h3 class="font-semibold text-surface-900 dark:text-surface-100 mb-2">{{ i18n.t('features.securePayment.title') }}</h3>
           <p class="text-sm text-surface-500 dark:text-surface-400">{{ i18n.t('features.securePayment.desc') }}</p>
         </div>
-        <div class="text-center p-6 rounded-2xl bg-white dark:bg-surface-900 border border-surface-200 dark:border-surface-700">
+        <div class="feature-card text-center p-6 rounded-2xl bg-white dark:bg-surface-900 border border-surface-200 dark:border-surface-700 hover:shadow-lg hover:-translate-y-1 transition-all duration-300">
           <div class="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-amber-100 dark:bg-amber-900/20 text-amber-500 mb-4">
             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />

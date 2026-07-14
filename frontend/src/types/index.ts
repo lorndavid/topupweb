@@ -63,6 +63,8 @@ export interface OrderResponse {
   payment_method: string
   payment_status: string
   order_status: string
+  retry_count?: number
+  next_retry_at?: string
   created_at: string
   updated_at: string
   completed_at?: string
@@ -73,6 +75,29 @@ export interface ApiResponse<T = unknown> {
   message: string
   data?: T
   error?: string
+}
+
+export interface VerifyPlayerResult {
+  verified: boolean
+  nickname?: string
+  playerId: string
+  serverId?: string
+  region?: string
+  gameTitle?: string
+  provider?: string
+}
+
+export interface CheckGameIdResponse {
+  success: boolean
+  message: string
+  data?: {
+    status: string
+    username?: string
+    region?: string
+    game_title?: string
+    timestamp?: string
+    developer?: string
+  }
 }
 
 export interface OrderSummary {

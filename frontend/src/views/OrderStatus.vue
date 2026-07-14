@@ -37,6 +37,15 @@ const statusConfig = computed(() => {
         pulse: true,
         badge: 'badge-primary',
       }
+    case 'awaiting_stock':
+      return {
+        color: 'text-purple-600 dark:text-purple-400',
+        bg: 'bg-purple-100 dark:bg-purple-900/20',
+        icon: 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z',
+        label: i18n.t('order.status.awaiting_stock'),
+        pulse: true,
+        badge: 'badge-primary',
+      }
     case 'processing':
       return {
         color: 'text-blue-600 dark:text-blue-400',
@@ -144,7 +153,7 @@ onMounted(() => {
       <!-- Status Header -->
       <div class="card p-6 sm:p-8 text-center mb-6">
         <div :class="['inline-flex items-center justify-center w-20 h-20 rounded-full mb-5', statusConfig.bg]">
-          <svg :class="['w-10 h-10', statusConfig.color]" :class="{ 'animate-pulse': statusConfig.pulse }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg :class="['w-10 h-10', statusConfig.color, { 'animate-pulse': statusConfig.pulse }]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" :d="statusConfig.icon" />
           </svg>
         </div>
@@ -171,6 +180,19 @@ onMounted(() => {
         <div v-if="order.server_id" class="flex justify-between items-center pb-4 border-b border-surface-200 dark:border-surface-700">
           <span class="text-sm text-surface-500 dark:text-surface-400">{{ i18n.t('order.server') }}</span>
           <span class="font-mono font-medium text-surface-900 dark:text-surface-100">{{ order.server_id }}</span>
+        </div>
+        <div v-if="order.order_status === 'awaiting_stock'" class="pb-4 border-b border-surface-200 dark:border-surface-700">
+          <div class="mt-2 p-3 rounded-lg bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800">
+            <p class="text-xs text-amber-700 dark:text-amber-400 flex items-start gap-2">
+              <svg class="w-4 h-4 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <span>
+                <strong>{{ i18n.t('order.awaitingStockTitle') }}</strong><br>
+                {{ i18n.t('order.awaitingStockMessage') }}
+              </span>
+            </p>
+          </div>
         </div>
         <div class="flex justify-between items-center pb-4 border-b border-surface-200 dark:border-surface-700">
           <span class="text-sm text-surface-500 dark:text-surface-400">{{ i18n.t('order.amount') }}</span>

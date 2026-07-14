@@ -7,6 +7,8 @@ import type {
   PaymentResponse,
   PaymentStatus,
   OrderResponse,
+  VerifyPlayerResult,
+  CheckGameIdResponse,
 } from '@/types'
 
 const api = axios.create({
@@ -83,12 +85,21 @@ export async function verifyPlayer(params: {
   game_code: string
   player_id: string
   server_id?: string
-}): Promise<{ verified: boolean; nickname?: string; playerId: string; provider?: string }> {
-  const { data } = await api.post<ApiResponse<{ verified: boolean; nickname?: string; playerId: string; provider?: string }>>('/verify-player', params)
+}): Promise<VerifyPlayerResult> {
+  const { data } = await api.post<ApiResponse<VerifyPlayerResult>>('/verify-player', params)
   if (!data.success || !data.data) {
     throw new Error(data.message || 'Player verification failed')
   }
   return data.data
+}
+
+export async function checkGameId(params: {
+  game: string
+  userid: string
+  serverid?: string
+}): Promise<CheckGameIdResponse> {
+  const { data } = await api.get<CheckGameIdResponse>('/check-id', { params })
+  return data
 }
 
 export async function getOrder(reference: string): Promise<OrderResponse> {
@@ -103,6 +114,18 @@ export async function cancelOrder(reference: string): Promise<{ success: boolean
   const { data } = await api.post<ApiResponse<{ success: boolean; message: string; reference: string }>>(`/order/${reference}/cancel`)
   if (!data.success || !data.data) {
     throw new Error(data.message || 'Failed to cancel order')
+  }
+  return data.data
+}
+
+export async function retryOrder(reference: string): Promise<{
+  success: boolean
+  message: string
+  awaiting_stock?: boolean
+}> {
+  const { data } = await api.post<ApiResponse<{ success: boolean; message: string; awaiting_stock?: boolean }>>(`/order/${reference}/retry`)
+  if (!data.success || !data.data) {
+    throw new Error(data.message || 'Failed to retry order')
   }
   return data.data
 }

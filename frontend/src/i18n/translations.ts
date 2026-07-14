@@ -138,8 +138,12 @@ export const en = {
   'order.fetchError': 'Failed to fetch order',
   'order.reference': 'Reference',
 
+  'order.awaitingStockTitle': 'Awaiting Stock',
+  'order.awaitingStockMessage': 'Your payment has been received and your order is queued. The top-up will be delivered automatically once stock is available. You will be notified when completed.',
+
   // Order Status Labels
   'order.status.awaiting_payment': 'Awaiting Payment',
+  'order.status.awaiting_stock': 'Awaiting Stock',
   'order.status.paid': 'Payment Received - Processing',
   'order.status.processing': 'Processing Top-Up',
   'order.status.completed': 'Completed',
@@ -334,8 +338,12 @@ export const km: Record<TranslationKey, string> = {
   'order.fetchError': 'បរាជ័យក្នុងការទាញយកការបញ្ជាទិញ',
   'order.reference': 'អត្តលេខ',
 
+  'order.awaitingStockTitle': 'កំពុងរង់ចាំស្តុក',
+  'order.awaitingStockMessage': 'ការទូទាត់របស់អ្នកត្រូវបានទទួលហើយ ហើយការបញ្ជាទិញរបស់អ្នកកំពុងស្ថិតក្នុងជួររង់ចាំ។ ការបញ្ចូលទឹកប្រាក់នឹងត្រូវបានបញ្ជូនដោយស្វ័យប្រវត្តិនៅពេលដែលស្តុកមាន។ អ្នកនឹងទទួលបានការជូនដំណឹងនៅពេលបញ្ចប់។',
+
   // Order Status Labels
   'order.status.awaiting_payment': 'កំពុងរង់ចាំការទូទាត់',
+  'order.status.awaiting_stock': 'កំពុងរង់ចាំស្តុក',
   'order.status.paid': 'ទទួលបានការទូទាត់ - កំពុងដំណើរការ',
   'order.status.processing': 'កំពុងដំណើរការបញ្ចូលទឹកប្រាក់',
   'order.status.completed': 'បានបញ្ចប់',

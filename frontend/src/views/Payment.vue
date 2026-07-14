@@ -110,13 +110,27 @@ function stopPolling() {
   }
 }
 
+async function handleTimeout() {
+  stopPolling()
+  toast.error(i18n.t('payment.toast.timeExpired'))
+
+  // Cancel the order on backend
+  if (paymentRef.value) {
+    try {
+      await cancelOrder(paymentRef.value)
+    } catch {
+      // Silently fail — order may already be expired
+    }
+  }
+
+  router.push('/')
+}
+
 function startTimer() {
   timerInterval = setInterval(() => {
     timeLeft.value--
     if (timeLeft.value <= 0) {
-      stopPolling()
-      toast.error(i18n.t('payment.toast.timeExpired'))
-      router.push('/')
+      handleTimeout()
     }
   }, 1000)
 }

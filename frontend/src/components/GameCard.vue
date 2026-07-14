@@ -9,17 +9,17 @@ const props = defineProps<{
 <template>
   <router-link
     :to="`/game/${game.game_code}`"
-    class="card group overflow-hidden p-0 cursor-pointer block"
+    class="card group overflow-hidden p-0 cursor-pointer block hover:shadow-xl hover:-translate-y-0.5 transition-all duration-300"
   >
     <!-- Image -->
     <div class="relative aspect-video overflow-hidden bg-surface-100 dark:bg-surface-800">
       <img
         :src="game.image_url"
         :alt="game.name"
-        class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+        class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 ease-out"
         loading="lazy"
       />
-      <div class="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent"></div>
+      <div class="absolute inset-0 bg-gradient-to-t from-black/50 via-black/10 to-transparent opacity-60 group-hover:opacity-80 transition-opacity duration-300"></div>
       <!-- Badge -->
       <div class="absolute top-3 left-3">
         <span class="px-2.5 py-1 bg-white/90 dark:bg-surface-900/90 backdrop-blur-sm rounded-lg text-xs font-semibold text-surface-700 dark:text-surface-200">

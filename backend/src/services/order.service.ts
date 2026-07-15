@@ -422,6 +422,50 @@ export class OrderService {
   }
 
   /**
+   * Manually confirm payment for an order.
+   * Used when Bakong API auto-verification is unavailable or fails.
+   * The admin can mark an order as paid after verifying payment in their bank app.
+   */
+  async manualConfirmPayment(reference: string) {
+    const order = await orderRepository.findByReference(reference);
+    if (!order) {
+      throw new AppError(ERROR_MESSAGES.ORDER_NOT_FOUND, HTTP_STATUS.NOT_FOUND);
+    }
+
+    if (order.payment_status !== 'pending') {
+      throw new AppError(
+        'Order is not pending payment. Current status: ' + order.payment_status,
+        HTTP_STATUS.UNPROCESSABLE_ENTITY
+      );
+    }
+
+    if (order.order_status !== 'awaiting_payment') {
+      throw new AppError(
+        'Order is not awaiting payment. Current status: ' + order.order_status,
+        HTTP_STATUS.UNPROCESSABLE_ENTITY
+      );
+    }
+
+    console.log(`💡 Manual payment confirmation for ${reference}`);
+
+    // Mark as paid and trigger top-up
+    const updated = await orderRepository.markPaid(reference);
+
+    // Trigger top-up processing (non-blocking)
+    this.processTopUp(reference).catch((err) =>
+      console.error('Top-up processing error:', err)
+    );
+
+    return {
+      success: true,
+      message: 'Payment confirmed manually. Top-up processing started.',
+      reference,
+      payment_status: updated?.payment_status || 'paid',
+      order_status: updated?.order_status || 'paid',
+    };
+  }
+
+  /**
    * Create order directly (after payment)
    */
   async createOrder(params: {

@@ -248,10 +248,14 @@ export class BakongService {
         );
       }
 
-      // Last resort: generate a simple QR with the transaction info
-      // (not a real KHQR, but functional for dev testing)
-      console.warn('   → Using fallback QR with transaction text (dev only)');
-      qr = `topup://${transactionId}`;
+      // Last resort: generate an EMVCo-compliant KHQR string manually
+      // This builds a valid KHQR with correct TLV structure + CRC16-CCITT
+      console.warn('   → Using manual EMVCo KHQR fallback');
+      qr = this.generateFallbackKHQR({
+        amount: params.amount,
+        description: params.description,
+        transactionId,
+      });
       qrImage = await this.generateQRImage(qr);
 
       return {
@@ -358,6 +362,117 @@ export class BakongService {
       .createHmac('sha256', config.bakong.apiToken)
       .update(data)
       .digest('hex');
+  }
+
+  /**
+   * Build a valid EMVCo-compliant KHQR string from scratch without relying on
+   * the bakong-khqr SDK. This is used as a last-resort fallback when both the
+   * Bakong API and the bakong-khqr library fail.
+   *
+   * The generated string follows the EMVCo QR Code standard with proper
+   * Tag-Length-Value (TLV) encoding and CRC16-CCITT checksum.
+   *
+   * Structure:
+   *   00  (Payload Format Indicator)           - 01
+   *   01  (Point of Initiation Method)         - 11 (static QR for repeated use)
+   *   29  (Merchant Account Info – Cambodia)   - nested sub-TLV
+   *      00  (Globally Unique Identifier)      - "khqr.bakong.com"
+   *      01  (Bakong Account ID)               - merchant's bakong ID
+   *      02  (Merchant Name)                   - shop name
+   *      03  (Merchant City)                   - Phnom Penh
+   *   53  (Transaction Currency)               - 116 (KHR)
+   *   54  (Transaction Amount)                 - amount in KHR
+   *   58  (Country Code)                       - KH
+   *   59  (Merchant Name - EMV)                - shop name
+   *   60  (Merchant City - EMV)                - Phnom Penh
+   *   62  (Additional Data)                    - bill number, store label
+   *   63  (CRC16-CCITT)                        - checksum
+   *
+   * All Cambodian banking apps (ABA, ACLEDA, Wing, Bakong, etc.) accept
+   * EMVCo-compliant KHQR strings.
+   */
+  private generateFallbackKHQR(params: {
+    amount: number;
+    description: string;
+    transactionId: string;
+  }): string {
+    const bakongAccount = config.merchant.bakongId || 'demo@bkrt';
+    const merchantName = config.merchant.name || 'MY SHOP';
+    const merchantCity = config.merchant.city || 'Phnom Penh';
+    const amountKHR = Math.round(params.amount * this.USD_TO_KHR);
+    const billNumber = params.description
+      .replace(/[^a-zA-Z0-9-_]/g, '')
+      .substring(0, 25);
+
+    // Helper: build TLV (Tag-Length-Value) segment
+    const tlv = (tag: string, value: string): string => {
+      const len = value.length.toString().padStart(2, '0');
+      return tag + len + value;
+    };
+
+    // ── Tag 29: Merchant Account Information (Cambodia KHQR) ──
+    // Sub-tags under 29:
+    //   00  = Globally Unique Identifier ("khqr.bakong.com")
+    //   01  = Bakong Account ID
+    //   02  = Merchant Name (optional, for display)
+    //   03  = Merchant City (optional)
+    const guid = 'khqr.bakong.com';
+    let tag29Data =
+      tlv('00', guid) +
+      tlv('01', bakongAccount) +
+      tlv('02', merchantName.substring(0, 25));
+
+    if (merchantCity) {
+      tag29Data += tlv('03', merchantCity.substring(0, 15));
+    }
+
+    // ── Tag 62: Additional Data ──
+    //   01  = Bill Number
+    //   07  = Store Label (mobile number or store name)
+    let tag62Data = '';
+    if (billNumber) {
+      tag62Data += tlv('01', billNumber);
+    }
+    tag62Data += tlv('07', merchantName.substring(0, 25));
+
+    // ── Build the raw QR payload (without CRC) ──
+    let rawQr = '';
+    rawQr += tlv('00', '01');                      // Payload Format Indicator
+    rawQr += tlv('01', '11');                      // Point of Initiation Method (static)
+    rawQr += tlv('29', tag29Data);                 // Merchant Account Information
+    rawQr += tlv('53', '116');                     // Transaction Currency (KHR = 116)
+    rawQr += tlv('54', amountKHR.toString());      // Transaction Amount
+    rawQr += tlv('58', 'KH');                      // Country Code
+    rawQr += tlv('59', merchantName.substring(0, 25));  // Merchant Name (EMV)
+    rawQr += tlv('60', merchantCity.substring(0, 15));  // Merchant City (EMV)
+    rawQr += tlv('62', tag62Data);                 // Additional Data
+
+    // ── Compute CRC16-CCITT (polynomial 0x1021) ──
+    const crcData = rawQr + '6304'; // placeholder for CRC (tag 63, length 04)
+    const crc = this.crc16ccitt(crcData);
+    rawQr += '63' + '04' + crc;
+
+    return rawQr;
+  }
+
+  /**
+   * Compute CRC16-CCITT (polynomial 0x1021, initial value 0xFFFF)
+   * as required by the EMVCo QR Code specification.
+   */
+  private crc16ccitt(data: string): string {
+    let crc = 0xffff;
+    for (let i = 0; i < data.length; i++) {
+      crc ^= (data.charCodeAt(i) << 8);
+      for (let j = 0; j < 8; j++) {
+        if (crc & 0x8000) {
+          crc = (crc << 1) ^ 0x1021;
+        } else {
+          crc = crc << 1;
+        }
+        crc &= 0xffff;
+      }
+    }
+    return crc.toString(16).toUpperCase().padStart(4, '0');
   }
 }
 

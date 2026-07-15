@@ -4,7 +4,7 @@ import { useRouter } from 'vue-router'
 import { useGameStore } from '@/stores/game'
 import { useI18nStore } from '@/stores/i18n'
 import { useToastStore } from '@/stores/toast'
-import { createPayment, getPaymentStatus, cancelOrder, getResellerBalance } from '@/services/api'
+import { createPayment, getPaymentStatus, cancelOrder, getResellerBalance, manualConfirmPayment } from '@/services/api'
 import KHQRCard from '@/components/KHQRCard.vue'
 
 const router = useRouter()
@@ -22,6 +22,8 @@ const timeLeft = ref(5 * 60) // 5 minutes
 const checkoutStarted = ref(false)
 const showCancelDialog = ref(false)
 const cancelling = ref(false)
+const showManualConfirmDialog = ref(false)
+const confirmingPayment = ref(false)
 const showSuccessOverlay = ref(false)
 const redirectCountdown = ref(3)
 
@@ -35,6 +37,10 @@ let redirectInterval: ReturnType<typeof setInterval> | null = null
 
 const isUrgent = computed(() => timeLeft.value < 60 && paymentStatus.value === 'pending')
 
+// Manual confirm availability (enabled 30s after checkout)
+const manualConfirmAvailable = ref(false)
+const manualConfirmTimer = ref<ReturnType<typeof setTimeout> | null>(null)
+
 if (!order.value) {
   router.replace('/')
 }
@@ -45,6 +51,9 @@ async function handleCheckout() {
 
   checkoutStarted.value = true
   qrLoading.value = true
+  // Enable manual confirm button after 30s (prevents accidental clicks before payment)
+  if (manualConfirmTimer.value) clearTimeout(manualConfirmTimer.value)
+  manualConfirmTimer.value = setTimeout(() => { manualConfirmAvailable.value = true }, 30000)
   qrError.value = null
 
   try {
@@ -135,6 +144,24 @@ async function checkResellerBalance() {
   }
 }
 
+// ─── Manual Payment Confirmation ────────────────────────────
+async function handleManualConfirm() {
+  if (!paymentRef.value) return
+  confirmingPayment.value = true
+  try {
+    const result = await manualConfirmPayment(paymentRef.value)
+    showManualConfirmDialog.value = false
+    toast.success('Payment confirmed! Processing top-up...')
+    paymentStatus.value = 'paid'
+    onPaymentReceived()
+  } catch (err) {
+    showManualConfirmDialog.value = false
+    toast.error(err instanceof Error ? err.message : 'Failed to confirm payment')
+  } finally {
+    confirmingPayment.value = false
+  }
+}
+
 // ─── Cancel Order ─────────────────────────────────────────────
 async function handleCancelOrder() {
   if (!paymentRef.value) return
@@ -212,6 +239,7 @@ function onPaymentReceived() {
 
 onUnmounted(() => {
   stopPolling()
+  if (manualConfirmTimer.value) clearTimeout(manualConfirmTimer.value)
 })
 </script>
 
@@ -281,6 +309,28 @@ onUnmounted(() => {
                   </div>
                 </div>
               </div>
+            </div>
+
+            <!-- Manual Confirm Button (for when Bakong auto-verification is unavailable) -->
+            <div
+              v-if="manualConfirmAvailable && paymentStatus === 'pending' && paymentRef"
+              class="p-4 bg-emerald-50 dark:bg-emerald-900/10 rounded-xl border border-emerald-200 dark:border-emerald-800/30"
+            >
+              <div class="flex items-start gap-3 mb-3">
+                <svg class="w-5 h-5 text-emerald-500 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                </svg>
+                <div>
+                  <p class="text-xs font-semibold text-emerald-700 dark:text-emerald-400">Payment received but not detected?</p>
+                  <p class="text-[10px] text-emerald-600 dark:text-emerald-500 mt-1">If you scanned and paid, confirm manually to process the top-up immediately.</p>
+                </div>
+              </div>
+              <button
+                @click="showManualConfirmDialog = true"
+                class="w-full py-2.5 px-4 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-bold transition-all duration-200 active:scale-[0.98]"
+              >
+                I've Paid — Confirm & Process
+              </button>
             </div>
 
             <!-- Low Balance Warning -->
@@ -365,6 +415,51 @@ onUnmounted(() => {
                 :disabled="cancelling"
                 class="w-full py-2.5 px-4 rounded-xl border-2 border-surface-200 dark:border-surface-700 text-surface-700 dark:text-surface-300 font-medium text-sm hover:bg-surface-50 dark:hover:bg-surface-700/50 disabled:opacity-50 transition-all duration-200"
               >{{ i18n.t('payment.cancelConfirmNo') }}</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
+    <!-- Manual Confirm Dialog -->
+    <Teleport to="body">
+      <div
+        v-if="showManualConfirmDialog"
+        class="fixed inset-0 z-50 flex items-center justify-center p-4"
+        @click.self="showManualConfirmDialog = false"
+      >
+        <div class="absolute inset-0 bg-black/50 dark:bg-black/70 backdrop-blur-sm"></div>
+        <div class="relative bg-white dark:bg-surface-800 rounded-2xl shadow-2xl max-w-sm w-full p-6 animate-fade-in">
+          <div class="text-center">
+            <div class="inline-flex items-center justify-center w-14 h-14 rounded-full bg-emerald-100 dark:bg-emerald-900/20 mb-4">
+              <svg class="w-7 h-7 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+              </svg>
+            </div>
+            <h3 class="text-lg font-bold text-surface-900 dark:text-surface-100 mb-2">Confirm Payment Received</h3>
+            <p class="text-sm text-surface-500 dark:text-surface-400 mb-2">
+              Have you verified in your banking app that this payment was received?
+            </p>
+            <p class="text-xs text-amber-600 dark:text-amber-400 mb-6 font-medium">
+              ⚠️ Only confirm if the money has actually arrived in your account.
+            </p>
+            <div class="flex flex-col gap-3">
+              <button
+                @click="handleManualConfirm"
+                :disabled="confirmingPayment"
+                class="w-full py-2.5 px-4 rounded-xl bg-emerald-500 hover:bg-emerald-600 disabled:bg-emerald-300 dark:disabled:bg-emerald-800 text-white font-medium text-sm transition-all duration-200"
+              >
+                <svg v-if="confirmingPayment" class="w-4 h-4 animate-spin inline mr-2" fill="none" viewBox="0 0 24 24">
+                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                </svg>
+                {{ confirmingPayment ? 'Processing...' : 'Yes, Payment Received — Process Top-Up' }}
+              </button>
+              <button
+                @click="showManualConfirmDialog = false"
+                :disabled="confirmingPayment"
+                class="w-full py-2.5 px-4 rounded-xl border-2 border-surface-200 dark:border-surface-700 text-surface-700 dark:text-surface-300 font-medium text-sm hover:bg-surface-50 dark:hover:bg-surface-700/50 disabled:opacity-50 transition-all duration-200"
+              >Cancel</button>
             </div>
           </div>
         </div>

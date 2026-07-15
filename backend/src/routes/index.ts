@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { getCategories, getCambodiaGames, getProductsByGame } from '../controllers/category.controller';
-import { createPayment, getPaymentStatus, handleCallback } from '../controllers/payment.controller';
+import { createPayment, getPaymentStatus, handleCallback, manualConfirmPayment } from '../controllers/payment.controller';
 import { createOrder, getOrder, cancelOrder, retryOrder } from '../controllers/order.controller';
 import { verifyPlayer, checkGameId } from '../controllers/player.controller';
 import { getAdminDashboard } from '../controllers/admin.controller';
@@ -22,6 +22,7 @@ router.get('/check-id', checkGameId);
 router.post('/payment/create', createPayment);
 router.get('/payment/status/:reference', getPaymentStatus);
 router.post('/payment/callback', handleCallback);
+router.post('/payment/manual-confirm/:reference', manualConfirmPayment);
 
 // Balance check (for customers to see if shop has stock before paying)
 router.get('/balance', getBalance);

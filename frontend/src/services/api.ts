@@ -149,6 +149,26 @@ export async function getAdminDashboard(): Promise<AdminDashboardData> {
   return data.data
 }
 
+export async function manualConfirmPayment(reference: string): Promise<{
+  success: boolean
+  message: string
+  reference: string
+  payment_status: string
+  order_status: string
+}> {
+  const { data } = await api.post<ApiResponse<{
+    success: boolean
+    message: string
+    reference: string
+    payment_status: string
+    order_status: string
+  }>>(`/payment/manual-confirm/${reference}`)
+  if (!data.success || !data.data) {
+    throw new Error(data.message || 'Failed to confirm payment')
+  }
+  return data.data
+}
+
 export async function getResellerBalance(): Promise<BalanceInfo> {
   const { data } = await api.get<ApiResponse<BalanceInfo>>('/balance')
   if (!data.success || !data.data) {

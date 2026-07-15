@@ -63,6 +63,30 @@ export async function getPaymentStatus(
   }
 }
 
+export async function manualConfirmPayment(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const { reference } = req.params;
+
+    if (!reference) {
+      throw new AppError('Reference is required', HTTP_STATUS.BAD_REQUEST);
+    }
+
+    const result = await orderService.manualConfirmPayment(reference);
+
+    res.status(HTTP_STATUS.OK).json({
+      success: true,
+      message: result.message,
+      data: result,
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
 export async function handleCallback(
   req: Request,
   res: Response,

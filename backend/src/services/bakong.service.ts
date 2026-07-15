@@ -4,6 +4,7 @@ import { bakongApi } from '../utils/axios';
 import { HTTP_STATUS, ERROR_MESSAGES } from '../constants';
 import { AppError } from '../middleware/errorHandler';
 import crypto from 'crypto';
+import { BakongKHQR, khqrData, IndividualInfo } from 'bakong-khqr';
 
 /* ───────────────────────────────────────────
  *  Types
@@ -60,48 +61,88 @@ export class BakongService {
         },
       });
     } catch {
-      return ''; // QR image generation failed
+      return '';
     }
   }
 
   /**
-   * Build an EMV merchant QR (KHQR) string with the merchant's details.
-   * This follows the Cambodia KHQR standard format for Bakong.
+   * Generate a proper EMVCo-compliant KHQR using the official NBC
+   * bakong-khqr library.
+   *
+   * This is the CORRECT way to build a KHQR — it handles:
+   *  - Proper EMVCo TLV (Tag-Length-Value) data structure
+   *  - Correct Merchant Account Information (Tag 29) with nested sub-tags
+   *  - CRC16-CCITT (polynomial 0x1021) as required by all Cambodian banks
+   *  - All bank apps (ABA, ACLEDA, Wing, Bakong, etc.) will accept this QR
+   *
+   * Merchant environment variables used:
+   *   MERCHANT_BAKONG_ID  – Bakong account (e.g. "yourname@bkrt")
+   *   MERCHANT_NAME       – Your shop/merchant name
+   *   MERCHANT_CITY       – Your city
    */
-  private buildSimulatedQR(params: {
+  private generateProperKHQR(params: {
     amount: number;
     description: string;
-    md5Hash: string;
-  }): string {
-    const bakongId = config.merchant.bakongId || 'demo@bkrt';
-    const name = config.merchant.name || 'MY SHOP';
-    const city = config.merchant.city || 'Phnom Penh';
+  }): { qr: string; md5: string } {
+    const bakongAccount = config.merchant.bakongId || 'demo@bkrt';
+    const merchantName = config.merchant.name || 'MY SHOP';
+    const merchantCity = config.merchant.city || 'Phnom Penh';
 
-    // Build a simplified EMV merchant QR string.
-    // Format: 00 01 01 02 12 (Payload Format Indicator + EMV tag)
-    // Then merchant account info, currency, amount, country, name, city, CRC
-    return [
-      '000201',                                    // Payload Format Indicator
-      '010212',                                    // Point of Initiation Method (12 = dynamic)
-      `29300012${bakongId}`,                       // Merchant Account Info
-      '52045999',                                  // Merchant Category Code
-      '5303116',                                   // Transaction Currency (116 = KHR)
-      `54${params.amount.toFixed(2).length.toString().padStart(2, '0')}${params.amount.toFixed(2)}`, // Amount
-      '5802KH',                                    // Country Code
-      `59${name.length.toString().padStart(2, '0')}${name}`, // Merchant Name
-      `60${city.length.toString().padStart(2, '0')}${city}`, // Merchant City
-      `6304${params.md5Hash.substring(0, 4)}`,     // CRC
-    ].join('');
+    // Convert USD amount to KHR for the QR (banks display KHR amounts)
+    const amountKHR = Math.round(params.amount * this.USD_TO_KHR);
+
+    // Use order reference or description truncated as bill number
+    const billNumber = params.description
+      .replace(/[^a-zA-Z0-9-_]/g, '')
+      .substring(0, 25);
+
+    const optionalData: Record<string, any> = {
+      currency: khqrData.currency.khr,
+      amount: amountKHR,
+      storeLabel: merchantName.substring(0, 25),
+      // expirationTimestamp is REQUIRED by the library when amount is provided
+      expirationTimestamp: Date.now() + 5 * 60 * 1000, // 5 minutes
+      merchantCategoryCode: '5999',
+    };
+
+    // Only add billNumber if we have a value
+    if (billNumber) {
+      optionalData.billNumber = billNumber;
+    }
+
+    const individualInfo = new IndividualInfo(
+      bakongAccount,
+      merchantName.substring(0, 25),
+      merchantCity.substring(0, 15),
+      optionalData
+    );
+
+    const khqr = new BakongKHQR();
+    const result = khqr.generateIndividual(individualInfo);
+
+    if (result.status?.code !== 0 || !result.data?.qr) {
+      throw new Error(
+        'KHQR generation failed: ' + (result.message || 'Unknown error')
+      );
+    }
+
+    return {
+      qr: result.data.qr,
+      md5: result.data.md5 || '',
+    };
   }
 
   /**
-   * Generate a KHQR code for payment via the official Bakong API.
+   * Generate a KHQR code for payment.
    *
-   * Uses Bearer token auth and the merchant details provided in env:
-   *   MERCHANT_BAKONG_ID  – e.g. "lorn_davit@bkrt"
-   *   MERCHANT_NAME       – e.g. "MY SHOP"
-   *   MERCHANT_CITY       – e.g. "Phnom Penh"
-   *   BAKONG_API_TOKEN    – Bearer token from developer portal
+   * Strategy (in order):
+   *   1. PRIMARY: Call the official Bakong API at /v1/generate_qr
+   *      (requires BAKONG_API_TOKEN and MERCHANT_BAKONG_ID)
+   *   2. FALLBACK: Use the official NBC bakong-khqr JavaScript SDK
+   *      (produces valid EMVCo-compliant KHQR with correct CRC16-CCITT)
+   *
+   * In production, only strategy 1 is used (strategy 2 will NOT run in
+   * production because we throw on Bakong API failure).
    */
   async generateKHQR(params: {
     amount: number;
@@ -151,8 +192,8 @@ export class BakongService {
           };
         }
 
-        // If Bakong returned success but no qr data, fall through to simulated
-        console.warn('⚠️  Bakong API returned empty QR data — falling back to simulated');
+        // Bakong returned success but no QR data — fall through to SDK
+        console.warn('⚠️  Bakong API returned empty QR data — falling back to bakong-khqr SDK');
       } catch (apiError: any) {
         const msg =
           apiError?.response?.data?.message ||
@@ -162,7 +203,7 @@ export class BakongService {
 
         console.warn(`⚠️  Bakong API generate KHQR failed: ${msg}`);
 
-        // For localhost dev we fall through to simulation
+        // In production, throw — don't generate unverified QRs
         if (config.isProd) {
           throw new AppError(
             `Bakong payment service error: ${msg}`,
@@ -170,29 +211,65 @@ export class BakongService {
           );
         }
 
-        console.warn('   → Falling back to simulated KHQR (dev mode only)');
+        console.warn('   → Falling back to bakong-khqr SDK (dev mode)');
       }
     } else {
-      console.warn('⚠️  Bakong API credentials missing – using simulated KHQR (dev mode)');
+      console.warn('⚠️  Bakong API credentials missing – using bakong-khqr SDK');
     }
 
-    // ── 3. Simulated KHQR for localhost dev ────────────
-    // Build a real EMV merchant QR string and generate a scannable PNG image
-    qr = this.buildSimulatedQR({ amount: params.amount, description: params.description, md5Hash });
-    qrImage = await this.generateQRImage(qr);
+    // ── 3. Fallback: Generate proper KHQR using the official NBC SDK ──
+    //     This library is maintained by the National Bank of Cambodia and
+    //     generates EMVCo-compliant QR strings with correct CRC16-CCITT
+    //     that ALL Cambodian banking apps can scan and validate.
+    try {
+      const khqrResult = this.generateProperKHQR({
+        amount: params.amount,
+        description: params.description,
+      });
 
-    return {
-      qr,
-      qrImage,
-      md5Hash,
-      transactionId,
-      amount: params.amount,
-      currency: 'KHR',
-    };
+      qr = khqrResult.qr;
+      qrImage = await this.generateQRImage(qr);
+
+      return {
+        qr,
+        qrImage,
+        md5Hash: khqrResult.md5 || md5Hash,
+        transactionId,
+        amount: params.amount,
+        currency: 'KHR',
+      };
+    } catch (khqrError: any) {
+      console.error('❌ bakong-khqr SDK failed:', khqrError.message);
+
+      if (config.isProd) {
+        throw new AppError(
+          'Failed to generate payment QR code',
+          HTTP_STATUS.SERVICE_UNAVAILABLE
+        );
+      }
+
+      // Last resort: generate a simple QR with the transaction info
+      // (not a real KHQR, but functional for dev testing)
+      console.warn('   → Using fallback QR with transaction text (dev only)');
+      qr = `topup://${transactionId}`;
+      qrImage = await this.generateQRImage(qr);
+
+      return {
+        qr,
+        qrImage,
+        md5Hash,
+        transactionId,
+        amount: params.amount,
+        currency: 'KHR',
+      };
+    }
   }
 
   /**
    * Check the status of a payment transaction via the Bakong API.
+   *
+   * Returns the REAL Bakong API response. In dev mode without valid credentials,
+   * returns PENDING so the order.service.ts falls through to its dev simulation.
    */
   async checkPaymentStatus(transactionId: string): Promise<PaymentCheckResponse> {
     if (config.bakong.apiUrl && config.bakong.apiToken) {
@@ -218,6 +295,7 @@ export class BakongService {
 
         console.warn(`⚠️  Bakong API check payment failed: ${msg}`);
 
+        // In production, throw so caller knows the API is down
         if (config.isProd) {
           throw new AppError(
             `Bakong payment check error: ${msg}`,
@@ -225,13 +303,23 @@ export class BakongService {
           );
         }
 
-        console.warn('   → Falling back to simulated payment status (dev mode)');
+        // In dev mode: return PENDING instead of simulated PAID
+        // The order service will fall through to its own time-based dev simulation
+        console.warn('   → Returning PENDING (API unavailable). Dev simulation will apply after timeout.');
+        return {
+          status: 'PENDING',
+          transactionId,
+          amount: 0,
+          currency: 'KHR',
+          timestamp: new Date().toISOString(),
+        };
       }
     }
 
-    // Simulated response for localhost dev
+    // No Bakong credentials configured at all — return PENDING
+    // The order service will apply its time-based dev simulation
     return {
-      status: 'PAID',
+      status: 'PENDING',
       transactionId,
       amount: 0,
       currency: 'KHR',

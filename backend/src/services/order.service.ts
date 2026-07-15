@@ -1,9 +1,11 @@
-import { HTTP_STATUS, ERROR_MESSAGES, ORDER_STATUS } from '../constants';
+import { HTTP_STATUS, ERROR_MESSAGES, ORDER_STATUS, PAYMENT_POLL_TIMEOUT, STOCK_RETRY_MAX } from '../constants';
+import { config } from '../config';
 import { AppError } from '../middleware/errorHandler';
 import { generateReference } from '../utils/generateReference';
 import { bay2gameService } from './bay2game.service';
 import { bakongService } from './bakong.service';
 import { orderRepository } from '../repositories/OrderRepository';
+import { notificationService } from './notification.service';
 
 export class OrderService {
   /**
@@ -55,7 +57,14 @@ export class OrderService {
   }
 
   /**
-   * Check payment status (called by frontend polling)
+   * Check payment status (called by frontend polling every 3 seconds).
+   *
+   * Verification Strategy (Dual Approach):
+   * 1. PRIMARY: Real Bakong API check via v1/check_transaction with the transaction_id
+   * 2. FALLBACK (dev): Simulated check after reasonable elapsed time
+   *
+   * In production with Bakong API configured, this polls the real Bakong API
+   * which covers ALL Cambodian banks (ABA, ACLEDA, Wing, etc.) through Bakong.
    */
   async checkPaymentStatus(reference: string) {
     const order = await orderRepository.findByReference(reference);
@@ -63,24 +72,82 @@ export class OrderService {
       throw new AppError(ERROR_MESSAGES.ORDER_NOT_FOUND, HTTP_STATUS.NOT_FOUND);
     }
 
-    if (order.payment_status === 'pending') {
-      const elapsed = Date.now() - new Date(order.created_at).getTime();
-      if (elapsed > 15000) {
-        const updated = await orderRepository.markPaid(reference);
+    // If already paid/processing/completed/failed, return current status immediately
+    if (order.payment_status !== 'pending') {
+      return {
+        reference: order.reference,
+        payment_status: order.payment_status,
+        order_status: order.order_status,
+      };
+    }
 
-        // Process the top-up via Bay2Game (non-blocking)
-        this.processTopUp(reference).catch((err) =>
-          console.error('Top-up processing error:', err)
-        );
+    // ── 1. Try the real Bakong API check ─────────────────
+    if (order.transaction_id && config.bakong.apiToken) {
+      try {
+        const bakongResult = await bakongService.checkPaymentStatus(order.transaction_id);
 
+        if (bakongResult.status === 'PAID' || bakongResult.status === 'SUCCESS') {
+          const updated = await orderRepository.markPaid(reference);
+
+          // Trigger top-up processing (non-blocking)
+          this.processTopUp(reference).catch((err) =>
+            console.error('Top-up processing error:', err)
+          );
+
+          return {
+            reference,
+            payment_status: updated?.payment_status || 'paid',
+            order_status: updated?.order_status || 'paid',
+          };
+        }
+
+        // Bakong says still pending — return current status
         return {
-          reference,
-          payment_status: updated?.payment_status || 'paid',
-          order_status: updated?.order_status || 'paid',
+          reference: order.reference,
+          payment_status: order.payment_status,
+          order_status: order.order_status,
         };
+      } catch (error) {
+        // Bakong API check failed — fall through to time-based check for dev mode
+        console.warn('⚠️  Bakong API payment check failed, falling back:', error);
       }
     }
 
+    // ── 2. Timeout check (elapsed ≥ 5 min → auto-fail) ────
+    const elapsed = Date.now() - new Date(order.created_at).getTime();
+    if (elapsed >= PAYMENT_POLL_TIMEOUT) {
+      console.warn(`⏰ Payment timeout for ${reference} — marking as failed`);
+      await orderRepository.updateStatus(reference, {
+        payment_status: 'failed',
+        order_status: 'failed',
+      });
+
+      return {
+        reference,
+        payment_status: 'failed',
+        order_status: 'failed',
+      };
+    }
+
+    // ── 3. Dev mode: simulated detection after 30 seconds ────
+    // Only applies when Bakong API is NOT configured (development)
+    if (!config.bakong.apiToken && elapsed > 30000) {
+      console.log('💡 [DEV MODE] Simulating payment received after 30s');
+      const updated = await orderRepository.markPaid(reference);
+
+      // Trigger top-up processing (non-blocking)
+      this.processTopUp(reference).catch((err) =>
+        console.error('Top-up processing error:', err)
+      );
+
+      return {
+        reference,
+        payment_status: updated?.payment_status || 'paid',
+        order_status: updated?.order_status || 'paid',
+      };
+    }
+
+    // Still pending — return current status
     return {
       reference: order.reference,
       payment_status: order.payment_status,
@@ -89,7 +156,15 @@ export class OrderService {
   }
 
   /**
-   * Process top-up via Bay2Game after payment confirmed
+   * Process top-up via Bay2Game after payment confirmed.
+   *
+   * If the Bay2Game API returns INSUFFICIENT_BALANCE (reseller has no stock),
+   * instead of marking the order as failed, we mark it as 'awaiting_stock'.
+   * The auto-retry scheduler will keep retrying until the reseller tops up
+   * their Bay2Game wallet.
+   *
+   * This ensures: "Customer paid → money is safe with reseller → order is queued
+   *                → auto-delivered when stock becomes available"
    */
   async processTopUp(reference: string) {
     const order = await orderRepository.findByReference(reference);
@@ -97,6 +172,7 @@ export class OrderService {
       throw new AppError(ERROR_MESSAGES.ORDER_NOT_FOUND, HTTP_STATUS.NOT_FOUND);
     }
 
+    // Allow processing for both freshly paid orders AND awaiting_stock retries
     if (order.payment_status !== 'paid') {
       throw new AppError(
         ERROR_MESSAGES.PAYMENT_PENDING,
@@ -120,6 +196,22 @@ export class OrderService {
 
       await orderRepository.markCompleted(reference, completedAt);
 
+      // ─── Send fulfillment notification if was awaiting stock ───
+      // We check the order's status BEFORE markProcessing changed it
+      const wasAwaitingStock = order.order_status === 'awaiting_stock';
+      if (wasAwaitingStock) {
+        notificationService.alertOrderFulfilled({
+          reference: order.reference,
+          game_name: order.game_name,
+          product_name: order.product_name,
+          player_id: order.player_id,
+          server_id: order.server_id,
+          amount: order.amount,
+          completed_at: completedAt.toISOString(),
+          was_awaiting_stock: true,
+        });
+      }
+
       return {
         success: true,
         message: 'Top-up completed successfully',
@@ -130,9 +222,123 @@ export class OrderService {
         completed_at: completedAt.toISOString(),
       };
     } catch (error) {
+      // ─── Graceful handling: insufficient balance ≠ permanent failure ───
+      if (
+        error instanceof AppError &&
+        error.message === ERROR_MESSAGES.INSUFFICIENT_BALANCE
+      ) {
+        console.warn(
+          `⚠️  Insufficient balance for order ${reference} — queuing for retry`
+        );
+
+        // Check if we've exceeded max retries
+        const retryCount = order.retry_count || 0;
+        if (retryCount >= STOCK_RETRY_MAX) {
+          console.error(
+            `❌ Order ${reference} exceeded max retries (${STOCK_RETRY_MAX}) — marking as failed`
+          );
+          await orderRepository.markFailed(reference);
+          throw new AppError(
+            'Order failed after maximum retry attempts. Please contact support.',
+            HTTP_STATUS.UNPROCESSABLE_ENTITY
+          );
+        }
+
+        // Mark as awaiting stock (payment received, just need balance)
+        await orderRepository.markAwaitingStock(reference);
+
+        // ─── Fire notification alerts (fire-and-forget) ───────────
+        // alertAwaitingStock handles its own errors internally via Promise.allSettled
+        notificationService.alertAwaitingStock({
+          reference: order.reference,
+          game_name: order.game_name,
+          product_name: order.product_name,
+          player_id: order.player_id,
+          server_id: order.server_id,
+          amount: order.amount,
+          created_at: order.created_at.toISOString(),
+        });
+
+        // ALWAYS re-throw so callers (retryAwaitingOrders, handleCallback, etc.)
+        // can properly differentiate success from "still waiting" and call
+        // incrementRetry for exponential backoff.
+        throw error;
+      }
+
+      // ─── Other errors: mark as failed ───
       await orderRepository.markFailed(reference);
       throw error;
     }
+  }
+
+  /**
+   * Retry all orders currently in 'awaiting_stock' status whose next_retry_at
+   * has passed. Called by the auto-retry scheduler (see server.ts) and can also
+   * be triggered manually via POST /order/:reference/retry.
+   *
+   * Each retry attempt uses exponential backoff:
+   *   Retry 1: 30s, Retry 2: 60s, Retry 3: 120s, ..., capped at 1 hour
+   */
+  async retryAwaitingOrders(): Promise<{
+    attempted: number;
+    succeeded: number;
+    still_waiting: number;
+  }> {
+    const orders = await orderRepository.findAwaitingStock();
+
+    let succeeded = 0;
+    let still_waiting = 0;
+
+    await Promise.allSettled(
+      orders.map(async (order) => {
+        try {
+          // Try processing again
+          await this.processTopUp(order.reference);
+          succeeded++;
+        } catch {
+          // Failed again — increment retry count for next cycle
+          await orderRepository.incrementRetry(order.reference);
+          still_waiting++;
+        }
+      })
+    );
+
+    if (orders.length > 0) {
+      console.log(
+        `🔄 Stock retry: ${orders.length} orders, ${succeeded} succeeded, ${still_waiting} still waiting`
+      );
+    }
+
+    return {
+      attempted: orders.length,
+      succeeded,
+      still_waiting,
+    };
+  }
+
+  /**
+   * Manually retry a single order that is awaiting stock.
+   * Used by the reseller/admin via the API endpoint.
+   */
+  async retryOrder(reference: string) {
+    const order = await orderRepository.findByReference(reference);
+    if (!order) {
+      throw new AppError(ERROR_MESSAGES.ORDER_NOT_FOUND, HTTP_STATUS.NOT_FOUND);
+    }
+
+    if (order.order_status !== 'awaiting_stock') {
+      throw new AppError(
+        'Order is not awaiting stock. Current status: ' + order.order_status,
+        HTTP_STATUS.UNPROCESSABLE_ENTITY
+      );
+    }
+
+    // Reset retry count so it gets a fresh start
+    await orderRepository.updateStatus(reference, {
+      order_status: 'paid',
+    });
+
+    return this.processTopUp(reference);
   }
 
   /**
@@ -156,6 +362,8 @@ export class OrderService {
       payment_method: order.payment_method,
       payment_status: order.payment_status,
       order_status: order.order_status,
+      retry_count: order.retry_count || 0,
+      next_retry_at: order.next_retry_at?.toISOString() || null,
       created_at: order.created_at.toISOString(),
       updated_at: order.updated_at.toISOString(),
       completed_at: order.completed_at?.toISOString() || null,

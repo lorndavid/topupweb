@@ -10,7 +10,7 @@ import {
 import { HTTP_STATUS, ERROR_MESSAGES, isBay2GameSuccess } from '../constants';
 import { AppError } from '../middleware/errorHandler';
 import { gameCacheRepository } from '../repositories/GameCacheRepository';
-import { gameLookupService } from './gameLookup.service';
+import { bay2gameCheckService } from './bay2gameCheck.service';
 
 function getApiParams(): Record<string, string> {
   return { api_key: config.bay2game.apiKey };
@@ -183,40 +183,15 @@ export class Bay2GameService {
   }
 
   /**
-   * Verify a player ID by looking up their in-game nickname.
-   * Uses the multi-provider GameLookupService which tries real game APIs
-   * (Valorant via Riot, MLBB/Free Fire via community APIs) and falls back
-   * to simulated names for games without public APIs.
+   * Verify a player ID by looking up their in-game nickname using the
+   * Bay2Game Check ID API which supports 204+ games with real-time validation.
    */
   async verifyPlayer(params: {
     gameCode: string;
     playerId: string;
     serverId?: string;
-  }): Promise<{ verified: boolean; nickname?: string; playerId: string; serverId?: string; provider?: string }> {
-    // First, try Bay2Game API in case they've added a user info endpoint
-    try {
-      const { data } = await bay2gameApi.get('/api/game_user_info', {
-        params: {
-          ...getApiParams(),
-          game_code: params.gameCode,
-          game_user_id: params.playerId,
-        },
-        timeout: 5000,
-      });
-      if (isBay2GameSuccess(data.status) && data.user?.nickname) {
-        return {
-          verified: true,
-          nickname: data.user.nickname,
-          playerId: params.playerId,
-          provider: 'bay2game',
-        };
-      }
-    } catch {
-      // Endpoint doesn't exist — fall through to GameLookupService
-    }
-
-    // Use the multi-provider GameLookupService
-    return gameLookupService.lookupPlayer({
+  }): Promise<{ verified: boolean; nickname?: string; playerId: string; serverId?: string; region?: string; gameTitle?: string; provider?: string }> {
+    return bay2gameCheckService.verifyPlayer({
       gameCode: params.gameCode,
       playerId: params.playerId.trim(),
       serverId: params.serverId,

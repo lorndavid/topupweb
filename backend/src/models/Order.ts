@@ -18,6 +18,8 @@ export interface IOrder extends Document {
   khqr_image?: string;
   khqr_data?: string;
   transaction_id?: string;
+  retry_count?: number;
+  next_retry_at?: Date;
   completed_at?: Date;
   created_at: Date;
   updated_at: Date;
@@ -57,6 +59,7 @@ const OrderSchema = new Schema<IOrder>(
         'awaiting_payment',
         'paid',
         'processing',
+        'awaiting_stock',
         'completed',
         'failed',
         'cancelled',
@@ -70,6 +73,8 @@ const OrderSchema = new Schema<IOrder>(
       index: true,
       sparse: true,
     },
+    retry_count: { type: Number, default: 0 },
+    next_retry_at: { type: Date },
     completed_at: { type: Date },
   },
   {
@@ -80,5 +85,8 @@ const OrderSchema = new Schema<IOrder>(
 
 // Compound index for common queries
 OrderSchema.index({ reference: 1, transaction_id: 1 });
+
+// Index for stock retry queries (findAwaitingStock)
+OrderSchema.index({ order_status: 1, next_retry_at: 1 });
 
 export const OrderModel = mongoose.model<IOrder>('Order', OrderSchema);

@@ -1,6 +1,6 @@
 import { OrderModel, IOrder } from '../models/Order';
 
-type OrderStatus = 'pending' | 'awaiting_payment' | 'paid' | 'processing' | 'completed' | 'failed' | 'cancelled';
+type OrderStatus = 'pending' | 'awaiting_payment' | 'paid' | 'processing' | 'awaiting_stock' | 'completed' | 'failed' | 'cancelled';
 type PaymentStatus = 'pending' | 'paid' | 'failed';
 
 /** Plain order data object returned by the repository (no Mongoose methods) */
@@ -21,6 +21,8 @@ export interface OrderData {
   khqr_image?: string;
   khqr_data?: string;
   transaction_id?: string;
+  retry_count?: number;
+  next_retry_at?: Date;
   completed_at?: Date;
   created_at: Date;
   updated_at: Date;
@@ -57,6 +59,11 @@ export class OrderRepository {
   async create(data: CreateOrderData): Promise<OrderData> {
     const doc = await OrderModel.create(data);
     return this.toData(doc);
+  }
+
+  async findAll(): Promise<OrderData[]> {
+    const docs = await OrderModel.find().sort({ created_at: -1 });
+    return docs.map((doc) => this.toData(doc));
   }
 
   async findByReference(reference: string): Promise<OrderData | null> {
@@ -114,6 +121,55 @@ export class OrderRepository {
     });
   }
 
+  async markAwaitingStock(
+    reference: string
+  ): Promise<OrderData | null> {
+    const doc = await OrderModel.findOneAndUpdate(
+      { reference },
+      {
+        $set: {
+          payment_status: 'paid',
+          order_status: 'awaiting_stock',
+          retry_count: 0,
+          next_retry_at: new Date(Date.now() + 30_000), // First retry in 30s
+        },
+      },
+      { new: true }
+    );
+    return doc ? this.toData(doc) : null;
+  }
+
+  /** Find all orders awaiting stock whose next_retry_at has passed */
+  async findAwaitingStock(): Promise<OrderData[]> {
+    const docs = await OrderModel.find({
+      order_status: 'awaiting_stock',
+      next_retry_at: { $lte: new Date() },
+    }).sort({ next_retry_at: 1 });
+    return docs.map((doc) => this.toData(doc));
+  }
+
+  /** Increment retry count and schedule next retry (exponential backoff) */
+  async incrementRetry(reference: string): Promise<OrderData | null> {
+    const order = await OrderModel.findOne({ reference });
+    if (!order) return null;
+
+    const retryCount = (order.retry_count || 0) + 1;
+    // Exponential backoff: 30s, 60s, 120s, 240s, ... cap at 1 hour
+    const delayMs = Math.min(30_000 * Math.pow(2, retryCount - 1), 3_600_000);
+
+    const doc = await OrderModel.findOneAndUpdate(
+      { reference },
+      {
+        $set: {
+          retry_count: retryCount,
+          next_retry_at: new Date(Date.now() + delayMs),
+        },
+      },
+      { new: true }
+    );
+    return doc ? this.toData(doc) : null;
+  }
+
   private toData(doc: IOrder): OrderData {
     return {
       reference: doc.reference,
@@ -132,6 +188,8 @@ export class OrderRepository {
       khqr_image: doc.khqr_image,
       khqr_data: doc.khqr_data,
       transaction_id: doc.transaction_id,
+      retry_count: doc.retry_count,
+      next_retry_at: doc.next_retry_at,
       completed_at: doc.completed_at,
       created_at: doc.created_at,
       updated_at: doc.updated_at,

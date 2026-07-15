@@ -40,6 +40,12 @@ export const config = {
       process.env.BAKONG_RETURN_URL || 'http://localhost:5173/payment/success',
   },
 
+  notifications: {
+    telegramBotToken: process.env.TELEGRAM_BOT_TOKEN || '',
+    telegramChatId: process.env.TELEGRAM_CHAT_ID || '',
+    webhookUrl: process.env.NOTIFICATION_WEBHOOK_URL || '',
+  },
+
   isDev: process.env.NODE_ENV === 'development',
   isProd: process.env.NODE_ENV === 'production',
 } as const;

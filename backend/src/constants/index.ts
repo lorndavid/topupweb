@@ -18,6 +18,7 @@ export const ORDER_STATUS = {
   AWAITING_PAYMENT: 'awaiting_payment',
   PAID: 'paid',
   PROCESSING: 'processing',
+  AWAITING_STOCK: 'awaiting_stock',
   COMPLETED: 'completed',
   FAILED: 'failed',
   CANCELLED: 'cancelled',
@@ -46,6 +47,7 @@ export const ERROR_MESSAGES = {
   ORDER_ALREADY_PROCESSED: 'Cannot cancel — order has already been processed',
   PAYMENT_FAILED: 'Payment verification failed',
   PAYMENT_PENDING: 'Payment is still pending',
+  PAYMENT_AWAITING_STOCK: 'Payment received — awaiting stock to deliver',
   INVALID_PLAYER_ID: 'Invalid player ID',
   SERVER_ERROR: 'Internal server error',
   API_TIMEOUT: 'Bay2Game API timeout',
@@ -59,3 +61,7 @@ export const REFERENCE_PREFIX = 'TUP';
 export const PAYMENT_POLL_INTERVAL = 3000; // 3 seconds
 export const PAYMENT_POLL_TIMEOUT = 5 * 60 * 1000; // 5 minutes
 export const API_TIMEOUT = 10000; // 10 seconds
+
+// Stock retry constants
+export const STOCK_RETRY_INTERVAL = 60_000; // Retry awaiting_stock orders every 60 seconds
+export const STOCK_RETRY_MAX = 1440; // Max 1440 retries = ~24 hours before giving up

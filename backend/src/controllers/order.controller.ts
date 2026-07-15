@@ -85,3 +85,31 @@ export async function getOrder(
     next(error);
   }
 }
+
+/**
+ * Manually retry an order that is awaiting stock.
+ * The reseller can call this after topping up their Bay2Game wallet.
+ */
+export async function retryOrder(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const { reference } = req.params;
+
+    if (!reference) {
+      throw new AppError('Reference is required', HTTP_STATUS.BAD_REQUEST);
+    }
+
+    const result = await orderService.retryOrder(reference);
+
+    res.status(HTTP_STATUS.OK).json({
+      success: true,
+      message: result.message || 'Order retry initiated',
+      data: result,
+    });
+  } catch (error) {
+    next(error);
+  }
+}

@@ -9,6 +9,8 @@ import type {
   OrderResponse,
   VerifyPlayerResult,
   CheckGameIdResponse,
+  AdminDashboardData,
+  BalanceInfo,
 } from '@/types'
 
 const api = axios.create({
@@ -38,6 +40,14 @@ export async function getCategories(): Promise<GameCategory[]> {
   const { data } = await api.get<ApiResponse<GameCategory[]>>('/categories')
   if (!data.success || !data.data) {
     throw new Error(data.message || 'Failed to fetch categories')
+  }
+  return data.data
+}
+
+export async function getCambodiaGames(): Promise<GameCategory[]> {
+  const { data } = await api.get<ApiResponse<GameCategory[]>>('/cambodia-games')
+  if (!data.success || !data.data) {
+    throw new Error(data.message || 'Failed to fetch Cambodia games')
   }
   return data.data
 }
@@ -126,6 +136,22 @@ export async function retryOrder(reference: string): Promise<{
   const { data } = await api.post<ApiResponse<{ success: boolean; message: string; awaiting_stock?: boolean }>>(`/order/${reference}/retry`)
   if (!data.success || !data.data) {
     throw new Error(data.message || 'Failed to retry order')
+  }
+  return data.data
+}
+
+export async function getAdminDashboard(): Promise<AdminDashboardData> {
+  const { data } = await api.get<ApiResponse<AdminDashboardData>>('/admin/dashboard')
+  if (!data.success || !data.data) {
+    throw new Error(data.message || 'Failed to load admin dashboard')
+  }
+  return data.data
+}
+
+export async function getResellerBalance(): Promise<BalanceInfo> {
+  const { data } = await api.get<ApiResponse<BalanceInfo>>('/balance')
+  if (!data.success || !data.data) {
+    return { balance: 0, username: '', available: false }
   }
   return data.data
 }

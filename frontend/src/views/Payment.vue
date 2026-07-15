@@ -4,7 +4,7 @@ import { useRouter } from 'vue-router'
 import { useGameStore } from '@/stores/game'
 import { useI18nStore } from '@/stores/i18n'
 import { useToastStore } from '@/stores/toast'
-import { createPayment, getPaymentStatus, cancelOrder } from '@/services/api'
+import { createPayment, getPaymentStatus, cancelOrder, getResellerBalance } from '@/services/api'
 
 const router = useRouter()
 const gameStore = useGameStore()
@@ -24,6 +24,14 @@ const showCancelDialog = ref(false)
 const cancelling = ref(false)
 const showSuccessOverlay = ref(false)
 const redirectCountdown = ref(3)
+
+// Low-balance warning
+const balanceInfo = ref<{ balance: number; available: boolean } | null>(null)
+const balanceLoading = ref(false)
+const showLowBalanceWarning = computed(() => {
+  if (!balanceInfo.value || !balanceInfo.value.available) return false
+  return balanceInfo.value.balance < amount.value
+})
 let pollInterval: ReturnType<typeof setInterval> | null = null
 let timerInterval: ReturnType<typeof setInterval> | null = null
 let redirectInterval: ReturnType<typeof setInterval> | null = null
@@ -67,6 +75,9 @@ async function initPayment() {
     // Start polling for payment status
     startPolling()
     startTimer()
+
+    // Non-blocking: fetch reseller balance to warn if low on stock
+    checkResellerBalance()
   } catch (err) {
     error.value = err instanceof Error ? err.message : i18n.t('payment.toast.createFailed')
     toast.error(error.value)
@@ -133,6 +144,18 @@ function startTimer() {
       handleTimeout()
     }
   }, 1000)
+}
+
+async function checkResellerBalance() {
+  balanceLoading.value = true
+  try {
+    balanceInfo.value = await getResellerBalance()
+  } catch {
+    // Silently fail — balance is non-critical
+    balanceInfo.value = { balance: 0, available: false }
+  } finally {
+    balanceLoading.value = false
+  }
 }
 
 async function handleCancelOrder() {
@@ -316,6 +339,38 @@ onUnmounted(() => {
                 </svg>
                 <p class="text-sm">KHQR Code</p>
               </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Low Balance Warning -->
+        <div
+          v-if="showLowBalanceWarning"
+          class="mb-4 p-3 rounded-xl bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800 animate-fade-in"
+        >
+          <div class="flex items-start gap-3">
+            <svg class="w-5 h-5 text-amber-500 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <div>
+              <p class="text-sm font-semibold text-amber-700 dark:text-amber-400">
+                {{ i18n.t('payment.lowBalanceTitle') }}
+              </p>
+              <p class="text-xs text-amber-600 dark:text-amber-500 mt-1">
+                {{ i18n.t('payment.lowBalanceMessage') }}
+              </p>
+            </div>
+          </div>
+        </div>
+        <div
+          v-else-if="balanceLoading"
+          class="mb-4 p-3 rounded-xl bg-surface-50 dark:bg-surface-800 animate-pulse"
+        >
+          <div class="flex items-center gap-3">
+            <div class="w-5 h-5 skeleton rounded"></div>
+            <div class="flex-1">
+              <div class="h-3 skeleton w-3/4 mb-1"></div>
+              <div class="h-3 skeleton w-1/2"></div>
             </div>
           </div>
         </div>

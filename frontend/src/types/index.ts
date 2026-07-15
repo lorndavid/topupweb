@@ -45,6 +45,12 @@ export interface PaymentResponse {
   expires_at: string
 }
 
+export interface BalanceInfo {
+  balance: number
+  username: string
+  available: boolean
+}
+
 export interface PaymentStatus {
   reference: string
   payment_status: 'pending' | 'paid' | 'failed'
@@ -109,4 +115,43 @@ export interface OrderSummary {
   playerId: string
   serverId?: string
   verifyProvider?: string
+}
+
+export interface AdminDashboardProfile {
+  username: string
+  balance: number
+  total_orders: number
+  total_spent: number
+}
+
+export interface AdminDashboardStats {
+  total_orders: number
+  awaiting_stock: number
+  completed: number
+  failed: number
+  awaiting_payment: number
+  processing: number
+  cancelled: number
+  total_revenue: number
+  pending_revenue: number
+}
+
+export interface AwaitingStockOrder {
+  reference: string
+  game_code: string
+  product_name: string
+  game_name: string
+  player_id: string
+  server_id?: string
+  amount: number
+  retry_count: number
+  next_retry_at: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface AdminDashboardData {
+  profile: AdminDashboardProfile | null
+  stats: AdminDashboardStats
+  awaiting_stock_orders: AwaitingStockOrder[]
 }

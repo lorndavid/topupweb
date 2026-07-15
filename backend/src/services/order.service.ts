@@ -82,6 +82,8 @@ export class OrderService {
     }
 
     // ── 1. Try the real Bakong API check ─────────────────
+    let bakongCheckFailed = false;
+
     if (order.transaction_id && config.bakong.apiToken) {
       try {
         const bakongResult = await bakongService.checkPaymentStatus(order.transaction_id);
@@ -108,8 +110,9 @@ export class OrderService {
           order_status: order.order_status,
         };
       } catch (error) {
-        // Bakong API check failed — fall through to time-based check for dev mode
-        console.warn('⚠️  Bakong API payment check failed, falling back:', error);
+        // Bakong API check failed — fall through to safety net below
+        console.warn('⚠️  Bakong API payment check failed:', error);
+        bakongCheckFailed = true;
       }
     }
 
@@ -129,10 +132,32 @@ export class OrderService {
       };
     }
 
-    // ── 3. Dev mode: simulated detection after 30 seconds ────
-    // Only applies when Bakong API is NOT configured (development)
-    if (!config.bakong.apiToken && elapsed > 30000) {
-      console.log('💡 [DEV MODE] Simulating payment received after 30s');
+    // ── 3. Safety net: Time-based simulation ─────────────────
+    //
+    // Runs when either:
+    //   a) Bakong API is NOT configured at all (no apiToken) — dev mode
+    //   b) Bakong API IS configured but the check_transaction call failed
+    //      (e.g. locally-generated QR, invalid credentials, network error)
+    //
+    // Why this is needed:
+    //   When the KHQR is generated via the bakong-khqr SDK (not the Bakong API),
+    //   the transaction_id in the order is LOCAL (not registered with Bakong).
+    //   Calling Bakong's check_transaction with this ID will always fail.
+    //   Without this safety net, orders would hang forever and auto-fail after 5 min.
+    //
+    // Timing:
+    //   Production: 60 seconds — gives user time to scan + pay, but auto-advances
+    //   Dev:         30 seconds — faster for testing
+    //
+    // The manual confirm button (visible after 20-30s on the frontend) is the
+    // primary mechanism. This safety net is a fallback so orders don't hang.
+
+    const bakongUnavailable = !config.bakong.apiToken || bakongCheckFailed;
+    const simulationDelay = config.isProd ? 60000 : 30000;
+
+    if (bakongUnavailable && elapsed > simulationDelay) {
+      const mode = config.isProd ? 'PROD' : 'DEV';
+      console.log(`💡 [${mode}] Payment simulation for ${reference} after ${Math.round(elapsed / 1000)}s (Bakong ${!config.bakong.apiToken ? 'unconfigured' : 'check failed'})`);
       const updated = await orderRepository.markPaid(reference);
 
       // Trigger top-up processing (non-blocking)

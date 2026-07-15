@@ -583,10 +583,7 @@ onMounted(() => {
                     <span class="text-[10px] text-surface-400 dark:text-surface-500 font-medium uppercase tracking-wider">
                       {{ i18n.t('verify.provider.prefix') }}
                     </span>
-                    <span class="ml-1.5 inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-100 dark:bg-emerald-900/20 rounded-full text-[10px] font-medium text-emerald-700 dark:text-emerald-300">
-                      <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                      Bay2Game Check ID
-                    </span>
+                    
                   </div>
                 </div>
               </div>

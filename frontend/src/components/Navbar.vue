@@ -37,9 +37,7 @@ const i18n = useI18nStore()
           <router-link to="/" class="px-4 py-2 text-sm font-medium text-surface-600 dark:text-surface-400 hover:text-surface-900 dark:hover:text-surface-100 rounded-lg hover:bg-surface-100 dark:hover:bg-surface-800 transition-all duration-200">
             {{ i18n.t('nav.home') }}
           </router-link>
-          <router-link to="/admin" class="px-4 py-2 text-sm font-medium text-surface-600 dark:text-surface-400 hover:text-surface-900 dark:hover:text-surface-100 rounded-lg hover:bg-surface-100 dark:hover:bg-surface-800 transition-all duration-200">
-            {{ i18n.t('nav.admin') }}
-          </router-link>
+
         </nav>
 
         <!-- Actions -->
@@ -95,13 +93,7 @@ const i18n = useI18nStore()
         >
           {{ i18n.t('nav.home') }}
         </router-link>
-        <router-link
-          to="/admin"
-          @click="mobileMenuOpen = false"
-          class="block px-4 py-2 text-sm font-medium text-surface-600 dark:text-surface-400 hover:text-surface-900 dark:hover:text-surface-100 rounded-lg hover:bg-surface-100 dark:hover:bg-surface-800 transition-all duration-200"
-        >
-          {{ i18n.t('nav.admin') }}
-        </router-link>
+
       </div>
     </div>
   </header>

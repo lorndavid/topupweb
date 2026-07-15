@@ -62,6 +62,7 @@ export const en = {
   'checkout.proceedPayment': 'Proceed to Payment',
   'checkout.processing': 'Processing...',
   'checkout.paymentInfo': "Payment is processed through Bakong KHQR. You'll scan the QR code with your banking app to complete the payment.",
+  'checkout.checkoutKHQR': 'Checkout with KHQR',
   'checkout.toast.proceedError': 'Failed to proceed to payment',
 
   // Payment
@@ -212,7 +213,6 @@ export const en = {
   'admin.viewOrder': 'View Order',
   'admin.retrySuccess': 'Order retried successfully!',
   'admin.retryStillWaiting': 'Still awaiting stock. Will auto-retry.',
-  'nav.admin': 'Admin',
 
   // Common
   'common.tryAgain': 'Try Again',
@@ -284,6 +284,7 @@ export const km: Record<TranslationKey, string> = {
   'checkout.proceedPayment': 'បន្តការទូទាត់',
   'checkout.processing': 'កំពុងដំណើរការ...',
   'checkout.paymentInfo': 'ការទូទាត់ត្រូវបានដំណើរការតាមរយៈ Bakong KHQR។ អ្នកនឹងស្កេន QR កូដជាមួយកម្មវិធីធនាគាររបស់អ្នកដើម្បីបញ្ចប់ការទូទាត់។',
+  'checkout.checkoutKHQR': 'បញ្ជាទិញជាមួយ KHQR',
   'checkout.toast.proceedError': 'បរាជ័យក្នុងការបន្តការទូទាត់',
 
   // Payment
@@ -434,8 +435,6 @@ export const km: Record<TranslationKey, string> = {
   'admin.viewOrder': 'មើលការបញ្ជាទិញ',
   'admin.retrySuccess': 'បានដំណើរការការបញ្ជាទិញឡើងវិញដោយជោគជ័យ!',
   'admin.retryStillWaiting': 'នៅតែរង់ចាំស្តុក។ នឹងព្យាយាមម្តងទៀតដោយស្វ័យប្រវត្តិ។',
-  'nav.admin': 'គ្រប់គ្រង',
-
   // Common
   'common.tryAgain': 'ព្យាយាមម្តងទៀត',
   'common.back': 'ត្រឡប់ក្រោយ',

@@ -39,11 +39,6 @@ const router = createRouter({
       props: true,
     },
     {
-      path: '/admin',
-      name: 'admin',
-      component: () => import('@/views/AdminDashboard.vue'),
-    },
-    {
       path: '/:pathMatch(.*)*',
       redirect: '/',
     },

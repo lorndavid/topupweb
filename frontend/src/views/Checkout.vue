@@ -1,191 +1,425 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useGameStore } from '@/stores/game'
 import { useI18nStore } from '@/stores/i18n'
 import { useToastStore } from '@/stores/toast'
-import type { TranslationKey } from '@/i18n/translations'
+import { createPayment, getPaymentStatus, cancelOrder, getResellerBalance } from '@/services/api'
+import KHQRCard from '@/components/KHQRCard.vue'
 
 const router = useRouter()
 const gameStore = useGameStore()
 const i18n = useI18nStore()
 const toast = useToastStore()
-const processing = ref(false)
 
 const order = computed(() => gameStore.currentOrder)
+const paymentRef = ref('')
+const qrImage = ref('')
+const qrLoading = ref(false)
+const qrError = ref<string | null>(null)
+const paymentStatus = ref<'pending' | 'paid' | 'failed'>('pending')
+const timeLeft = ref(5 * 60) // 5 minutes
+const checkoutStarted = ref(false)
+const showCancelDialog = ref(false)
+const cancelling = ref(false)
+const showSuccessOverlay = ref(false)
+const redirectCountdown = ref(3)
 
-// Helper functions (shared with GameDetail.vue)
-function providerLabel(provider: string): string {
-  const key = `verify.provider.${provider}` as TranslationKey
-  const label = i18n.t(key)
-  return label === key ? provider : label
-}
+// Balance
+const balanceInfo = ref<{ balance: number; available: boolean } | null>(null)
+const balanceLoading = ref(false)
 
-function providerTooltip(provider: string): string {
-  const tooltipKey = `verify.provider.tooltip.${provider}` as TranslationKey
-  const tooltip = i18n.t(tooltipKey)
-  return tooltip === tooltipKey
-    ? `${i18n.t('verify.provider.prefix')} ${providerLabel(provider)}`
-    : tooltip
-}
+let pollInterval: ReturnType<typeof setInterval> | null = null
+let timerInterval: ReturnType<typeof setInterval> | null = null
+let redirectInterval: ReturnType<typeof setInterval> | null = null
 
-function isRealProvider(provider: string | null | undefined): boolean {
-  return !!provider && provider !== 'simulated'
-}
+const isUrgent = computed(() => timeLeft.value < 60 && paymentStatus.value === 'pending')
 
 if (!order.value) {
   router.replace('/')
 }
 
-async function proceedToPayment() {
+// ─── Payment Creation ─────────────────────────────────────────
+async function handleCheckout() {
   if (!order.value) return
 
-  processing.value = true
+  checkoutStarted.value = true
+  qrLoading.value = true
+  qrError.value = null
+
   try {
-    router.push('/payment')
+    const result = await createPayment({
+      game_code: order.value.gameCode,
+      product_code: order.value.productCode,
+      product_name: order.value.productName,
+      game_name: order.value.gameName,
+      player_id: order.value.playerId,
+      server_id: order.value.serverId,
+      amount: order.value.amount,
+    })
+
+    paymentRef.value = result.reference
+    qrImage.value = result.khqr_image || ''
+    paymentStatus.value = 'pending'
+
+    // Start polling + timer
+    startPolling()
+    startTimer()
+    checkResellerBalance()
   } catch (err) {
-    toast.error(i18n.t('checkout.toast.proceedError'))
-    processing.value = false
+    qrError.value = err instanceof Error ? err.message : i18n.t('payment.toast.createFailed')
+    toast.error(qrError.value)
+  } finally {
+    qrLoading.value = false
   }
 }
+
+// ─── Retry on error ───────────────────────────────────────────
+function handleRetry() {
+  qrError.value = null
+  qrImage.value = ''
+  paymentRef.value = ''
+  paymentStatus.value = 'pending'
+  timeLeft.value = 5 * 60
+  handleCheckout()
+}
+
+// ─── Polling ──────────────────────────────────────────────────
+function startPolling() {
+  pollInterval = setInterval(async () => {
+    if (!paymentRef.value) return
+    try {
+      const status = await getPaymentStatus(paymentRef.value)
+      paymentStatus.value = status.payment_status as 'pending' | 'paid' | 'failed'
+
+      if (status.payment_status === 'paid') {
+        onPaymentReceived()
+      } else if (status.payment_status === 'failed') {
+        stopPolling()
+        toast.error(i18n.t('payment.toast.paymentFailed'))
+      }
+    } catch {
+      // silently retry
+    }
+  }, 3000)
+}
+
+function stopPolling() {
+  if (pollInterval) { clearInterval(pollInterval); pollInterval = null }
+  if (timerInterval) { clearInterval(timerInterval); timerInterval = null }
+  if (redirectInterval) { clearInterval(redirectInterval); redirectInterval = null }
+}
+
+// ─── Timer ────────────────────────────────────────────────────
+function startTimer() {
+  timerInterval = setInterval(() => {
+    timeLeft.value--
+    if (timeLeft.value <= 0) {
+      stopPolling()
+      toast.error(i18n.t('payment.toast.timeExpired'))
+      cancelOrder(paymentRef.value).catch(() => {})
+      paymentStatus.value = 'failed'
+    }
+  }, 1000)
+}
+
+// ─── Balance Check ────────────────────────────────────────────
+async function checkResellerBalance() {
+  balanceLoading.value = true
+  try {
+    balanceInfo.value = await getResellerBalance()
+  } catch {
+    balanceInfo.value = { balance: 0, available: false }
+  } finally {
+    balanceLoading.value = false
+  }
+}
+
+// ─── Cancel Order ─────────────────────────────────────────────
+async function handleCancelOrder() {
+  if (!paymentRef.value) return
+  cancelling.value = true
+  try {
+    await cancelOrder(paymentRef.value)
+    showCancelDialog.value = false
+    stopPolling()
+    toast.success(i18n.t('payment.toast.cancelSuccess'))
+    router.push('/')
+  } catch (err) {
+    showCancelDialog.value = false
+    const msg = err instanceof Error ? err.message : ''
+    if (msg.toLowerCase().includes('already processed') || msg.toLowerCase().includes('cancelled')) {
+      toast.error(i18n.t('payment.toast.cannotCancel'))
+    } else {
+      toast.error(i18n.t('payment.toast.cancelFailed'))
+    }
+  } finally {
+    cancelling.value = false
+  }
+}
+
+// ─── Success ──────────────────────────────────────────────────
+function playSuccessSound() {
+  try {
+    const ctx = new (window.AudioContext || (window as any).webkitAudioContext)()
+    const now = ctx.currentTime
+    const osc1 = ctx.createOscillator()
+    const gain1 = ctx.createGain()
+    osc1.type = 'sine'
+    osc1.frequency.setValueAtTime(523, now)
+    gain1.gain.setValueAtTime(0.25, now)
+    gain1.gain.exponentialRampToValueAtTime(0.01, now + 0.35)
+    osc1.connect(gain1)
+    gain1.connect(ctx.destination)
+    osc1.start(now)
+    osc1.stop(now + 0.35)
+    const osc2 = ctx.createOscillator()
+    const gain2 = ctx.createGain()
+    osc2.type = 'sine'
+    osc2.frequency.setValueAtTime(659, now + 0.12)
+    gain2.gain.setValueAtTime(0.25, now + 0.12)
+    gain2.gain.exponentialRampToValueAtTime(0.01, now + 0.5)
+    osc2.connect(gain2)
+    gain2.connect(ctx.destination)
+    osc2.start(now + 0.12)
+    osc2.stop(now + 0.5)
+    const osc3 = ctx.createOscillator()
+    const gain3 = ctx.createGain()
+    osc3.type = 'sine'
+    osc3.frequency.setValueAtTime(784, now + 0.24)
+    gain3.gain.setValueAtTime(0.2, now + 0.24)
+    gain3.gain.exponentialRampToValueAtTime(0.01, now + 0.6)
+    osc3.connect(gain3)
+    gain3.connect(ctx.destination)
+    osc3.start(now + 0.24)
+    osc3.stop(now + 0.6)
+  } catch { /* silent */ }
+}
+
+function onPaymentReceived() {
+  stopPolling()
+  playSuccessSound()
+  showSuccessOverlay.value = true
+  gameStore.clearOrder()
+  redirectInterval = setInterval(() => {
+    redirectCountdown.value--
+    if (redirectCountdown.value <= 0) {
+      if (redirectInterval) clearInterval(redirectInterval)
+      router.push(`/order/${paymentRef.value}`)
+    }
+  }, 1000)
+}
+
+onUnmounted(() => {
+  stopPolling()
+})
 </script>
 
 <template>
-  <div class="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-    <!-- Back Button -->
-    <button
-      @click="router.back()"
-      class="inline-flex items-center gap-1.5 text-sm text-surface-500 dark:text-surface-400 hover:text-surface-700 dark:hover:text-surface-200 mb-6 transition-colors"
-    >
-      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
-      </svg>
-      Back
-    </button>
+  <div class="min-h-screen bg-gradient-to-br from-surface-50 to-surface-100 dark:from-surface-950 dark:to-surface-900">
+    <div class="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10">
+      <button
+        @click="checkoutStarted ? (showCancelDialog = true) : router.back()"
+        class="inline-flex items-center gap-1.5 text-sm text-surface-400 hover:text-surface-600 dark:hover:text-surface-300 mb-6 transition-all duration-200 group"
+      >
+        <svg class="w-4 h-4 group-hover:-translate-x-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+        </svg>
+        {{ checkoutStarted ? i18n.t('payment.cancelOrder') : i18n.t('checkout.cancel') }}
+      </button>
 
-    <div class="animate-fade-in" v-if="order">
-      <!-- Header -->
-      <div class="mb-8">
-        <h1 class="text-3xl font-bold text-surface-900 dark:text-surface-100">{{ i18n.t('checkout.title') }}</h1>
-        <p class="mt-1 text-surface-500 dark:text-surface-400">{{ i18n.t('checkout.subtitle') }}</p>
-      </div>
-
-      <!-- Order Details -->
-      <div class="card p-6 space-y-5">
-        <!-- Game Info -->
-        <div class="flex items-center gap-4 pb-5 border-b border-surface-200 dark:border-surface-700">
-          <div class="w-14 h-14 rounded-xl bg-primary-100 dark:bg-primary-900/20 flex items-center justify-center">
-            <svg class="w-7 h-7 text-primary-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-          </div>
-          <div>
-            <p class="text-sm text-surface-500 dark:text-surface-400">{{ i18n.t('checkout.game') }}</p>
-            <p class="font-semibold text-surface-900 dark:text-surface-100">{{ order.gameName }}</p>
-          </div>
-        </div>
-
-        <!-- Package -->
-        <div class="flex items-center justify-between pb-5 border-b border-surface-200 dark:border-surface-700">
-          <div>
-            <p class="text-sm text-surface-500 dark:text-surface-400">{{ i18n.t('checkout.package') }}</p>
-            <p class="font-semibold text-surface-900 dark:text-surface-100">{{ order.productName }}</p>
-          </div>
-          <span class="text-lg font-bold text-primary-500 dark:text-primary-400">
-            ${{ order.amount.toFixed(2) }}
-          </span>
-        </div>
-
-        <!-- Player ID -->
-        <div class="flex items-center justify-between pb-5 border-b border-surface-200 dark:border-surface-700">
-          <div class="min-w-0">
-            <p class="text-sm text-surface-500 dark:text-surface-400">{{ i18n.t('checkout.playerId') }}</p>
-            <p class="font-mono font-semibold text-surface-900 dark:text-surface-100">{{ order.playerId }}</p>
-            <!-- Provider badge -->
-            <span
-              v-if="order.verifyProvider"
-              :title="providerTooltip(order.verifyProvider)"
-              class="group inline-flex items-center gap-1 mt-1.5 px-2 py-0.5 text-[10px] font-medium rounded-full cursor-help"
-              :class="isRealProvider(order.verifyProvider)
-                ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300'
-                : 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300'"
-            >
-              <!-- Dot indicator -->
-              <span
-                class="w-1.5 h-1.5 rounded-full shrink-0"
-                :class="isRealProvider(order.verifyProvider)
-                  ? 'bg-emerald-500'
-                  : 'bg-amber-500'"
-              ></span>
-              {{ i18n.t('verify.provider.prefix') }} {{ providerLabel(order.verifyProvider) }}
-              <!-- Info icon -->
-              <svg
-                class="w-3 h-3 shrink-0 transition-colors duration-200"
-                :class="isRealProvider(order.verifyProvider)
-                  ? 'text-emerald-400 dark:text-emerald-500 group-hover:text-emerald-600 dark:group-hover:text-emerald-300'
-                  : 'text-amber-400 dark:text-amber-500 group-hover:text-amber-600 dark:group-hover:text-amber-300'"
-                fill="currentColor"
-                viewBox="0 0 20 20"
-              >
-                <path
-                  fill-rule="evenodd"
-                  d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
-                  clip-rule="evenodd"
-                />
-              </svg>
-            </span>
-          </div>
-          <button class="text-xs text-primary-500 hover:text-primary-600 font-medium shrink-0">
-            {{ i18n.t('checkout.edit') }}
-          </button>
-        </div>
-
-        <!-- Server ID (if present) -->
-        <div v-if="order.serverId" class="flex items-center justify-between pb-5 border-b border-surface-200 dark:border-surface-700">
-          <div>
-            <p class="text-sm text-surface-500 dark:text-surface-400">{{ i18n.t('checkout.serverId') }}</p>
-            <p class="font-mono font-semibold text-surface-900 dark:text-surface-100">{{ order.serverId }}</p>
-          </div>
-        </div>
-
-        <!-- Total -->
-        <div class="flex items-center justify-between pt-2">
-          <p class="text-lg font-semibold text-surface-900 dark:text-surface-100">{{ i18n.t('checkout.total') }}</p>
-          <p class="text-2xl font-bold text-primary-500 dark:text-primary-400">
-            ${{ order.amount.toFixed(2) }}
+      <div v-if="order" class="animate-fade-in">
+        <!-- Header -->
+        <div class="mb-8">
+          <h1 class="text-2xl sm:text-3xl font-bold text-surface-900 dark:text-surface-100">
+            {{ checkoutStarted ? i18n.t('payment.scanToPay') : i18n.t('checkout.title') }}
+          </h1>
+          <p class="mt-1.5 text-sm text-surface-400 dark:text-surface-500">
+            {{ checkoutStarted ? i18n.t('payment.scanHint') : i18n.t('checkout.subtitle') }}
           </p>
         </div>
 
-        <!-- Payment Info -->
-        <div class="flex items-start gap-3 p-3 bg-amber-50 dark:bg-amber-900/10 rounded-xl text-xs text-amber-700 dark:text-amber-400">
-          <svg class="w-4 h-4 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M12 2a10 10 0 100 20 10 10 0 000-20z" />
-          </svg>
-          <p>{{ i18n.t('checkout.paymentInfo') }}</p>
+        <div class="grid grid-cols-1 lg:grid-cols-5 gap-6 lg:gap-8">
+          <!-- ─── ORDER DETAILS ─── -->
+          <div class="lg:col-span-2 space-y-4">
+            <div class="bg-white dark:bg-surface-900 rounded-2xl border border-surface-200 dark:border-surface-700 shadow-sm overflow-hidden">
+              <div class="p-5 space-y-4">
+                <div class="flex items-center gap-3">
+                  <div class="w-10 h-10 rounded-xl bg-primary-100 dark:bg-primary-900/30 flex items-center justify-center shrink-0">
+                    <svg class="w-5 h-5 text-primary-600 dark:text-primary-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                  <div class="min-w-0">
+                    <p class="text-xs text-surface-400 dark:text-surface-500">{{ i18n.t('checkout.game') }}</p>
+                    <p class="text-sm font-semibold text-surface-900 dark:text-surface-100 truncate">{{ order.gameName }}</p>
+                  </div>
+                </div>
+                <div class="h-px bg-surface-100 dark:bg-surface-800"></div>
+                <div class="flex items-center justify-between">
+                  <div>
+                    <p class="text-xs text-surface-400 dark:text-surface-500">{{ i18n.t('checkout.package') }}</p>
+                    <p class="text-sm font-semibold text-surface-900 dark:text-surface-100">{{ order.productName }}</p>
+                  </div>
+                  <span class="text-base font-bold text-primary-600 dark:text-primary-400">${{ order.amount.toFixed(2) }}</span>
+                </div>
+                <div class="h-px bg-surface-100 dark:bg-surface-800"></div>
+                <div>
+                  <p class="text-xs text-surface-400 dark:text-surface-500">{{ i18n.t('checkout.playerId') }}</p>
+                  <p class="text-sm font-mono font-semibold text-surface-900 dark:text-surface-100">
+                    {{ order.playerId }}
+                    <span v-if="order.serverId" class="text-surface-400">({{ order.serverId }})</span>
+                  </p>
+                </div>
+                <div class="pt-2 border-t border-surface-100 dark:border-surface-800">
+                  <div class="flex items-center justify-between">
+                    <p class="text-sm font-semibold text-surface-900 dark:text-surface-100">{{ i18n.t('checkout.total') }}</p>
+                    <p class="text-xl font-bold text-primary-600 dark:text-primary-400">
+                      ${{ order.amount.toFixed(2) }} <span class="text-[10px] text-surface-400 font-normal">USD</span>
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Low Balance Warning -->
+            <div
+              v-if="balanceInfo && balanceInfo.available && balanceInfo.balance < order.amount && paymentStatus === 'pending'"
+              class="p-3 bg-amber-50 dark:bg-amber-900/10 rounded-xl border border-amber-100 dark:border-amber-800/30 animate-fade-in"
+            >
+              <div class="flex items-start gap-2.5">
+                <svg class="w-4 h-4 text-amber-500 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <div>
+                  <p class="text-xs font-semibold text-amber-700 dark:text-amber-400">{{ i18n.t('payment.lowBalanceTitle') }}</p>
+                  <p class="text-[10px] text-amber-600 dark:text-amber-500 mt-1">{{ i18n.t('payment.lowBalanceMessage') }}</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Payment Info -->
+            <div v-if="!checkoutStarted" class="p-4 bg-amber-50 dark:bg-amber-900/10 rounded-xl border border-amber-100 dark:border-amber-800/30">
+              <div class="flex items-start gap-3">
+                <svg class="w-4 h-4 text-amber-500 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M12 2a10 10 0 100 20 10 10 0 000-20z" />
+                </svg>
+                <p class="text-xs text-amber-700 dark:text-amber-400">{{ i18n.t('checkout.paymentInfo') }}</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- ─── KHQR PAYMENT CARD ─── -->
+          <div class="lg:col-span-3">
+            <KHQRCard
+              :merchant-name="'GameTopUp Store'"
+              :amount="order.amount"
+              :qr-image="qrImage"
+              :payment-ref="paymentRef"
+              :loading="qrLoading"
+              :error="qrError"
+              :payment-status="paymentStatus"
+              :time-left="timeLeft"
+              :is-urgent="isUrgent"
+              @checkout="handleCheckout"
+              @retry="handleRetry"
+              @cancel="showCancelDialog = true"
+            />
+          </div>
         </div>
       </div>
-
-      <!-- Actions -->
-      <div class="mt-6 flex flex-col sm:flex-row gap-3">
-        <button
-          @click="router.back()"
-          class="btn-secondary flex-1"
-        >
-          {{ i18n.t('checkout.cancel') }}
-        </button>
-        <button
-          @click="proceedToPayment"
-          :disabled="processing"
-          class="btn-primary flex-1"
-        >
-          <svg v-if="processing" class="w-5 h-5 animate-spin mr-2" fill="none" viewBox="0 0 24 24">
-            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-          </svg>
-          {{ processing ? i18n.t('checkout.processing') : i18n.t('checkout.proceedPayment') }}
-        </button>
-      </div>
     </div>
+
+    <!-- Cancel Dialog -->
+    <Teleport to="body">
+      <div
+        v-if="showCancelDialog"
+        class="fixed inset-0 z-50 flex items-center justify-center p-4"
+        @click.self="showCancelDialog = false"
+      >
+        <div class="absolute inset-0 bg-black/50 dark:bg-black/70 backdrop-blur-sm"></div>
+        <div class="relative bg-white dark:bg-surface-800 rounded-2xl shadow-2xl max-w-sm w-full p-6 animate-fade-in">
+          <div class="text-center">
+            <div class="inline-flex items-center justify-center w-14 h-14 rounded-full bg-red-100 dark:bg-red-900/20 mb-4">
+              <svg class="w-7 h-7 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <h3 class="text-lg font-bold text-surface-900 dark:text-surface-100 mb-2">{{ i18n.t('payment.cancelConfirmTitle') }}</h3>
+            <p class="text-sm text-surface-500 dark:text-surface-400 mb-6">{{ i18n.t('payment.cancelConfirmMessage') }}</p>
+            <div class="flex flex-col gap-3">
+              <button
+                @click="handleCancelOrder"
+                :disabled="cancelling"
+                class="w-full py-2.5 px-4 rounded-xl bg-red-500 hover:bg-red-600 disabled:bg-red-300 dark:disabled:bg-red-800 text-white font-medium text-sm transition-all duration-200"
+              >
+                <svg v-if="cancelling" class="w-4 h-4 animate-spin inline mr-2" fill="none" viewBox="0 0 24 24">
+                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                </svg>
+                {{ cancelling ? i18n.t('payment.cancelling') : i18n.t('payment.cancelConfirmYes') }}
+              </button>
+              <button
+                @click="showCancelDialog = false"
+                :disabled="cancelling"
+                class="w-full py-2.5 px-4 rounded-xl border-2 border-surface-200 dark:border-surface-700 text-surface-700 dark:text-surface-300 font-medium text-sm hover:bg-surface-50 dark:hover:bg-surface-700/50 disabled:opacity-50 transition-all duration-200"
+              >{{ i18n.t('payment.cancelConfirmNo') }}</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
+    <!-- Celebration Overlay -->
+    <Teleport to="body">
+      <div
+        v-if="showSuccessOverlay"
+        class="fixed inset-0 z-50 flex items-center justify-center p-4"
+      >
+        <div class="absolute inset-0 bg-gradient-to-br from-emerald-500/90 via-emerald-600/85 to-teal-700/90 backdrop-blur-md"></div>
+        <div class="absolute inset-0 overflow-hidden pointer-events-none" aria-hidden="true">
+          <div
+            v-for="i in 30" :key="i"
+            class="absolute w-2.5 h-2.5 rounded-sm animate-confetti"
+            :style="{
+              left: `${Math.random() * 100}%`,
+              top: `-${Math.random() * 20}%`,
+              backgroundColor: ['#10B981', '#34D399', '#6EE7B7', '#FCD34D', '#F472B6', '#818CF8', '#FBBF24'][i % 7],
+              animationDelay: `${Math.random() * 2}s`,
+              animationDuration: `${2 + Math.random() * 2}s`,
+              width: `${8 + Math.random() * 8}px`,
+              height: `${8 + Math.random() * 8}px`,
+              borderRadius: Math.random() > 0.5 ? '50%' : '2px',
+            }"
+          ></div>
+        </div>
+        <div class="relative text-center animate-scale-in">
+          <div class="inline-flex items-center justify-center w-24 h-24 rounded-full bg-white/20 backdrop-blur-sm mb-8 animate-bounce-in">
+            <svg class="w-14 h-14 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="3">
+              <path class="animate-draw-check" stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+            </svg>
+          </div>
+          <h2 class="text-3xl font-bold text-white mb-2">{{ i18n.t('payment.successTitle') }}</h2>
+          <p class="text-emerald-100 text-lg mb-2">{{ i18n.t('payment.successMessage') }}</p>
+          <p class="text-2xl font-bold text-white mb-6">${{ order?.amount.toFixed(2) }}</p>
+          <div class="inline-flex items-center gap-2 px-4 py-2 bg-white/10 backdrop-blur-sm rounded-xl text-emerald-100 text-sm font-mono mb-8">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+            </svg>
+            {{ paymentRef }}
+          </div>
+          <div class="max-w-xs mx-auto">
+            <div class="w-full h-1.5 bg-white/20 rounded-full overflow-hidden mb-3">
+              <div
+                class="h-full bg-white rounded-full transition-all duration-1000 ease-linear"
+                :style="{ width: `${(redirectCountdown / 3) * 100}%` }"
+              ></div>
+            </div>
+            <p class="text-emerald-200 text-sm">{{ i18n.t('payment.redirectingIn') }} {{ redirectCountdown }}...</p>
+          </div>
+        </div>
+      </div>
+    </Teleport>
   </div>
 </template>

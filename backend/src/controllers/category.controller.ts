@@ -2,8 +2,8 @@ import { Request, Response, NextFunction } from 'express';
 import { bay2gameService } from '../services/bay2game.service';
 import { HTTP_STATUS } from '../constants';
 
-// Cambodia-only game codes — these are the top games in Cambodia
-const CAMBODIA_GAME_CODES = ['mlbb', 'freefire_sgmy', 'pubgm', 'hok'];
+// Featured top game codes — these are the top games in Cambodia
+const FEATURED_GAME_CODES = ['mlbb', 'freefire_sgmy', 'pubgm', 'hok'];
 
 export async function getCategories(
   _req: Request,
@@ -29,19 +29,25 @@ export async function getCambodiaGames(
 ): Promise<void> {
   try {
     const categories = await bay2gameService.getCategories();
-    const cambodiaGames = categories.filter((g) =>
-      CAMBODIA_GAME_CODES.includes(g.game_code)
-    );
 
-    // Sort in the same order as the CAMBODIA_GAME_CODES array
-    const sorted = CAMBODIA_GAME_CODES.map(
-      (code) => cambodiaGames.find((g) => g.game_code === code)
-    ).filter(Boolean);
+    // Sort featured games to the top, maintain order
+    const featured = FEATURED_GAME_CODES.map(
+      (code) => categories.find((g) => g.game_code === code)
+    ).filter(Boolean) as typeof categories;
+
+    // All other games (non-featured)
+    const others = categories.filter(
+      (g) => !FEATURED_GAME_CODES.includes(g.game_code)
+    );
 
     res.status(HTTP_STATUS.OK).json({
       success: true,
-      message: 'Cambodia games fetched successfully',
-      data: sorted,
+      message: 'All games fetched successfully',
+      data: {
+        featured,
+        others,
+        total: categories.length,
+      },
     });
   } catch (error) {
     next(error);

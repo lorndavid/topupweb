@@ -2,6 +2,7 @@ import axios from 'axios'
 import type {
   ApiResponse,
   GameCategory,
+  CambodiaGamesResponse,
   ProductsResponse,
   PaymentRequest,
   PaymentResponse,
@@ -44,8 +45,8 @@ export async function getCategories(): Promise<GameCategory[]> {
   return data.data
 }
 
-export async function getCambodiaGames(): Promise<GameCategory[]> {
-  const { data } = await api.get<ApiResponse<GameCategory[]>>('/cambodia-games')
+export async function getCambodiaGames(): Promise<CambodiaGamesResponse> {
+  const { data } = await api.get<ApiResponse<CambodiaGamesResponse>>('/cambodia-games')
   if (!data.success || !data.data) {
     throw new Error(data.message || 'Failed to fetch Cambodia games')
   }

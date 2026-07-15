@@ -45,6 +45,13 @@ export interface PaymentResponse {
   expires_at: string
 }
 
+// Response shape from GET /api/cambodia-games
+export interface CambodiaGamesResponse {
+  featured: GameCategory[]
+  others: GameCategory[]
+  total: number
+}
+
 export interface BalanceInfo {
   balance: number
   username: string

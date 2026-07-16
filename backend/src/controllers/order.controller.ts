@@ -3,6 +3,7 @@ import { orderService } from '../services/order.service';
 import { orderCreateSchema } from '../validators';
 import { HTTP_STATUS } from '../constants';
 import { AppError } from '../middleware/errorHandler';
+import { orderRepository } from '../repositories/OrderRepository';
 
 export async function createOrder(
   req: Request,
@@ -80,6 +81,34 @@ export async function getOrder(
       success: true,
       message: 'Order retrieved successfully',
       data: order,
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+/**
+ * Get all orders for a specific player ID.
+ * Used by the Order History page so customers can look up their past orders.
+ */
+export async function getOrdersByPlayer(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const { playerId } = req.params;
+
+    if (!playerId) {
+      throw new AppError('Player ID is required', HTTP_STATUS.BAD_REQUEST);
+    }
+
+    const orders = await orderRepository.findByPlayerId(playerId);
+
+    res.status(HTTP_STATUS.OK).json({
+      success: true,
+      message: orders.length > 0 ? 'Orders retrieved successfully' : 'No orders found for this player ID',
+      data: orders,
     });
   } catch (error) {
     next(error);

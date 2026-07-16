@@ -35,8 +35,12 @@ function getColors(type: string) {
 </script>
 
 <template>
-  <div class="fixed top-20 right-4 z-[100] flex flex-col gap-2 max-w-sm w-full pointer-events-none">
-    <transition-group name="toast">
+  <div class="fixed top-20 right-4 z-[100] flex flex-col gap-2.5 max-w-sm w-full pointer-events-none">
+    <transition-group
+      name="toast"
+      tag="div"
+      class="flex flex-col gap-2.5"
+    >
       <div
         v-for="toast in toastStore.toasts"
         :key="toast.id"
@@ -45,13 +49,15 @@ function getColors(type: string) {
           getColors(toast.type)
         ]"
       >
-        <svg class="w-5 h-5 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" :d="getIcon(toast.type)" />
-        </svg>
-        <p class="text-sm font-medium flex-1">{{ toast.message }}</p>
+        <div class="shrink-0 mt-0.5">
+          <svg class="w-5 h-5 toast-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" :d="getIcon(toast.type)" />
+          </svg>
+        </div>
+        <p class="text-sm font-medium flex-1 min-w-0">{{ toast.message }}</p>
         <button
           @click="toastStore.removeToast(toast.id)"
-          class="shrink-0 p-0.5 rounded hover:bg-black/10 dark:hover:bg-white/10 transition-colors"
+          class="shrink-0 p-0.5 rounded-lg hover:bg-black/10 dark:hover:bg-white/10 transition-colors duration-150"
         >
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
@@ -64,17 +70,33 @@ function getColors(type: string) {
 
 <style scoped>
 .toast-enter-active {
-  transition: all 0.3s ease-out;
+  transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
 }
 .toast-leave-active {
   transition: all 0.2s ease-in;
 }
 .toast-enter-from {
   opacity: 0;
-  transform: translateX(100%);
+  transform: translateX(100%) scale(0.9);
 }
 .toast-leave-to {
   opacity: 0;
-  transform: translateX(100%);
+  transform: translateX(100%) scale(0.9);
+}
+
+.toast-enter-active .toast-icon {
+  animation: toast-icon-bounce 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55) 0.15s both;
+}
+
+@keyframes toast-icon-bounce {
+  0% {
+    transform: scale(0);
+  }
+  50% {
+    transform: scale(1.2);
+  }
+  100% {
+    transform: scale(1);
+  }
 }
 </style>

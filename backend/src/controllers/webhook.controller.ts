@@ -84,6 +84,27 @@ export async function getRecentAlerts(
 }
 
 /**
+ * POST /api/webhook/daily-summary
+ *
+ * Manually trigger the daily summary report to be sent immediately.
+ * Useful for testing or if the auto-scheduler missed a day.
+ */
+export async function triggerDailySummary(
+  _req: Request,
+  res: Response,
+  _next: NextFunction
+): Promise<void> {
+  const sent = await notificationService.sendDailySummary();
+
+  res.status(HTTP_STATUS.OK).json({
+    success: sent,
+    message: sent
+      ? 'Daily summary sent to Telegram successfully'
+      : 'Failed to send daily summary. Is Telegram configured?',
+  });
+}
+
+/**
  * POST /api/webhook/test
  *
  * Sends a test notification to both Telegram and the webhook URL

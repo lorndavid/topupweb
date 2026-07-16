@@ -33,6 +33,11 @@ const router = createRouter({
       component: () => import('@/views/PaymentSuccess.vue'),
     },
     {
+      path: '/orders',
+      name: 'order-history',
+      component: () => import('@/views/OrderHistory.vue'),
+    },
+    {
       path: '/order/:reference',
       name: 'order-status',
       component: () => import('@/views/OrderStatus.vue'),

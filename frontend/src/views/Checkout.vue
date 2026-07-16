@@ -4,7 +4,8 @@ import { useRouter } from 'vue-router'
 import { useGameStore } from '@/stores/game'
 import { useI18nStore } from '@/stores/i18n'
 import { useToastStore } from '@/stores/toast'
-import { createPayment, getPaymentStatus, cancelOrder, getResellerBalance, manualConfirmPayment } from '@/services/api'
+import { createPayment, getPaymentStatus, cancelOrder, getResellerBalance } from '@/services/api'
+import { usePaymentWebSocket } from '@/composables/usePaymentWebSocket'
 import KHQRCard from '@/components/KHQRCard.vue'
 
 const router = useRouter()
@@ -22,8 +23,6 @@ const timeLeft = ref(5 * 60) // 5 minutes
 const checkoutStarted = ref(false)
 const showCancelDialog = ref(false)
 const cancelling = ref(false)
-const showManualConfirmDialog = ref(false)
-const confirmingPayment = ref(false)
 const showSuccessOverlay = ref(false)
 const redirectCountdown = ref(3)
 
@@ -37,18 +36,24 @@ let redirectInterval: ReturnType<typeof setInterval> | null = null
 
 const isUrgent = computed(() => timeLeft.value < 60 && paymentStatus.value === 'pending')
 
-// Admin manual confirm (enabled 30s after checkout)
-const manualConfirmAvailable = ref(false)
-const manualConfirmTimer = ref<ReturnType<typeof setTimeout> | null>(null)
-
-// User-facing "I've Paid" button (enabled 20s after checkout — faster for user self-service)
-const userConfirmAvailable = ref(false)
-let userConfirmTimer: ReturnType<typeof setTimeout> | null = null
-const showUserConfirmDialog = ref(false)
-
 if (!order.value) {
   router.replace('/')
 }
+
+// ─── WebSocket: Real-time payment status ─────────────────────
+const wsReference = ref<string | null>(null)
+const ws = usePaymentWebSocket(wsReference)
+
+ws.setOnStatusChange((data) => {
+  if (data.payment_status === 'paid') {
+    paymentStatus.value = 'paid'
+    onPaymentReceived()
+  } else if (data.payment_status === 'failed') {
+    paymentStatus.value = 'failed'
+    stopPolling()
+    toast.error(i18n.t('payment.toast.paymentFailed'))
+  }
+})
 
 // ─── Payment Creation ─────────────────────────────────────────
 async function handleCheckout() {
@@ -56,12 +61,6 @@ async function handleCheckout() {
 
   checkoutStarted.value = true
   qrLoading.value = true
-  // Enable admin manual confirm after 30s
-  if (manualConfirmTimer.value) clearTimeout(manualConfirmTimer.value)
-  manualConfirmTimer.value = setTimeout(() => { manualConfirmAvailable.value = true }, 30000)
-  // Enable user "I've Paid" button after 20s (user has time to scan + pay)
-  if (userConfirmTimer) clearTimeout(userConfirmTimer)
-  userConfirmTimer = setTimeout(() => { userConfirmAvailable.value = true }, 20000)
 
   try {
     const result = await createPayment({
@@ -75,6 +74,7 @@ async function handleCheckout() {
     })
 
     paymentRef.value = result.reference
+    wsReference.value = result.reference
     qrImage.value = result.khqr_image || ''
     paymentStatus.value = 'pending'
 
@@ -95,6 +95,7 @@ function handleRetry() {
   qrError.value = null
   qrImage.value = ''
   paymentRef.value = ''
+  wsReference.value = null
   paymentStatus.value = 'pending'
   timeLeft.value = 5 * 60
   handleCheckout()
@@ -149,43 +150,6 @@ async function checkResellerBalance() {
   } finally {
     balanceLoading.value = false
   }
-}
-
-// ─── Manual Payment Confirmation (Admin) ────────────────────
-async function handleManualConfirm() {
-  if (!paymentRef.value) return
-  confirmingPayment.value = true
-  try {
-    const result = await manualConfirmPayment(paymentRef.value)
-    showManualConfirmDialog.value = false
-    showUserConfirmDialog.value = false
-    toast.success('Payment confirmed! Processing top-up...')
-    paymentStatus.value = 'paid'
-    onPaymentReceived()
-  } catch (err) {
-    showManualConfirmDialog.value = false
-    showUserConfirmDialog.value = false
-    const msg = err instanceof Error ? err.message : 'Failed to confirm payment'
-    // If order was already processed, that's actually good — treat as success
-    if (msg.toLowerCase().includes('already') || msg.toLowerCase().includes('paid') || msg.toLowerCase().includes('processing')) {
-      toast.success('Payment already confirmed! Processing top-up...')
-      paymentStatus.value = 'paid'
-      onPaymentReceived()
-    } else {
-      toast.error(msg)
-    }
-  } finally {
-    confirmingPayment.value = false
-  }
-}
-
-// ─── User-Facing "I've Paid" Confirmation ───────────────────
-function handleUserConfirm() {
-  showUserConfirmDialog.value = true
-}
-
-async function confirmUserPayment() {
-  await handleManualConfirm() // reuses the same logic
 }
 
 // ─── Cancel Order ─────────────────────────────────────────────
@@ -250,7 +214,6 @@ function playSuccessSound() {
 }
 
 function onPaymentReceived() {
-  // Guard: prevent double-firing from rapid clicks
   if (showSuccessOverlay.value) return
   stopPolling()
   playSuccessSound()
@@ -268,14 +231,13 @@ function onPaymentReceived() {
 
 onUnmounted(() => {
   stopPolling()
-  if (manualConfirmTimer.value) clearTimeout(manualConfirmTimer.value)
-  if (userConfirmTimer) clearTimeout(userConfirmTimer)
 })
 </script>
 
 <template>
   <div class="min-h-screen bg-gradient-to-br from-surface-50 to-surface-100 dark:from-surface-950 dark:to-surface-900">
     <div class="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10">
+      <!-- Back Button -->
       <button
         @click="checkoutStarted ? (showCancelDialog = true) : router.back()"
         class="inline-flex items-center gap-1.5 text-sm text-surface-400 hover:text-surface-600 dark:hover:text-surface-300 mb-6 transition-all duration-200 group"
@@ -288,7 +250,7 @@ onUnmounted(() => {
 
       <div v-if="order" class="animate-fade-in">
         <!-- Header -->
-        <div class="mb-8">
+        <div class="mb-6 sm:mb-8">
           <h1 class="text-2xl sm:text-3xl font-bold text-surface-900 dark:text-surface-100">
             {{ checkoutStarted ? i18n.t('payment.scanToPay') : i18n.t('checkout.title') }}
           </h1>
@@ -298,9 +260,10 @@ onUnmounted(() => {
         </div>
 
         <div class="grid grid-cols-1 lg:grid-cols-5 gap-6 lg:gap-8">
-          <!-- ─── ORDER DETAILS ─── -->
+          <!-- ─── LEFT COLUMN (changes based on state) ─── -->
           <div class="lg:col-span-2 space-y-4">
-            <div class="bg-white dark:bg-surface-900 rounded-2xl border border-surface-200 dark:border-surface-700 shadow-sm overflow-hidden">
+            <!-- Before Checkout: Compact Order Summary -->
+            <div v-if="!checkoutStarted" class="bg-white dark:bg-surface-900 rounded-2xl border border-surface-200 dark:border-surface-700 shadow-sm overflow-hidden">
               <div class="p-5 space-y-4">
                 <div class="flex items-center gap-3">
                   <div class="w-10 h-10 rounded-xl bg-primary-100 dark:bg-primary-900/30 flex items-center justify-center shrink-0">
@@ -309,89 +272,125 @@ onUnmounted(() => {
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                   </div>
-                  <div class="min-w-0">
+                  <div class="min-w-0 flex-1">
                     <p class="text-xs text-surface-400 dark:text-surface-500">{{ i18n.t('checkout.game') }}</p>
                     <p class="text-sm font-semibold text-surface-900 dark:text-surface-100 truncate">{{ order.gameName }}</p>
                   </div>
-                </div>
-                <div class="h-px bg-surface-100 dark:bg-surface-800"></div>
-                <div class="flex items-center justify-between">
-                  <div>
-                    <p class="text-xs text-surface-400 dark:text-surface-500">{{ i18n.t('checkout.package') }}</p>
-                    <p class="text-sm font-semibold text-surface-900 dark:text-surface-100">{{ order.productName }}</p>
+                  <div class="text-right shrink-0">
+                    <p class="text-lg font-bold text-primary-600 dark:text-primary-400">${{ order.amount.toFixed(2) }}</p>
+                    <p class="text-[10px] text-surface-400 uppercase">USD</p>
                   </div>
-                  <span class="text-base font-bold text-primary-600 dark:text-primary-400">${{ order.amount.toFixed(2) }}</span>
                 </div>
                 <div class="h-px bg-surface-100 dark:bg-surface-800"></div>
-                <div>
-                  <p class="text-xs text-surface-400 dark:text-surface-500">{{ i18n.t('checkout.playerId') }}</p>
-                  <p class="text-sm font-mono font-semibold text-surface-900 dark:text-surface-100">
-                    {{ order.playerId }}
-                    <span v-if="order.serverId" class="text-surface-400">({{ order.serverId }})</span>
-                  </p>
+                <div class="flex items-center justify-between text-sm">
+                  <span class="text-surface-500 dark:text-surface-400">{{ i18n.t('checkout.package') }}</span>
+                  <span class="font-semibold text-surface-900 dark:text-surface-100">{{ order.productName }}</span>
                 </div>
-                <div class="pt-2 border-t border-surface-100 dark:border-surface-800">
+                <div class="h-px bg-surface-100 dark:bg-surface-800"></div>
+                <div class="flex items-center justify-between text-sm">
+                  <span class="text-surface-500 dark:text-surface-400">{{ i18n.t('checkout.playerId') }}</span>
+                  <span class="font-mono font-semibold text-surface-900 dark:text-surface-100">
+                    {{ order.playerId }}<span v-if="order.serverId" class="text-surface-400 ml-1">({{ order.serverId }})</span>
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <!-- After Checkout: Order Details Sidebar -->
+            <template v-if="checkoutStarted">
+              <div class="bg-white dark:bg-surface-900 rounded-2xl border border-surface-200 dark:border-surface-700 shadow-sm overflow-hidden">
+                <div class="p-5 space-y-4">
+                  <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-primary-100 dark:bg-primary-900/30 flex items-center justify-center shrink-0">
+                      <svg class="w-5 h-5 text-primary-600 dark:text-primary-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    </div>
+                    <div class="min-w-0">
+                      <p class="text-xs text-surface-400 dark:text-surface-500">{{ i18n.t('checkout.game') }}</p>
+                      <p class="text-sm font-semibold text-surface-900 dark:text-surface-100 truncate">{{ order.gameName }}</p>
+                    </div>
+                  </div>
+                  <div class="h-px bg-surface-100 dark:bg-surface-800"></div>
                   <div class="flex items-center justify-between">
-                    <p class="text-sm font-semibold text-surface-900 dark:text-surface-100">{{ i18n.t('checkout.total') }}</p>
-                    <p class="text-xl font-bold text-primary-600 dark:text-primary-400">
-                      ${{ order.amount.toFixed(2) }} <span class="text-[10px] text-surface-400 font-normal">USD</span>
+                    <div>
+                      <p class="text-xs text-surface-400 dark:text-surface-500">{{ i18n.t('checkout.package') }}</p>
+                      <p class="text-sm font-semibold text-surface-900 dark:text-surface-100">{{ order.productName }}</p>
+                    </div>
+                    <span class="text-base font-bold text-primary-600 dark:text-primary-400">${{ order.amount.toFixed(2) }}</span>
+                  </div>
+                  <div class="h-px bg-surface-100 dark:bg-surface-800"></div>
+                  <div>
+                    <p class="text-xs text-surface-400 dark:text-surface-500">{{ i18n.t('checkout.playerId') }}</p>
+                    <p class="text-sm font-mono font-semibold text-surface-900 dark:text-surface-100">
+                      {{ order.playerId }}
+                      <span v-if="order.serverId" class="text-surface-400">({{ order.serverId }})</span>
                     </p>
                   </div>
+                  <div class="pt-2 border-t border-surface-100 dark:border-surface-800">
+                    <div class="flex items-center justify-between">
+                      <p class="text-sm font-semibold text-surface-900 dark:text-surface-100">{{ i18n.t('checkout.total') }}</p>
+                      <p class="text-xl font-bold text-primary-600 dark:text-primary-400">
+                        ${{ order.amount.toFixed(2) }} <span class="text-[10px] text-surface-400 font-normal">USD</span>
+                      </p>
+                    </div>
+                  </div>
                 </div>
               </div>
-            </div>
 
-            <!-- Manual Confirm Button (for when Bakong auto-verification is unavailable) -->
-            <div
-              v-if="manualConfirmAvailable && paymentStatus === 'pending' && paymentRef"
-              class="p-4 bg-emerald-50 dark:bg-emerald-900/10 rounded-xl border border-emerald-200 dark:border-emerald-800/30"
-            >
-              <div class="flex items-start gap-3 mb-3">
-                <svg class="w-5 h-5 text-emerald-500 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-                </svg>
-                <div>
-                  <p class="text-xs font-semibold text-emerald-700 dark:text-emerald-400">Payment received but not detected?</p>
-                  <p class="text-[10px] text-emerald-600 dark:text-emerald-500 mt-1">If you scanned and paid, confirm manually to process the top-up immediately.</p>
-                </div>
-              </div>
-              <button
-                @click="showManualConfirmDialog = true"
-                class="w-full py-2.5 px-4 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-bold transition-all duration-200 active:scale-[0.98]"
+              <!-- Low Balance Warning -->
+              <div
+                v-if="balanceInfo && balanceInfo.available && balanceInfo.balance < order.amount && paymentStatus === 'pending'"
+                class="p-3 bg-amber-50 dark:bg-amber-900/10 rounded-xl border border-amber-100 dark:border-amber-800/30 animate-fade-in"
               >
-                I've Paid — Confirm & Process
-              </button>
-            </div>
-
-            <!-- Low Balance Warning -->
-            <div
-              v-if="balanceInfo && balanceInfo.available && balanceInfo.balance < order.amount && paymentStatus === 'pending'"
-              class="p-3 bg-amber-50 dark:bg-amber-900/10 rounded-xl border border-amber-100 dark:border-amber-800/30 animate-fade-in"
-            >
-              <div class="flex items-start gap-2.5">
-                <svg class="w-4 h-4 text-amber-500 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <div>
-                  <p class="text-xs font-semibold text-amber-700 dark:text-amber-400">{{ i18n.t('payment.lowBalanceTitle') }}</p>
-                  <p class="text-[10px] text-amber-600 dark:text-amber-500 mt-1">{{ i18n.t('payment.lowBalanceMessage') }}</p>
+                <div class="flex items-start gap-2.5">
+                  <svg class="w-4 h-4 text-amber-500 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <div>
+                    <p class="text-xs font-semibold text-amber-700 dark:text-amber-400">{{ i18n.t('payment.lowBalanceTitle') }}</p>
+                    <p class="text-[10px] text-amber-600 dark:text-amber-500 mt-1">{{ i18n.t('payment.lowBalanceMessage') }}</p>
+                  </div>
                 </div>
               </div>
-            </div>
 
-            <!-- Payment Info -->
-            <div v-if="!checkoutStarted" class="p-4 bg-amber-50 dark:bg-amber-900/10 rounded-xl border border-amber-100 dark:border-amber-800/30">
-              <div class="flex items-start gap-3">
-                <svg class="w-4 h-4 text-amber-500 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M12 2a10 10 0 100 20 10 10 0 000-20z" />
-                </svg>
-                <p class="text-xs text-amber-700 dark:text-amber-400">{{ i18n.t('checkout.paymentInfo') }}</p>
+              <!-- Payment Status Indicator -->
+              <div
+                v-if="paymentStatus === 'pending' && timeLeft > 0"
+                class="p-4 bg-white dark:bg-surface-900 rounded-2xl border border-surface-200 dark:border-surface-700 shadow-sm"
+              >
+                <div class="flex items-center gap-3">
+                  <div class="relative w-10 h-10 shrink-0">
+                    <svg class="w-10 h-10 -rotate-90 animate-spin-slow" viewBox="0 0 36 36">
+                      <path
+                        class="text-surface-100 dark:text-surface-800"
+                        fill="none" stroke="currentColor" stroke-width="3"
+                        d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                      />
+                      <path
+                        :class="isUrgent ? 'text-amber-400' : 'text-primary-400'"
+                        fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"
+                        :stroke-dasharray="`${((timeLeft / 300) * 100)}, 100`"
+                        class="transition-all duration-1000 ease-linear"
+                        d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                      />
+                    </svg>
+                    <span class="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-surface-500">
+                      {{ Math.floor(timeLeft / 60) }}:{{ String(timeLeft % 60).padStart(2, '0') }}
+                    </span>
+                  </div>
+                  <div>
+                    <p class="text-xs font-medium text-surface-700 dark:text-surface-300">Awaiting Payment</p>
+                    <p class="text-[10px] text-surface-400 dark:text-surface-500 mt-0.5">Scan & pay with your banking app</p>
+                  </div>
+                </div>
               </div>
-            </div>
+            </template>
           </div>
 
-          <!-- ─── KHQR PAYMENT CARD ─── -->
-          <div class="lg:col-span-3 space-y-4">
+          <!-- ─── RIGHT COLUMN: KHQR Card (always rendered) ─── -->
+          <div class="lg:col-span-3">
             <KHQRCard
               :merchant-name="'GameTopUp Store'"
               :amount="order.amount"
@@ -406,35 +405,6 @@ onUnmounted(() => {
               @retry="handleRetry"
               @cancel="showCancelDialog = true"
             />
-
-            <!-- ═════ USER-FACING "I'VE PAID" BUTTON ═════ -->
-            <div
-              v-if="userConfirmAvailable && paymentStatus === 'pending' && paymentRef"
-              class="p-5 bg-gradient-to-br from-emerald-50 to-green-50 dark:from-emerald-900/15 dark:to-green-900/10 rounded-2xl border-2 border-emerald-200 dark:border-emerald-700/50 shadow-lg shadow-emerald-500/10 animate-fade-in"
-            >
-              <div class="flex items-start gap-3 mb-4">
-                <div class="w-10 h-10 rounded-xl bg-emerald-100 dark:bg-emerald-800/40 flex items-center justify-center shrink-0">
-                  <svg class="w-5 h-5 text-emerald-600 dark:text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                </div>
-                <div>
-                  <p class="text-sm font-bold text-emerald-800 dark:text-emerald-300">Already Paid?</p>
-                  <p class="text-xs text-emerald-600 dark:text-emerald-400 mt-1">
-                    If you've scanned the QR and completed the payment in your banking app, click below to confirm and we'll process your top-up immediately.
-                  </p>
-                </div>
-              </div>
-              <button
-                @click="handleUserConfirm"
-                class="w-full py-3 px-4 rounded-xl bg-emerald-500 hover:bg-emerald-600 active:bg-emerald-700 text-white font-bold text-sm shadow-lg shadow-emerald-500/20 hover:shadow-emerald-500/30 transition-all duration-200 active:scale-[0.98] flex items-center justify-center gap-2"
-              >
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                I've Paid — Confirm & Process Now
-              </button>
-            </div>
           </div>
         </div>
       </div>
@@ -474,103 +444,6 @@ onUnmounted(() => {
                 :disabled="cancelling"
                 class="w-full py-2.5 px-4 rounded-xl border-2 border-surface-200 dark:border-surface-700 text-surface-700 dark:text-surface-300 font-medium text-sm hover:bg-surface-50 dark:hover:bg-surface-700/50 disabled:opacity-50 transition-all duration-200"
               >{{ i18n.t('payment.cancelConfirmNo') }}</button>
-            </div>
-          </div>
-        </div>
-      </div>
-    </Teleport>
-
-    <!-- Manual Confirm Dialog (Admin) -->
-    <Teleport to="body">
-      <div
-        v-if="showManualConfirmDialog"
-        class="fixed inset-0 z-50 flex items-center justify-center p-4"
-        @click.self="showManualConfirmDialog = false"
-      >
-        <div class="absolute inset-0 bg-black/50 dark:bg-black/70 backdrop-blur-sm"></div>
-        <div class="relative bg-white dark:bg-surface-800 rounded-2xl shadow-2xl max-w-sm w-full p-6 animate-fade-in">
-          <div class="text-center">
-            <div class="inline-flex items-center justify-center w-14 h-14 rounded-full bg-emerald-100 dark:bg-emerald-900/20 mb-4">
-              <svg class="w-7 h-7 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-              </svg>
-            </div>
-            <h3 class="text-lg font-bold text-surface-900 dark:text-surface-100 mb-2">Confirm Payment Received</h3>
-            <p class="text-sm text-surface-500 dark:text-surface-400 mb-2">
-              Have you verified in your banking app that this payment was received?
-            </p>
-            <p class="text-xs text-amber-600 dark:text-amber-400 mb-6 font-medium">
-              ⚠️ Only confirm if the money has actually arrived in your account.
-            </p>
-            <div class="flex flex-col gap-3">
-              <button
-                @click="handleManualConfirm"
-                :disabled="confirmingPayment"
-                class="w-full py-2.5 px-4 rounded-xl bg-emerald-500 hover:bg-emerald-600 disabled:bg-emerald-300 dark:disabled:bg-emerald-800 text-white font-medium text-sm transition-all duration-200"
-              >
-                <svg v-if="confirmingPayment" class="w-4 h-4 animate-spin inline mr-2" fill="none" viewBox="0 0 24 24">
-                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                </svg>
-                {{ confirmingPayment ? 'Processing...' : 'Yes, Payment Received — Process Top-Up' }}
-              </button>
-              <button
-                @click="showManualConfirmDialog = false"
-                :disabled="confirmingPayment"
-                class="w-full py-2.5 px-4 rounded-xl border-2 border-surface-200 dark:border-surface-700 text-surface-700 dark:text-surface-300 font-medium text-sm hover:bg-surface-50 dark:hover:bg-surface-700/50 disabled:opacity-50 transition-all duration-200"
-              >Cancel</button>
-            </div>
-          </div>
-        </div>
-      </div>
-    </Teleport>
-
-    <!-- User-Facing "I've Paid" Confirmation Dialog -->
-    <Teleport to="body">
-      <div
-        v-if="showUserConfirmDialog"
-        class="fixed inset-0 z-50 flex items-center justify-center p-4"
-        @click.self="showUserConfirmDialog = false"
-      >
-        <div class="absolute inset-0 bg-black/50 dark:bg-black/70 backdrop-blur-sm"></div>
-        <div class="relative bg-white dark:bg-surface-800 rounded-2xl shadow-2xl max-w-sm w-full p-6 animate-fade-in">
-          <div class="text-center">
-            <div class="inline-flex items-center justify-center w-14 h-14 rounded-full bg-emerald-100 dark:bg-emerald-900/20 mb-4">
-              <svg class="w-7 h-7 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </div>
-            <h3 class="text-lg font-bold text-surface-900 dark:text-surface-100 mb-2">Confirm Your Payment</h3>
-            <p class="text-sm text-surface-500 dark:text-surface-400 mb-4">
-              Please confirm that you have completed the payment in your banking app.
-              Once confirmed, we'll process your order immediately.
-            </p>
-            <div class="p-3 bg-surface-50 dark:bg-surface-900/50 rounded-xl mb-4">
-              <div class="flex items-center justify-between text-sm">
-                <span class="text-surface-500 dark:text-surface-400">Amount</span>
-                <span class="font-bold text-surface-900 dark:text-surface-100">${{ order?.amount.toFixed(2) }}</span>
-              </div>
-            </div>
-            <div class="flex flex-col gap-3">
-              <button
-                @click="confirmUserPayment"
-                :disabled="confirmingPayment"
-                class="w-full py-3 px-4 rounded-xl bg-emerald-500 hover:bg-emerald-600 disabled:bg-emerald-300 dark:disabled:bg-emerald-800 text-white font-bold text-sm transition-all duration-200 active:scale-[0.98] flex items-center justify-center gap-2"
-              >
-                <svg v-if="confirmingPayment" class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                </svg>
-                <svg v-else class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                {{ confirmingPayment ? 'Processing...' : 'Yes, I Have Paid — Process Now' }}
-              </button>
-              <button
-                @click="showUserConfirmDialog = false"
-                :disabled="confirmingPayment"
-                class="w-full py-2.5 px-4 rounded-xl border-2 border-surface-200 dark:border-surface-700 text-surface-700 dark:text-surface-300 font-medium text-sm hover:bg-surface-50 dark:hover:bg-surface-700/50 disabled:opacity-50 transition-all duration-200"
-              >I'll Pay Later</button>
             </div>
           </div>
         </div>

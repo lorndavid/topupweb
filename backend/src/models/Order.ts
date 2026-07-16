@@ -89,4 +89,7 @@ OrderSchema.index({ reference: 1, transaction_id: 1 });
 // Index for stock retry queries (findAwaitingStock)
 OrderSchema.index({ order_status: 1, next_retry_at: 1 });
 
+// Index for order history queries (findByPlayerId)
+OrderSchema.index({ player_id: 1, created_at: -1 });
+
 export const OrderModel = mongoose.model<IOrder>('Order', OrderSchema);

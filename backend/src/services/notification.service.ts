@@ -1,5 +1,6 @@
 import { config } from '../config';
 import axios from 'axios';
+import { orderRepository } from '../repositories/OrderRepository';
 
 /* ───────────────────────────────────────────
  *  Types
@@ -31,6 +32,79 @@ export interface OrderFulfilledAlert {
  * ─────────────────────────────────────────── */
 
 export class NotificationService {
+  /**
+   * Send a daily summary report to Telegram with today's revenue,
+   * orders completed, profit stats, and game breakdown.
+   * Returns whether the message was sent successfully.
+   */
+  async sendDailySummary(): Promise<boolean> {
+    const { telegramBotToken, telegramChatId } = config.notifications;
+    if (!telegramBotToken || !telegramChatId) {
+      console.warn('⚠️  Daily summary not sent: Telegram not configured');
+      return false;
+    }
+
+    try {
+      const stats = await orderRepository.getDailyStats();
+
+      // Build game breakdown lines
+      const gameLines = Object.entries(stats.by_game)
+        .sort((a, b) => b[1].revenue - a[1].revenue)
+        .map(
+          ([game, data]) =>
+            `   • ${this.getGameEmoji(game)} <b>${game.toUpperCase()}</b> — ${data.count} order${data.count !== 1 ? 's' : ''} ($${data.revenue.toFixed(2)})`
+        );
+
+      const dateStr = new Date().toLocaleDateString('en-US', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+      });
+
+      const lines = [
+        `📊 <b>DAILY SUMMARY — ${dateStr}</b>`,
+        `━━━━━━━━━━━━━━━━━━━━━━`,
+        ``,
+        `✅ <b>Orders Completed:</b> ${stats.total_orders}`,
+        `💰 <b>Revenue:</b> $${stats.total_revenue.toFixed(2)}`,
+        `🤑 <b>Profit:</b> $${stats.total_profit.toFixed(2)}`,
+        stats.total_orders > 0 ? `📈 <b>Avg/Order:</b> $${(stats.total_revenue / stats.total_orders).toFixed(2)}` : '',
+        ``,
+        `━━━━━━━━━━━━━━━━━━━━━━`,
+        `<b>🎮 By Game</b>`,
+        `━━━━━━━━━━━━━━━━━━━━━━`,
+        ``,
+        ...(gameLines.length > 0 ? gameLines : ['   No orders today']),
+        ``,
+        `━━━━━━━━━━━━━━━━━━━━━━`,
+        ``,
+        stats.total_orders > 0
+          ? `⏱️  Last order: ${new Date(
+              stats.orders[0]?.completed_at || ''
+            ).toLocaleTimeString()}`
+          : '💤 No activity today',
+      ];
+
+      await this.sendTelegram(lines.filter(Boolean).join('\n'), {
+        inline_keyboard: [
+          [
+            {
+              text: '📋 Open Bay2Game Dashboard',
+              url: 'https://bay2game.xyz/partners/login.php',
+            },
+          ],
+        ],
+      });
+
+      console.log(`📊 Daily summary sent: ${stats.total_orders} orders, $${stats.total_revenue.toFixed(2)} revenue`);
+      return true;
+    } catch (err: any) {
+      console.warn(`⚠️  Daily summary failed: ${err.message || err}`);
+      return false;
+    }
+  }
+
   /**
    * Send a test notification to verify Telegram + Webhook config.
    * Unlike other methods, this returns detailed results so the caller
@@ -136,6 +210,26 @@ export class NotificationService {
     await Promise.allSettled([
       this.sendTelegramFulfilled(order),
       this.sendWebhook('order.fulfilled', order),
+    ]);
+  }
+
+  /**
+   * Send alerts when ANY order completes successfully — not just
+   * awaiting_stock recovery. This keeps the admin informed of every
+   * successful top-up in real time.
+   */
+  async alertOrderCompleted(order: {
+    reference: string;
+    game_name: string;
+    product_name: string;
+    player_id: string;
+    server_id?: string;
+    amount: number;
+    completed_at: string;
+  }): Promise<void> {
+    await Promise.allSettled([
+      this.sendTelegramCompleted(order),
+      this.sendWebhook('order.completed', order),
     ]);
   }
 
@@ -284,6 +378,72 @@ export class NotificationService {
     ];
 
     await this.sendTelegram(lines.filter(Boolean).join('\n'));
+  }
+
+  /**
+   * Send the "order completed" Telegram alert.
+   * Fires for EVERY successful top-up so the admin sees live activity.
+   */
+  private async sendTelegramCompleted(order: {
+    reference: string;
+    game_name: string;
+    product_name: string;
+    player_id: string;
+    server_id?: string;
+    amount: number;
+    completed_at: string;
+  }): Promise<void> {
+    const lines = [
+      `✅ <b>ORDER COMPLETED!</b>`,
+      ``,
+      `━━━━━━━━━━━━━━━━━━━`,
+      `<b>📦 Order Delivered</b>`,
+      `━━━━━━━━━━━━━━━━━━━`,
+      ``,
+      `<b>Reference:</b> <code>${order.reference}</code>`,
+      `<b>Game:</b> ${order.game_name}`,
+      `<b>Package:</b> ${order.product_name}`,
+      `<b>Player ID:</b> <code>${order.player_id}</code>`,
+      order.server_id ? `<b>Server:</b> <code>${order.server_id}</code>` : '',
+      `<b>Amount:</b> $${order.amount.toFixed(2)}`,
+      `<b>Completed:</b> ${new Date(order.completed_at).toLocaleString()}`,
+      ``,
+      `━━━━━━━━━━━━━━━━━━━`,
+      ``,
+      `💰 <b>Profit:</b> $0.20 (your markup on this order)`,
+      ``,
+      `🔗 <a href="${config.frontendUrl}/order/${order.reference}">View Order Details</a>`,
+    ];
+
+    await this.sendTelegram(lines.filter(Boolean).join('\n'), {
+      inline_keyboard: [
+        [
+          {
+            text: '📋 View Order',
+            url: `${config.frontendUrl}/order/${order.reference}`,
+          },
+        ],
+      ],
+    });
+  }
+
+  /**
+   * Get an emoji for a game code to make the daily summary more visual.
+   */
+  private getGameEmoji(gameCode: string): string {
+    const emojis: Record<string, string> = {
+      mlbb: '🎮',
+      'freefire_sgmy': '🔥',
+      freefire: '🔥',
+      pubgm: '⚔️',
+      hok: '👑',
+      'honor of kings': '👑',
+      codm: '🎯',
+      genshin: '✨',
+      lol: '🏆',
+      valorant: '🔫',
+    };
+    return emojis[gameCode.toLowerCase()] || '🎮';
   }
 }
 

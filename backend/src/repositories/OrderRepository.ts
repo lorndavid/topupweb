@@ -76,6 +76,11 @@ export class OrderRepository {
     return doc ? this.toData(doc) : null;
   }
 
+  async findByPlayerId(playerId: string): Promise<OrderData[]> {
+    const docs = await OrderModel.find({ player_id: playerId }).sort({ created_at: -1 });
+    return docs.map((doc) => this.toData(doc));
+  }
+
   async updateStatus(
     reference: string,
     status: UpdateStatusData
@@ -146,6 +151,49 @@ export class OrderRepository {
       next_retry_at: { $lte: new Date() },
     }).sort({ next_retry_at: 1 });
     return docs.map((doc) => this.toData(doc));
+  }
+
+  /**
+   * Get all orders completed today (since midnight) with stats.
+   * Used for the daily Telegram summary report.
+   */
+  async getDailyStats(): Promise<{
+    total_orders: number;
+    total_revenue: number;
+    total_profit: number;
+    by_game: Record<string, { count: number; revenue: number }>;
+    orders: OrderData[];
+  }> {
+    const now = new Date();
+    const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
+
+    const docs = await OrderModel.find({
+      order_status: 'completed',
+      completed_at: { $gte: startOfDay },
+    }).sort({ completed_at: -1 });
+
+    const orders = docs.map((doc) => this.toData(doc));
+    let totalRevenue = 0;
+    const byGame: Record<string, { count: number; revenue: number }> = {};
+
+    for (const order of orders) {
+      totalRevenue += order.amount;
+      const game = order.game_code || 'unknown';
+      if (!byGame[game]) byGame[game] = { count: 0, revenue: 0 };
+      byGame[game].count++;
+      byGame[game].revenue += order.amount;
+    }
+
+    // Profit is $0.20 per completed order
+    const totalProfit = orders.length * 0.20;
+
+    return {
+      total_orders: orders.length,
+      total_revenue: Math.round(totalRevenue * 100) / 100,
+      total_profit: totalProfit,
+      by_game: byGame,
+      orders,
+    };
   }
 
   /** Increment retry count and schedule next retry (exponential backoff) */

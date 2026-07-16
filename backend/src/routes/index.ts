@@ -1,11 +1,11 @@
 import { Router } from 'express';
 import { getCategories, getCambodiaGames, getProductsByGame } from '../controllers/category.controller';
 import { createPayment, getPaymentStatus, handleCallback, manualConfirmPayment } from '../controllers/payment.controller';
-import { createOrder, getOrder, cancelOrder, retryOrder } from '../controllers/order.controller';
+import { createOrder, getOrder, getOrdersByPlayer, cancelOrder, retryOrder } from '../controllers/order.controller';
 import { verifyPlayer, checkGameId } from '../controllers/player.controller';
 import { getAdminDashboard } from '../controllers/admin.controller';
 import { getBalance } from '../controllers/balance.controller';
-import { receiveStockAlert, getRecentAlerts, testNotification } from '../controllers/webhook.controller';
+import { receiveStockAlert, getRecentAlerts, triggerDailySummary, testNotification } from '../controllers/webhook.controller';
 
 const router = Router();
 
@@ -30,6 +30,7 @@ router.get('/balance', getBalance);
 // Orders
 router.post('/order', createOrder);
 router.get('/order/:reference', getOrder);
+router.get('/orders/player/:playerId', getOrdersByPlayer);
 router.post('/order/:reference/cancel', cancelOrder);
 router.post('/order/:reference/retry', retryOrder);
 
@@ -37,6 +38,7 @@ router.post('/order/:reference/retry', retryOrder);
 router.post('/webhook/stock-alert', receiveStockAlert);
 router.get('/webhook/recent-alerts', getRecentAlerts);
 router.post('/webhook/test', testNotification);
+router.post('/webhook/daily-summary', triggerDailySummary);
 
 // Admin
 router.get('/admin/dashboard', getAdminDashboard);

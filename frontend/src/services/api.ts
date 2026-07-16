@@ -169,6 +169,14 @@ export async function manualConfirmPayment(reference: string): Promise<{
   return data.data
 }
 
+export async function getOrdersByPlayer(playerId: string): Promise<OrderResponse[]> {
+  const { data } = await api.get<ApiResponse<OrderResponse[]>>(`/orders/player/${encodeURIComponent(playerId)}`)
+  if (!data.success) {
+    throw new Error(data.message || 'Failed to fetch orders')
+  }
+  return data.data || []
+}
+
 export async function getResellerBalance(): Promise<BalanceInfo> {
   const { data } = await api.get<ApiResponse<BalanceInfo>>('/balance')
   if (!data.success || !data.data) {

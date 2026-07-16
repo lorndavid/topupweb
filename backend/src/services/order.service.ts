@@ -6,6 +6,7 @@ import { bay2gameService } from './bay2game.service';
 import { bakongService } from './bakong.service';
 import { orderRepository } from '../repositories/OrderRepository';
 import { notificationService } from './notification.service';
+import { webSocketService } from './websocket.service';
 
 export class OrderService {
   /**
@@ -91,6 +92,13 @@ export class OrderService {
         if (bakongResult.status === 'PAID' || bakongResult.status === 'SUCCESS') {
           const updated = await orderRepository.markPaid(reference);
 
+          // Notify connected clients in real-time
+          webSocketService.emitPaymentStatus({
+            reference,
+            payment_status: 'paid',
+            order_status: 'paid',
+          });
+
           // Trigger top-up processing (non-blocking)
           this.processTopUp(reference).catch((err) =>
             console.error('Top-up processing error:', err)
@@ -160,6 +168,13 @@ export class OrderService {
       console.log(`💡 [${mode}] Payment simulation for ${reference} after ${Math.round(elapsed / 1000)}s (Bakong ${!config.bakong.apiToken ? 'unconfigured' : 'check failed'})`);
       const updated = await orderRepository.markPaid(reference);
 
+      // Notify connected clients in real-time
+      webSocketService.emitPaymentStatus({
+        reference,
+        payment_status: 'paid',
+        order_status: 'paid',
+      });
+
       // Trigger top-up processing (non-blocking)
       this.processTopUp(reference).catch((err) =>
         console.error('Top-up processing error:', err)
@@ -221,10 +236,19 @@ export class OrderService {
 
       await orderRepository.markCompleted(reference, completedAt);
 
-      // ─── Send fulfillment notification if was awaiting stock ───
+      // Notify connected clients in real-time
+      webSocketService.emitPaymentStatus({
+        reference,
+        payment_status: 'paid',
+        order_status: 'completed',
+      });
+
+      // ─── Send order completion notification ───────────────────
       // We check the order's status BEFORE markProcessing changed it
       const wasAwaitingStock = order.order_status === 'awaiting_stock';
+
       if (wasAwaitingStock) {
+        // Awaiting-stock recovery: sends "STOCK DELIVERED" alert
         notificationService.alertOrderFulfilled({
           reference: order.reference,
           game_name: order.game_name,
@@ -234,6 +258,17 @@ export class OrderService {
           amount: order.amount,
           completed_at: completedAt.toISOString(),
           was_awaiting_stock: true,
+        });
+      } else {
+        // Normal order: sends "ORDER COMPLETED" alert for admin awareness
+        notificationService.alertOrderCompleted({
+          reference: order.reference,
+          game_name: order.game_name,
+          product_name: order.product_name,
+          player_id: order.player_id,
+          server_id: order.server_id,
+          amount: order.amount,
+          completed_at: completedAt.toISOString(),
         });
       }
 
@@ -272,6 +307,13 @@ export class OrderService {
         // Mark as awaiting stock (payment received, just need balance)
         await orderRepository.markAwaitingStock(reference);
 
+        // Notify connected clients in real-time
+        webSocketService.emitPaymentStatus({
+          reference,
+          payment_status: 'paid',
+          order_status: 'awaiting_stock',
+        });
+
         // ─── Fire notification alerts (fire-and-forget) ───────────
         // alertAwaitingStock handles its own errors internally via Promise.allSettled
         notificationService.alertAwaitingStock({
@@ -292,6 +334,14 @@ export class OrderService {
 
       // ─── Other errors: mark as failed ───
       await orderRepository.markFailed(reference);
+
+      // Notify connected clients in real-time
+      webSocketService.emitPaymentStatus({
+        reference,
+        payment_status: 'failed',
+        order_status: 'failed',
+      });
+
       throw error;
     }
   }
@@ -414,6 +464,13 @@ export class OrderService {
 
     await orderRepository.markCancelled(reference);
 
+    // Notify connected clients in real-time
+    webSocketService.emitPaymentStatus({
+      reference,
+      payment_status: 'cancelled',
+      order_status: 'cancelled',
+    });
+
     return {
       success: true,
       message: 'Order cancelled successfully',
@@ -440,6 +497,14 @@ export class OrderService {
 
     if (payload.status === 'PAID' || payload.status === 'SUCCESS') {
       await orderRepository.markPaid(order.reference);
+
+      // Notify connected clients in real-time
+      webSocketService.emitPaymentStatus({
+        reference: order.reference,
+        payment_status: 'paid',
+        order_status: 'paid',
+      });
+
       await this.processTopUp(order.reference);
     }
 
@@ -475,6 +540,13 @@ export class OrderService {
 
     // Mark as paid and trigger top-up
     const updated = await orderRepository.markPaid(reference);
+
+    // Notify connected clients in real-time
+    webSocketService.emitPaymentStatus({
+      reference,
+      payment_status: 'paid',
+      order_status: 'paid',
+    });
 
     // Trigger top-up processing (non-blocking)
     this.processTopUp(reference).catch((err) =>

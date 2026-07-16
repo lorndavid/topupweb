@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref, computed, watch, nextTick } from 'vue'
+import { onMounted, onUnmounted, ref, computed, watch, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useGameStore } from '@/stores/game'
 import { useI18nStore } from '@/stores/i18n'
@@ -8,7 +8,11 @@ import ProductCard from '@/components/ProductCard.vue'
 import LoadingSkeleton from '@/components/LoadingSkeleton.vue'
 import { verifyPlayer } from '@/services/api'
 import type { GameProduct } from '@/types'
+import { useSavedPlayers } from '@/composables/useSavedPlayers'
 import gsap from 'gsap'
+import { ScrollTrigger } from 'gsap/ScrollTrigger'
+
+gsap.registerPlugin(ScrollTrigger)
 
 const route = useRoute()
 const router = useRouter()
@@ -22,9 +26,14 @@ const gameCode = computed(() => route.params.gameCode as string)
 const pageRef = ref<HTMLElement | null>(null)
 const headerRef = ref<HTMLElement | null>(null)
 const formRef = ref<HTMLElement | null>(null)
-const productsRef = ref<HTMLElement | null>(null)
+const productsContainerRef = ref<HTMLElement | null>(null)
+const productsListRef = ref<HTMLElement | null>(null)
 const resultRef = ref<HTMLElement | null>(null)
 const verifyBtnRef = ref<HTMLElement | null>(null)
+const errorRef = ref<HTMLElement | null>(null)
+const serverIdRef = ref<HTMLElement | null>(null)
+const proceedBtnRef = ref<HTMLElement | null>(null)
+const savedChipsRef = ref<HTMLElement | null>(null)
 
 const selectedProduct = ref<GameProduct | null>(null)
 const playerId = ref('')
@@ -39,6 +48,13 @@ const playerRegion = ref<string | null>(null)
 const playerGameTitle = ref<string | null>(null)
 const verifyProvider = ref<string | null>(null)
 
+// Track previous canProceed for pulse effect
+const prevCanProceed = ref(false)
+
+// Saved Players (localStorage for returning customers)
+const { getByGame, save } = useSavedPlayers()
+const savedForGame = ref<ReturnType<typeof getByGame>>([])
+
 // ─── Computed ────────────────────────────────────────────────
 const needsServerId = computed(() => {
   const category = gameStore.categories.find((c) => c.game_code === gameCode.value)
@@ -46,12 +62,47 @@ const needsServerId = computed(() => {
 })
 
 const canProceed = computed(() => {
-  return selectedProduct.value && verified.value && playerId.value.trim()
+  return !!(selectedProduct.value && verified.value && playerId.value.trim())
 })
 
 const gameDisplayName = computed(() => {
   return gameStore.selectedGame?.name || gameCode.value
 })
+
+// ─── Product stagger reveal (one-shot guard prevents re-trigger flash) ───
+const staggerDone = ref(false)
+
+watch(
+  () => gameStore.products,
+  (products) => {
+    if (products.length > 0 && !staggerDone.value) {
+      staggerDone.value = true
+      nextTick(() => {
+        const items = productsListRef.value?.querySelectorAll('.product-card')
+        if (!items || items.length === 0) return
+
+        // Kill any existing tweens on product cards
+        gsap.killTweensOf(items)
+
+        // Stagger reveal — GSAP fromTo immediately applies the 'from' state
+        // so there's no flash of visible -> hidden -> animate
+        gsap.fromTo(
+          items,
+          { opacity: 0, y: 20, scale: 0.96 },
+          {
+            opacity: 1,
+            y: 0,
+            scale: 1,
+            duration: 0.45,
+            stagger: { each: 0.06, from: 'start', ease: 'power2.out' },
+            ease: 'back.out(1.4)',
+          }
+        )
+      })
+    }
+  },
+  { immediate: true }
+)
 
 // ─── Watchers ────────────────────────────────────────────────
 watch(playerId, () => {
@@ -65,24 +116,102 @@ watch(playerId, () => {
   }
 })
 
+// Multi-step result card reveal
 watch(verified, (val) => {
   if (val && resultRef.value) {
     nextTick(() => {
+      const card = resultRef.value
+      if (!card) return
+      const bar = card.querySelector('.result-accent-bar')
+      const avatar = card.querySelector('.result-avatar')
+      const info = card.querySelector('.result-info')
+      const badge = card.querySelector('.result-badge')
+
+      // Step 1: Card entrance with spring
       gsap.fromTo(
-        resultRef.value,
-        { opacity: 0, y: 20, scale: 0.95 },
+        card,
+        { opacity: 0, y: 24, scale: 0.93 },
+        { opacity: 1, y: 0, scale: 1, duration: 0.55, ease: 'back.out(1.8)' }
+      )
+
+      // Step 2: Accent bar sweeps in (slightly delayed)
+      if (bar) {
+        gsap.fromTo(bar, { scaleX: 0 }, { scaleX: 1, duration: 0.5, ease: 'power3.out', delay: 0.1 })
+      }
+
+      // Step 3: Content staggers in after card settles
+      const contentItems: HTMLElement[] = []
+      if (avatar) contentItems.push(avatar as HTMLElement)
+      if (info) contentItems.push(info as HTMLElement)
+      if (badge) contentItems.push(badge as HTMLElement)
+
+      if (contentItems.length > 0) {
+        gsap.fromTo(
+          contentItems,
+          { opacity: 0, y: 12 },
+          { opacity: 1, y: 0, duration: 0.35, stagger: 0.08, ease: 'power2.out', delay: 0.2 }
+        )
+      }
+    })
+  }
+})
+
+// Smooth error slide-in
+watch(verifyError, (err) => {
+  if (err && errorRef.value) {
+    nextTick(() => {
+      gsap.set(errorRef.value, { opacity: 0, y: -8, maxHeight: 0 })
+      gsap.to(errorRef.value, {
+        opacity: 1, y: 0, maxHeight: 200,
+        duration: 0.35,
+        ease: 'power3.out',
+      })
+    })
+  }
+})
+
+// Server ID field slide animation when it appears
+watch(needsServerId, () => {
+  nextTick(() => {
+    if (serverIdRef.value) {
+      // Apply hidden state first, then animate in — prevents flash
+      gsap.set(serverIdRef.value, { opacity: 0, y: -10, maxHeight: 0 })
+      gsap.to(serverIdRef.value, { opacity: 1, y: 0, maxHeight: 200, duration: 0.35, ease: 'power3.out' })
+    }
+  })
+})
+
+// Proceed button pulse when canProceed becomes true
+watch(canProceed, (val) => {
+  if (val && !prevCanProceed.value && proceedBtnRef.value) {
+    nextTick(() => {
+      gsap.fromTo(
+        proceedBtnRef.value,
+        { boxShadow: '0 0 0 rgba(37, 99, 235, 0)' },
         {
-          opacity: 1,
-          y: 0,
-          scale: 1,
-          duration: 0.5,
-          ease: 'back.out(1.7)',
+          boxShadow: '0 0 30px rgba(37, 99, 235, 0.4), 0 0 60px rgba(37, 99, 235, 0.15)',
+          duration: 0.6,
+          ease: 'power2.out',
+          yoyo: true,
+          repeat: 1,
         }
       )
-      // Animate the accent bar
-      const bar = resultRef.value?.querySelector('.result-accent-bar')
-      if (bar) {
-        gsap.fromTo(bar, { scaleX: 0 }, { scaleX: 1, duration: 0.6, ease: 'power2.out' })
+    })
+  }
+  prevCanProceed.value = val
+})
+
+// ─── Saved chip entrance ────────────────────────────────────
+watch(savedForGame, (chips) => {
+  if (chips.length > 0) {
+    nextTick(() => {
+      const els = savedChipsRef.value?.querySelectorAll('.saved-chip')
+      if (els && els.length > 0) {
+        gsap.fromTo(
+          els,
+          { opacity: 0, scale: 0.85, y: 8 },
+          { opacity: 1, scale: 1, y: 0, duration: 0.3, stagger: 0.05, ease: 'back.out(2)' }
+        )
       }
     })
   }
@@ -105,9 +234,13 @@ async function handleVerify() {
   verifyError.value = null
   verified.value = false
 
-  // Animate verify button to show loading
+  // Animate verify button to pressed state
   if (verifyBtnRef.value) {
-    gsap.to(verifyBtnRef.value, { scale: 0.97, duration: 0.15 })
+    gsap.to(verifyBtnRef.value, {
+      scale: 0.95,
+      duration: 0.12,
+      ease: 'power2.in',
+    })
   }
 
   try {
@@ -126,14 +259,26 @@ async function handleVerify() {
 
       toast.success(i18n.t('verify.successMessage'))
 
-      // Success animation on button
+      // Save to localStorage so returning users can re-select instantly
+      save({
+        gameCode: gameCode.value,
+        playerId: id,
+        serverId: serverId.value.trim() || undefined,
+        nickname: result.nickname,
+        region: result.region,
+        gameTitle: result.gameTitle,
+      })
+      // Refresh the saved players list
+      loadSavedPlayers()
+
+      // Success bounce on button (morphs to verified badge via v-if)
       if (verifyBtnRef.value) {
         gsap.to(verifyBtnRef.value, {
-          scale: 1.05,
-          duration: 0.3,
-          ease: 'back.out(2)',
+          scale: 1.08,
+          duration: 0.25,
+          ease: 'back.out(2.5)',
           onComplete: () => {
-            gsap.to(verifyBtnRef.value, { scale: 1, duration: 0.2 })
+            gsap.to(verifyBtnRef.value, { scale: 1, duration: 0.15 })
           },
         })
       }
@@ -162,6 +307,29 @@ function shakeElement(el: HTMLElement | null) {
       { x: 0, duration: 0.04 },
     ],
   })
+}
+
+// ─── Saved Players ─────────────────────────────────
+/** Load previously verified player IDs for this game from localStorage. */
+function loadSavedPlayers() {
+  savedForGame.value = getByGame(gameCode.value)
+}
+
+/** Select a saved player: auto-fill ID, server, and restore cached verification instantly. */
+function selectSavedPlayer(saved: ReturnType<typeof getByGame>[number]) {
+  playerId.value = saved.playerId
+  serverId.value = saved.serverId || ''
+  verified.value = true
+  playerNickname.value = saved.nickname
+  playerRegion.value = saved.region || null
+  playerGameTitle.value = saved.gameTitle || null
+  verifyError.value = null
+  toast.success(`Welcome back, ${saved.nickname}!`)
+
+  // Scroll to show the verified result card
+  if (resultRef.value) {
+    resultRef.value.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+  }
 }
 
 function proceedToCheckout() {
@@ -202,16 +370,21 @@ onMounted(() => {
     gameStore.fetchProducts(gameCode.value)
   }
 
+  // Load saved player IDs from localStorage for this game
+  loadSavedPlayers()
+
   // Page entrance animation
   nextTick(() => {
     const tl = gsap.timeline({ defaults: { ease: 'power3.out' } })
 
+    // Page fade in
     tl.fromTo(
       pageRef.value,
       { opacity: 0, y: 30 },
       { opacity: 1, y: 0, duration: 0.5 }
     )
 
+    // Header items stagger
     if (headerRef.value) {
       tl.fromTo(
         headerRef.value.querySelectorAll('.anim-item'),
@@ -221,6 +394,7 @@ onMounted(() => {
       )
     }
 
+    // Form column slides in from right
     if (formRef.value) {
       tl.fromTo(
         formRef.value,
@@ -230,9 +404,10 @@ onMounted(() => {
       )
     }
 
-    if (productsRef.value) {
+    // Products column slides in from left
+    if (productsContainerRef.value) {
       tl.fromTo(
-        productsRef.value,
+        productsContainerRef.value,
         { opacity: 0, x: -30 },
         { opacity: 1, x: 0, duration: 0.4 },
         '-=0.1'
@@ -248,7 +423,31 @@ onMounted(() => {
       ease: 'sine.inOut',
       stagger: 0.3,
     })
+
+    // ─── Parallax: header background image ───
+    if (headerRef.value) {
+      const bgImg = headerRef.value.querySelector('.parallax-header-bg')
+      if (bgImg) {
+        gsap.to(bgImg, {
+          y: 30,
+          scale: 1.1,
+          ease: 'none',
+          scrollTrigger: {
+            trigger: headerRef.value,
+            start: 'top bottom',
+            end: 'bottom top',
+            scrub: 1.2,
+          },
+        })
+      }
+    }
   })
+})
+
+onUnmounted(() => {
+  ScrollTrigger.getAll().forEach((st) => st.kill())
+  gsap.killTweensOf('.bg-particle')
+  gsap.killTweensOf('.product-card, .saved-chip, .result-accent-bar, .result-avatar, .result-info, .result-badge')
 })
 </script>
 
@@ -315,8 +514,8 @@ onMounted(() => {
       <template v-else-if="gameStore.selectedGame">
         <!-- Game Header -->
         <div ref="headerRef" class="relative overflow-hidden rounded-2xl bg-gradient-to-br from-surface-900 via-surface-800 to-primary-900 dark:from-surface-950 dark:via-surface-900 dark:to-primary-950 mb-8 p-6 sm:p-8 shadow-xl">
-          <!-- Background image with overlay -->
-          <div class="absolute inset-0 opacity-10">
+          <!-- Background image with parallax overlay -->
+          <div class="parallax-header-bg absolute inset-0 opacity-10 will-change-transform">
             <img
               :src="gameStore.selectedGame.image_url"
               :alt="gameStore.selectedGame.name"
@@ -366,7 +565,7 @@ onMounted(() => {
         <!-- Main Content Grid -->
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8">
           <!-- Products Column (left on desktop) -->
-          <div ref="productsRef" class="lg:col-span-7 space-y-6 order-2 lg:order-1">
+          <div ref="productsContainerRef" class="lg:col-span-7 space-y-6 order-2 lg:order-1">
             <div class="flex items-center justify-between">
               <h2 class="text-lg font-semibold text-surface-900 dark:text-surface-100">
                 {{ i18n.t('detail.selectPackage') }}
@@ -385,14 +584,13 @@ onMounted(() => {
               <p class="text-sm text-surface-500 dark:text-surface-400">No packages available yet</p>
             </div>
 
-            <div class="space-y-3">
+            <div ref="productsListRef" class="space-y-3">
               <ProductCard
-                v-for="(product, index) in gameStore.products"
+                v-for="product in gameStore.products"
                 :key="product.product_code"
                 :product="product"
                 :selected="selectedProduct?.product_code === product.product_code"
                 @select="selectProduct(product)"
-                :style="{ animationDelay: `${index * 0.05}s` }"
                 class="product-card"
               />
             </div>
@@ -477,10 +675,50 @@ onMounted(() => {
                       </svg>
                       {{ i18n.t('verify.hint') }}
                     </p>
+
+                    <!-- Saved Players (localStorage) -->
+                    <div v-if="savedForGame.length > 0 && !verified" ref="savedChipsRef" class="pt-2">
+                      <p class="text-[10px] text-surface-400 dark:text-surface-500 font-medium uppercase tracking-wider mb-2">
+                        Previously Verified
+                      </p>
+                      <div class="flex flex-wrap gap-2">
+                        <button
+                          v-for="saved in savedForGame"
+                          :key="saved.playerId + (saved.serverId || '')"
+                          @click="selectSavedPlayer(saved)"
+                          class="saved-chip group inline-flex items-center gap-2 px-3 py-2 rounded-xl border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800 hover:border-primary-300 dark:hover:border-primary-600 hover:bg-primary-50 dark:hover:bg-primary-900/20 transition-all duration-200 text-left"
+                        >
+                          <div class="w-7 h-7 rounded-full bg-gradient-to-br from-emerald-400 to-primary-500 flex items-center justify-center text-white font-bold text-xs shrink-0">
+                            {{ (saved.nickname[0] || '?').toUpperCase() }}
+                          </div>
+                          <div class="min-w-0">
+                            <p class="text-xs font-semibold text-surface-800 dark:text-surface-200 truncate max-w-[120px]">
+                              {{ saved.nickname }}
+                            </p>
+                            <p class="text-[10px] text-surface-400 dark:text-surface-500 font-mono">
+                              {{ saved.playerId }}<span v-if="saved.serverId"> ({{ saved.serverId }})</span>
+                            </p>
+                          </div>
+                          <svg class="w-3.5 h-3.5 text-surface-300 dark:text-surface-600 group-hover:text-primary-400 transition-colors shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                          </svg>
+                        </button>
+                      </div>
+                    </div>
+
+                    <!-- Saved Players Badge (when verified but one exists) -->
+                    <div v-if="savedForGame.length > 0 && verified" class="pt-1">
+                      <span class="inline-flex items-center gap-1.5 text-[10px] text-emerald-600 dark:text-emerald-400">
+                        <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                          <path fill-rule="evenodd" d="M6.267 3.455a3.066 3.066 0 001.745-.723 3.066 3.066 0 013.976 0 3.066 3.066 0 001.745.723 3.066 3.066 0 012.812 2.812c.051.643.304 1.254.723 1.745a3.066 3.066 0 010 3.976 3.066 3.066 0 00-.723 1.745 3.066 3.066 0 01-2.812 2.812 3.066 3.066 0 00-1.745.723 3.066 3.066 0 01-3.976 0 3.066 3.066 0 00-1.745-.723 3.066 3.066 0 01-2.812-2.812 3.066 3.066 0 00-.723-1.745 3.066 3.066 0 010-3.976 3.066 3.066 0 00.723-1.745 3.066 3.066 0 012.812-2.812zm7.44 5.252a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
+                        </svg>
+                        Saved for quick access on your next visit
+                      </span>
+                    </div>
                   </div>
 
                   <!-- Server / Zone ID -->
-                  <div v-if="needsServerId">
+                  <div v-show="needsServerId" ref="serverIdRef" class="overflow-hidden">
                     <label class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1.5">
                       {{ i18n.t('detail.serverId') }} <span class="text-red-400">*</span>
                     </label>
@@ -510,7 +748,8 @@ onMounted(() => {
                   <!-- Verification Error -->
                   <div
                     v-if="verifyError"
-                    class="flex items-start gap-2.5 p-3 bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-800/30 rounded-xl"
+                    ref="errorRef"
+                    class="flex items-start gap-2.5 p-3 bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-800/30 rounded-xl overflow-hidden"
                   >
                     <svg class="w-4 h-4 shrink-0 mt-0.5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -564,10 +803,10 @@ onMounted(() => {
                   <!-- Player Info -->
                   <div class="flex items-center gap-4">
                     <!-- Avatar -->
-                    <div class="w-14 h-14 rounded-full bg-gradient-to-br from-emerald-400 to-primary-600 flex items-center justify-center text-white font-bold text-xl shadow-lg shrink-0">
+                    <div class="result-avatar w-14 h-14 rounded-full bg-gradient-to-br from-emerald-400 to-primary-600 flex items-center justify-center text-white font-bold text-xl shadow-lg shrink-0">
                       {{ (playerNickname[0] || '?').toUpperCase() }}
                     </div>
-                    <div class="min-w-0 flex-1">
+                    <div class="result-info min-w-0 flex-1">
                       <p class="text-xs text-surface-500 dark:text-surface-400 mb-0.5">{{ i18n.t('verify.nicknamePrefix') }}</p>
                       <p class="font-bold text-lg text-surface-900 dark:text-surface-100 truncate">
                         {{ playerNickname }}
@@ -579,7 +818,7 @@ onMounted(() => {
                   </div>
 
                   <!-- Provider badge -->
-                  <div v-if="verifyProvider" class="mt-4 pt-3 border-t border-emerald-200/30 dark:border-emerald-800/20">
+                  <div v-if="verifyProvider" class="result-badge mt-4 pt-3 border-t border-emerald-200/30 dark:border-emerald-800/20">
                     <span class="text-[10px] text-surface-400 dark:text-surface-500 font-medium uppercase tracking-wider">
                       {{ i18n.t('verify.provider.prefix') }}
                     </span>
@@ -620,6 +859,7 @@ onMounted(() => {
 
                   <!-- Proceed Button -->
                   <button
+                    ref="proceedBtnRef"
                     @click="proceedToCheckout"
                     :disabled="!canProceed"
                     class="btn-primary w-full relative overflow-hidden group"
@@ -648,17 +888,7 @@ onMounted(() => {
 
 <style scoped>
 .product-card {
-  animation: card-enter 0.4s ease-out both;
-}
-
-@keyframes card-enter {
-  from {
-    opacity: 0;
-    transform: translateY(12px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  /* Initial state is set by GSAP; this ensures a static fallback */
+  will-change: transform, opacity;
 }
 </style>

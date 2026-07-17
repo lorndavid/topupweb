@@ -88,8 +88,9 @@ export class BakongService {
     const merchantName = config.merchant.name || 'MY SHOP';
     const merchantCity = config.merchant.city || 'Phnom Penh';
 
-    // Convert USD amount to KHR for the QR (banks display KHR amounts)
-    const amountKHR = Math.round(params.amount * this.USD_TO_KHR);
+    // Use USD amount directly — KHQR supports USD currency code (840)
+    // All Cambodian banking apps (ABA, ACLEDA, Wing, Bakong) accept USD KHQR.
+    const amountUSD = params.amount;
 
     // Use order reference or description truncated as bill number
     const billNumber = params.description
@@ -97,8 +98,8 @@ export class BakongService {
       .substring(0, 25);
 
     const optionalData: Record<string, any> = {
-      currency: khqrData.currency.khr,
-      amount: amountKHR,
+      currency: khqrData.currency.usd,
+      amount: amountUSD,
       storeLabel: merchantName.substring(0, 25),
       // expirationTimestamp is REQUIRED by the library when amount is provided
       expirationTimestamp: Date.now() + 5 * 60 * 1000, // 5 minutes
@@ -162,14 +163,13 @@ export class BakongService {
     // ── 2. Try the real Bakong API ─────────────────────
     if (config.bakong.apiUrl && config.bakong.apiToken && config.merchant.bakongId) {
       try {
-        const amountKHR = Math.round(params.amount * this.USD_TO_KHR);
-
+    
         const { data } = await bakongApi.post('/v1/generate_qr', {
           account_id: config.merchant.bakongId,
           merchant_name: config.merchant.name,
           merchant_city: config.merchant.city,
-          amount: amountKHR,
-          currency: 'KHR',
+          amount: params.amount,
+          currency: 'USD',
           description: params.description.substring(0, 50),
         });
 
@@ -188,7 +188,7 @@ export class BakongService {
             md5Hash: data.md5_hash || data.md5Hash || md5Hash,
             transactionId: data.transaction_id || data.transactionId || transactionId,
             amount: params.amount,
-            currency: 'KHR',
+            currency: 'USD',
           };
         }
 
@@ -236,7 +236,7 @@ export class BakongService {
         md5Hash: khqrResult.md5 || md5Hash,
         transactionId,
         amount: params.amount,
-        currency: 'KHR',
+        currency: 'USD',
       };
     } catch (khqrError: any) {
       console.error('❌ bakong-khqr SDK failed:', khqrError.message);
@@ -264,7 +264,7 @@ export class BakongService {
         md5Hash,
         transactionId,
         amount: params.amount,
-        currency: 'KHR',
+        currency: 'USD',
       };
     }
   }
@@ -286,7 +286,7 @@ export class BakongService {
           status: data.status || 'PENDING',
           transactionId: data.transaction_id || transactionId,
           amount: data.amount || 0,
-          currency: data.currency || 'KHR',
+          currency: data.currency || 'USD',
           senderAccount: data.sender_account,
           timestamp: data.timestamp,
         };
@@ -314,7 +314,7 @@ export class BakongService {
           status: 'PENDING',
           transactionId,
           amount: 0,
-          currency: 'KHR',
+          currency: 'USD',
           timestamp: new Date().toISOString(),
         };
       }
@@ -326,7 +326,7 @@ export class BakongService {
       status: 'PENDING',
       transactionId,
       amount: 0,
-      currency: 'KHR',
+      currency: 'USD',
       timestamp: new Date().toISOString(),
     };
   }
@@ -399,7 +399,6 @@ export class BakongService {
     const bakongAccount = config.merchant.bakongId || 'demo@bkrt';
     const merchantName = config.merchant.name || 'MY SHOP';
     const merchantCity = config.merchant.city || 'Phnom Penh';
-    const amountKHR = Math.round(params.amount * this.USD_TO_KHR);
     const billNumber = params.description
       .replace(/[^a-zA-Z0-9-_]/g, '')
       .substring(0, 25);
@@ -440,8 +439,8 @@ export class BakongService {
     rawQr += tlv('00', '01');                      // Payload Format Indicator
     rawQr += tlv('01', '11');                      // Point of Initiation Method (static)
     rawQr += tlv('29', tag29Data);                 // Merchant Account Information
-    rawQr += tlv('53', '116');                     // Transaction Currency (KHR = 116)
-    rawQr += tlv('54', amountKHR.toString());      // Transaction Amount
+    rawQr += tlv('53', '840');                     // Transaction Currency (USD = 840)
+    rawQr += tlv('54', params.amount.toFixed(2));  // Transaction Amount (USD)
     rawQr += tlv('58', 'KH');                      // Country Code
     rawQr += tlv('59', merchantName.substring(0, 25));  // Merchant Name (EMV)
     rawQr += tlv('60', merchantCity.substring(0, 15));  // Merchant City (EMV)

@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useI18nStore } from '@/stores/i18n'
 import { getOrder } from '@/services/api'
 import type { OrderResponse } from '@/types'
+import ReceiptCard from '@/components/ReceiptCard.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -219,6 +220,25 @@ onMounted(() => {
           <span class="text-sm text-surface-500 dark:text-surface-400">{{ i18n.t('order.completed') }}</span>
           <span class="text-sm text-surface-500 dark:text-surface-400">{{ new Date(order.completed_at).toLocaleString() }}</span>
         </div>
+      </div>
+
+      <!-- Receipt (completed or paid orders) -->
+      <div
+        v-if="order.order_status === 'completed' || order.order_status === 'paid'"
+        class="mt-6"
+      >
+        <ReceiptCard
+          :reference="order.reference"
+          :game-name="order.game_name"
+          :product-name="order.product_name"
+          :player-id="order.player_id"
+          :server-id="order.server_id || null"
+          :amount="order.amount"
+          :payment-status="order.payment_status"
+          :order-status="order.order_status"
+          :created-at="order.created_at"
+          :completed-at="order.completed_at || null"
+        />
       </div>
 
       <!-- Actions -->

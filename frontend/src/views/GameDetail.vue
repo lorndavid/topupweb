@@ -6,10 +6,11 @@ import { useI18nStore } from '@/stores/i18n'
 import { useToastStore } from '@/stores/toast'
 import ProductCard from '@/components/ProductCard.vue'
 import LoadingSkeleton from '@/components/LoadingSkeleton.vue'
-import { verifyPlayer } from '@/services/api'
+import { verifyPlayer, createPayment, getPaymentStatus, cancelOrder } from '@/services/api'
 import type { GameProduct } from '@/types'
 import { useSavedPlayers } from '@/composables/useSavedPlayers'
 import { formatPrice } from '@/composables/useCurrency'
+import { usePaymentWebSocket } from '@/composables/usePaymentWebSocket'
 import gsap from 'gsap'
 import { ScrollTrigger } from 'gsap/ScrollTrigger'
 
@@ -310,6 +311,152 @@ function shakeElement(el: HTMLElement | null) {
   })
 }
 
+// ─── Mobile One-Step Checkout ───────────────────────
+const mobileCheckoutActive = ref(false)
+const mobileQrImage = ref('')
+const mobilePaymentRef = ref('')
+const mobileQrLoading = ref(false)
+const mobileQrError = ref<string | null>(null)
+const mobilePaymentStatus = ref<'pending' | 'paid' | 'failed'>('pending')
+const mobileTimeLeft = ref(5 * 60)
+const mobileUrgent = computed(() => mobileTimeLeft.value < 60 && mobilePaymentStatus.value === 'pending')
+
+// WebSocket for real-time payment status (mobile checkout)
+const mobileWsRef = ref<string | null>(null)
+const mobileWs = usePaymentWebSocket(mobileWsRef)
+mobileWs.setOnStatusChange((data) => {
+  if (data.payment_status === 'paid') {
+    mobilePaymentStatus.value = 'paid'
+    stopMobilePolling()
+    toast.success('Payment received! Redirecting...')
+    setTimeout(() => {
+      router.push('/order/' + mobilePaymentRef.value)
+    }, 1500)
+  } else if (data.payment_status === 'failed') {
+    mobilePaymentStatus.value = 'failed'
+    stopMobilePolling()
+    toast.error('Payment failed')
+  }
+})
+
+let mobilePollInterval: ReturnType<typeof setInterval> | null = null
+let mobileTimerInterval: ReturnType<typeof setInterval> | null = null
+
+function playSuccessSound() {
+  try {
+    const ctx = new (window.AudioContext || (window as any).webkitAudioContext)()
+    const now = ctx.currentTime
+    const notes = [523, 659, 784]
+    notes.forEach((freq, i) => {
+      const osc = ctx.createOscillator()
+      const gain = ctx.createGain()
+      osc.type = 'sine'
+      osc.frequency.setValueAtTime(freq, now + i * 0.12)
+      gain.gain.setValueAtTime(0.2, now + i * 0.12)
+      gain.gain.exponentialRampToValueAtTime(0.01, now + i * 0.12 + 0.4)
+      osc.connect(gain)
+      gain.connect(ctx.destination)
+      osc.start(now + i * 0.12)
+      osc.stop(now + i * 0.12 + 0.4)
+    })
+  } catch { /* silent */ }
+}
+
+async function handleMobileCheckout() {
+  if (!selectedProduct.value || !playerId.value.trim() || !verified.value) return
+
+  // Set the order in store first
+  gameStore.setOrder({
+    gameName: gameDisplayName.value,
+    gameCode: gameCode.value,
+    productName: selectedProduct.value.name,
+    productCode: selectedProduct.value.product_code,
+    amount: selectedProduct.value.sell_price,
+    playerId: playerId.value.trim(),
+    serverId: serverId.value.trim() || undefined,
+    verifyProvider: verifyProvider.value || undefined,
+  })
+
+  if (!gameStore.currentOrder) return
+
+  mobileCheckoutActive.value = true
+  mobileQrLoading.value = true
+  mobileQrError.value = null
+
+  try {
+    const result = await createPayment({
+      game_code: gameCode.value,
+      product_code: selectedProduct.value.product_code,
+      product_name: selectedProduct.value.name,
+      game_name: gameDisplayName.value,
+      player_id: playerId.value.trim(),
+      server_id: serverId.value.trim() || undefined,
+      amount: selectedProduct.value.sell_price,
+    })
+
+    mobilePaymentRef.value = result.reference
+    mobileWsRef.value = result.reference
+    mobileQrImage.value = result.khqr_image || ''
+    mobilePaymentStatus.value = 'pending'
+    mobileTimeLeft.value = 5 * 60
+
+    // Start polling + timer
+    startMobilePolling()
+    startMobileTimer()
+  } catch (err) {
+    mobileQrError.value = err instanceof Error ? err.message : 'Failed to create payment'
+    toast.error(mobileQrError.value)
+  } finally {
+    mobileQrLoading.value = false
+  }
+}
+
+function startMobilePolling() {
+  mobilePollInterval = setInterval(async () => {
+    if (!mobilePaymentRef.value) return
+    try {
+      const status = await getPaymentStatus(mobilePaymentRef.value)
+      mobilePaymentStatus.value = status.payment_status as 'pending' | 'paid' | 'failed'
+      if (status.payment_status === 'paid') {
+        stopMobilePolling()
+        playSuccessSound()
+        toast.success('Payment received! Redirecting...')
+        setTimeout(() => router.push('/order/' + mobilePaymentRef.value), 1500)
+      } else if (status.payment_status === 'failed') {
+        stopMobilePolling()
+        toast.error('Payment failed')
+      }
+    } catch { /* silent */ }
+  }, 3000)
+}
+
+function stopMobilePolling() {
+  if (mobilePollInterval) { clearInterval(mobilePollInterval); mobilePollInterval = null }
+  if (mobileTimerInterval) { clearInterval(mobileTimerInterval); mobileTimerInterval = null }
+}
+
+function startMobileTimer() {
+  mobileTimerInterval = setInterval(() => {
+    mobileTimeLeft.value--
+    if (mobileTimeLeft.value <= 0) {
+      stopMobilePolling()
+      toast.error('Payment time expired')
+      cancelOrder(mobilePaymentRef.value).catch(() => {})
+      mobilePaymentStatus.value = 'failed'
+    }
+  }, 1000)
+}
+
+function closeMobileCheckout() {
+  stopMobilePolling()
+  cancelOrder(mobilePaymentRef.value).catch(() => {})
+  mobileCheckoutActive.value = false
+  mobileQrImage.value = ''
+  mobilePaymentRef.value = ''
+  mobilePaymentStatus.value = 'pending'
+  mobileTimeLeft.value = 5 * 60
+}
+
 // ─── Saved Players ─────────────────────────────────
 /** Load previously verified player IDs for this game from localStorage. */
 function loadSavedPlayers() {
@@ -449,6 +596,7 @@ onUnmounted(() => {
   ScrollTrigger.getAll().forEach((st) => st.kill())
   gsap.killTweensOf('.bg-particle')
   gsap.killTweensOf('.product-card, .saved-chip, .result-accent-bar, .result-avatar, .result-info, .result-badge')
+  stopMobilePolling()
 })
 </script>
 
@@ -880,6 +1028,197 @@ onUnmounted(() => {
       </template>
     </div>
   </div>
+
+  <!-- ═══ Mobile Floating Checkout Bar (appears when product selected + verified) ═══ -->
+  <div
+    v-if="gameStore.selectedGame && canProceed && !mobileCheckoutActive"
+    class="fixed bottom-0 left-0 right-0 z-40 block lg:hidden safe-bottom"
+  >
+    <div class="absolute inset-0 bg-white/90 dark:bg-surface-900/90 backdrop-blur-xl border-t border-surface-200 dark:border-surface-700"></div>
+    <div class="relative flex items-center justify-between px-5 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom,0.75rem))]">
+      <div>
+        <p class="text-[10px] text-surface-400 dark:text-surface-500 uppercase tracking-wider font-medium">Total</p>
+        <p class="text-xl font-bold text-surface-900 dark:text-white">
+          {{ formatPrice(selectedProduct?.sell_price || 0).formatted }}
+          <span class="text-xs text-surface-400 font-normal ml-0.5">{{ formatPrice(selectedProduct?.sell_price || 0).code }}</span>
+        </p>
+        <p v-if="playerNickname" class="text-[11px] text-surface-400 dark:text-surface-500 mt-0.5">
+          {{ playerNickname }}
+        </p>
+      </div>
+      <button
+        @click="handleMobileCheckout"
+        class="px-8 py-3 bg-gradient-to-r from-primary-500 to-primary-600 hover:from-primary-600 hover:to-primary-700 text-white font-semibold rounded-2xl shadow-lg shadow-primary-500/30 active:scale-[0.97] transition-all duration-200 text-sm flex items-center gap-2"
+      >
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+        Pay Now
+      </button>
+    </div>
+  </div>
+
+  <!-- Spacer for mobile floating bar -->
+  <div v-if="gameStore.selectedGame && canProceed && !mobileCheckoutActive" class="h-20 lg:hidden"></div>
+
+  <!-- ═══ Mobile KHQR Bottom Sheet ═══ -->
+  <Teleport to="body">
+    <div
+      v-if="mobileCheckoutActive"
+      class="fixed inset-0 z-50"
+    >
+      <!-- Backdrop -->
+      <div
+        class="absolute inset-0 bg-black/50 backdrop-blur-sm"
+        @click="closeMobileCheckout"
+      ></div>
+
+      <!-- Bottom Sheet -->
+      <div
+        class="absolute bottom-0 left-0 right-0 bg-white dark:bg-surface-900 rounded-t-2xl shadow-2xl max-h-[90vh] overflow-y-auto"
+        :class="{ 'animate-slide-up': true }"
+      >
+        <!-- Handle bar -->
+        <div class="flex justify-center pt-3 pb-1">
+          <div class="w-10 h-1 rounded-full bg-surface-300 dark:bg-surface-600"></div>
+        </div>
+
+        <!-- Close button -->
+        <button
+          @click="closeMobileCheckout"
+          class="absolute top-4 right-4 w-8 h-8 rounded-full bg-surface-100 dark:bg-surface-800 flex items-center justify-center text-surface-400 hover:text-surface-600 dark:hover:text-surface-300 transition-colors"
+        >
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+
+        <div class="px-6 pb-8">
+          <!-- Order Summary -->
+          <div class="text-center mb-4 pt-2">
+            <h3 class="text-lg font-bold text-surface-900 dark:text-surface-100">Scan to Pay</h3>
+            <p class="text-sm text-surface-400 dark:text-surface-500 mt-1">Scan with any Cambodian banking app</p>
+          </div>
+
+          <!-- Game + Amount info -->
+          <div class="flex items-center justify-between px-4 py-3 bg-surface-50 dark:bg-surface-800/50 rounded-xl mb-4">
+            <div class="min-w-0 flex-1">
+              <p class="text-xs text-surface-400 dark:text-surface-500 truncate">{{ gameDisplayName }}</p>
+              <p v-if="playerNickname" class="text-sm font-semibold text-surface-900 dark:text-surface-100 mt-0.5 truncate">{{ playerNickname }}</p>
+            </div>
+            <div class="text-right shrink-0 ml-3">
+              <p class="text-lg font-bold text-primary-600 dark:text-primary-400">
+                {{ formatPrice(selectedProduct?.sell_price || 0).formatted }}
+              </p>
+              <p class="text-[10px] text-surface-400 uppercase">{{ formatPrice(selectedProduct?.sell_price || 0).code }}</p>
+            </div>
+          </div>
+
+          <!-- QR Code -->
+          <div class="flex justify-center mb-4">
+            <div class="relative p-3 bg-white dark:bg-surface-800 rounded-xl border border-surface-100 dark:border-surface-700 shadow-sm">
+              <div class="w-52 h-52 flex items-center justify-center">
+                <!-- Loading -->
+                <template v-if="mobileQrLoading">
+                  <div class="text-center">
+                    <svg class="w-10 h-10 mx-auto text-surface-300 animate-spin" fill="none" viewBox="0 0 24 24">
+                      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+                      <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                    </svg>
+                    <p class="text-[10px] text-surface-400 mt-2">Generating QR...</p>
+                  </div>
+                </template>
+                <!-- QR Image -->
+                <template v-else-if="mobileQrImage">
+                  <img :src="mobileQrImage" alt="KHQR Code" class="w-full h-full object-contain" />
+                </template>
+                <!-- Placeholder -->
+                <template v-else-if="mobileQrError">
+                  <div class="text-center">
+                    <p class="text-xs text-red-500 mb-2">{{ mobileQrError }}</p>
+                    <button @click="handleMobileCheckout" class="text-xs text-primary-500 underline">Retry</button>
+                  </div>
+                </template>
+              </div>
+              <!-- USD-KHQR overlay logo -->
+              <div v-if="mobileQrImage" class="absolute inset-0 flex items-center justify-center pointer-events-none">
+                <div class="w-9 h-9 bg-white rounded-lg shadow-sm flex items-center justify-center p-1.5">
+                  <img src="https://checkout.payway.com.kh/images/usd-khqr-logo.svg" alt="USD-KHQR" class="w-full h-full" />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Timer ring -->
+          <div v-if="mobilePaymentStatus === 'pending' && mobileTimeLeft > 0" class="flex justify-center mb-4">
+            <div class="flex items-center gap-2 text-xs text-surface-400 dark:text-surface-500">
+              <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10" />
+                <path d="M12 6v6l4 2" />
+              </svg>
+              <span>{{ Math.floor(mobileTimeLeft / 60) }}:{{ String(mobileTimeLeft % 60).padStart(2, '0') }} remaining</span>
+            </div>
+          </div>
+
+          <!-- Payment instructions -->
+          <div class="text-center">
+            <div class="flex items-center justify-center gap-6 text-xs text-surface-500 dark:text-surface-400">
+              <span class="flex items-center gap-1.5">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                </svg>
+                Pay with any bank
+              </span>
+              <span class="text-surface-300">or</span>
+              <span class="flex items-center gap-1.5">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                Download QR
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </Teleport>
+
+  <!-- Success overlay (mobile) -->
+  <Teleport to="body">
+    <div
+      v-if="mobilePaymentStatus === 'paid'"
+      class="fixed inset-0 z-[60] flex items-center justify-center p-4"
+    >
+      <div class="absolute inset-0 bg-gradient-to-br from-emerald-500/90 via-emerald-600/85 to-teal-700/90 backdrop-blur-md"></div>
+      <!-- Confetti particles -->
+      <div class="absolute inset-0 overflow-hidden pointer-events-none" aria-hidden="true">
+        <div
+          v-for="i in 40" :key="i"
+          class="absolute w-2.5 h-2.5 rounded-sm animate-confetti"
+          :style="{
+            left: `${Math.random() * 100}%`,
+            top: `-${Math.random() * 20}%`,
+            backgroundColor: ['#10B981', '#34D399', '#6EE7B7', '#FCD34D', '#F472B6', '#818CF8', '#FBBF24', '#F97316'][i % 8],
+            animationDelay: `${Math.random() * 2.5}s`,
+            animationDuration: `${2.5 + Math.random() * 2.5}s`,
+            width: `${8 + Math.random() * 10}px`,
+            height: `${8 + Math.random() * 10}px`,
+            borderRadius: Math.random() > 0.5 ? '50%' : '2px',
+          }"
+        ></div>
+      </div>
+      <div class="relative text-center animate-scale-in">
+        <div class="inline-flex items-center justify-center w-20 h-20 rounded-full bg-white/20 backdrop-blur-sm mb-6 animate-bounce-in">
+          <svg class="w-12 h-12 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="3">
+            <path class="animate-draw-check" stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+          </svg>
+        </div>
+        <h2 class="text-2xl font-bold text-white mb-1">Payment Successful!</h2>
+        <p class="text-emerald-100 text-sm">Redirecting to order details...</p>
+      </div>
+    </div>
+  </Teleport>
 </template>
 
 <style scoped>

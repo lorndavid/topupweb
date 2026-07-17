@@ -15,7 +15,7 @@
   body {
     background-color: theme('colors.surface.50');
     color: theme('colors.surface.900');
-    font-family: 'Inter', 'Battambang', system-ui, -apple-system, sans-serif;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
@@ -34,26 +34,17 @@
     color-scheme: dark;
   }
 
-  /* Khmer typography */
-  .font-khmer-heading {
-    font-family: 'Moul', 'Battambang', serif;
+  /* ─── Typography utilities ─── */
+  .font-heading {
+    font-family: 'Space Grotesk', 'Inter', system-ui, sans-serif;
   }
 
-  .font-khmer-body {
-    font-family: 'Battambang', 'Inter', system-ui, sans-serif;
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Space Grotesk', 'Inter', system-ui, sans-serif;
   }
 
-  :lang(km) body,
-  [lang="km"] body,
-  .locale-km {
-    font-family: 'Battambang', 'Inter', system-ui, -apple-system, sans-serif;
-  }
-
-  .locale-km h1,
-  .locale-km h2,
-  .locale-km h3,
-  .locale-km .font-heading {
-    font-family: 'Moul', 'Battambang', serif;
+  code, pre, .font-mono {
+    font-family: 'JetBrains Mono', monospace;
   }
 
   ::selection {

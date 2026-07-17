@@ -1,38 +1,74 @@
 <script setup lang="ts">
-import { onMounted, ref, watch } from 'vue'
+import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import Navbar from '@/components/Navbar.vue'
 import Footer from '@/components/Footer.vue'
 import ToastContainer from '@/components/ToastContainer.vue'
-import RouteLoadingBar from '@/components/RouteLoadingBar.vue'
-import { useI18nStore } from '@/stores/i18n'
-import { isAnyLoading, setRouteLoading } from '@/stores/loading'
 import gsap from 'gsap'
 
 const router = useRouter()
-const i18n = useI18nStore()
 const isDark = ref(false)
 const transitioning = ref(false)
 const overlayRef = ref<HTMLElement | null>(null)
 
-// ─── Universal loading progress bar ───────────────────────────
-// Combines route transitions + in-flight API calls into a single
-// loading indicator. The RouteLoadingBar watches `isAnyLoading`
-// which is true when either route is transitioning OR an API
-// request is in progress.
+// ─── Page transition loading overlay ────────────────────────
+// Shows a centered loading spinner between route transitions.
+// The overlay is GSAP-animated so it's buttery smooth.
+const loadingOverlayRef = ref<HTMLElement | null>(null)
+
 router.beforeEach(() => {
-  setRouteLoading(true)
+  // Show the loading overlay immediately
+  if (loadingOverlayRef.value) {
+    gsap.to(loadingOverlayRef.value, {
+      opacity: 1,
+      duration: 0.08,
+      ease: 'power2.out',
+    })
+  }
 })
 
-router.afterEach(() => {
-  // Brief delay to let the page transition animation play
-  // before the loading bar snaps to 100% and fades out
-  setTimeout(() => {
-    setRouteLoading(false)
-  }, 100)
-})
+function onPageLeave(el: Element, done: () => void) {
+  gsap.to(el, {
+    opacity: 0,
+    y: -8,
+    scale: 0.97,
+    duration: 0.12,
+    ease: 'power2.in',
+    onComplete: done,
+  })
+}
 
+function onPageEnter(el: Element, done: () => void) {
+  const overlay = loadingOverlayRef.value
+  const tl = gsap.timeline({ onComplete: done })
 
+  // Brief hold so the spinner is seen at least briefly (no flash)
+  tl.to({}, { duration: 0.2 })
+
+  // Fade out loading overlay
+  if (overlay) {
+    tl.to(overlay, {
+      opacity: 0,
+      duration: 0.12,
+      ease: 'power2.in',
+    })
+  }
+
+  // Animate page in
+  tl.fromTo(
+    el,
+    { opacity: 0, y: 20, scale: 0.97 },
+    {
+      opacity: 1,
+      y: 0,
+      scale: 1,
+      duration: 0.35,
+      ease: 'power3.out',
+      clearProps: 'transform',
+    },
+    '-=0.05'
+  )
+}
 
 function toggleDark() {
   if (transitioning.value) return
@@ -90,15 +126,6 @@ function toggleDark() {
     })
 }
 
-function applyLocaleClasses(locale: string) {
-  document.documentElement.lang = locale
-  document.body.classList.toggle('locale-km', locale === 'km')
-}
-
-watch(() => i18n.locale, (newLocale) => {
-  applyLocaleClasses(newLocale)
-}, { immediate: true })
-
 onMounted(() => {
   const saved = localStorage.getItem('theme')
   if (saved === 'dark' || (!saved && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
@@ -114,8 +141,18 @@ onMounted(() => {
   <!-- Theme crossfade overlay — sits above everything during transitions -->
   <div ref="overlayRef" class="theme-overlay" style="opacity: 0;"></div>
 
-  <!-- Universal loading bar: route transitions + in-flight API calls -->
-  <RouteLoadingBar :loading="isAnyLoading" />
+  <!-- Page transition loading overlay -->
+  <div
+    ref="loadingOverlayRef"
+    class="page-loading-overlay"
+    style="opacity: 0;"
+    aria-hidden="true"
+  >
+    <div class="page-loading-inner">
+      <div class="page-loading-spinner"></div>
+      <p class="page-loading-text">Loading</p>
+    </div>
+  </div>
 
   <div class="min-h-screen flex flex-col">
     <Navbar
@@ -126,9 +163,9 @@ onMounted(() => {
     <main class="flex-1">
       <router-view v-slot="{ Component }">
         <transition
-          name="page"
           mode="out-in"
-          @enter="(el) => { (el as HTMLElement).style.opacity = '1' }"
+          @leave="onPageLeave"
+          @enter="onPageEnter"
         >
           <component :is="Component" />
         </transition>
@@ -140,21 +177,64 @@ onMounted(() => {
 </template>
 
 <style>
-.page-enter-active {
-  transition: opacity 0.25s ease, transform 0.25s ease;
+/* ═══ Page transition loading overlay ═══ */
+.page-loading-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  background: rgba(248, 250, 252, 0.75);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  will-change: opacity;
 }
 
-.page-leave-active {
-  transition: opacity 0.2s ease, transform 0.2s ease;
+.dark .page-loading-overlay {
+  background: rgba(2, 6, 23, 0.75);
 }
 
-.page-enter-from {
-  opacity: 0;
-  transform: translateY(12px) scale(0.98);
+.page-loading-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
 }
 
-.page-leave-to {
-  opacity: 0;
-  transform: translateY(-8px) scale(0.98);
+.page-loading-spinner {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 3px solid theme('colors.surface.200');
+  border-top-color: theme('colors.primary.500');
+  animation: page-spin 0.8s linear infinite;
+}
+
+.dark .page-loading-spinner {
+  border-color: theme('colors.surface.700');
+  border-top-color: theme('colors.primary.400');
+}
+
+.page-loading-text {
+  font-size: 13px;
+  font-weight: 500;
+  color: theme('colors.surface.400');
+  letter-spacing: 0.05em;
+  animation: page-pulse 1.5s ease-in-out infinite;
+}
+
+.dark .page-loading-text {
+  color: theme('colors.surface.500');
+}
+
+@keyframes page-spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes page-pulse {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 1; }
 }
 </style>

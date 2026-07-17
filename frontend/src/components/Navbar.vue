@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, computed } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { useI18nStore } from '@/stores/i18n'
+import { preferredCurrency, toggleCurrency } from '@/composables/useCurrency'
 import gsap from 'gsap'
 
 const props = defineProps<{
@@ -16,7 +16,6 @@ const emit = defineEmits<{
 const router = useRouter()
 const route = useRoute()
 const mobileMenuOpen = ref(false)
-const i18n = useI18nStore()
 const scrolled = ref(false)
 
 // ─── Scroll-aware shadow ───
@@ -90,7 +89,7 @@ function navigateAndClose(path: string) {
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
               </svg>
-              {{ i18n.t('nav.home') }}
+              Home
             </span>
           </router-link>
           <router-link
@@ -113,12 +112,13 @@ function navigateAndClose(path: string) {
 
         <!-- Actions -->
         <div class="flex items-center gap-2">
-          <!-- Language Toggle -->
+          <!-- Currency Toggle -->
           <button
-            @click="i18n.toggleLocale()"
-            class="px-3 py-1.5 text-xs font-semibold rounded-xl border border-surface-200 dark:border-surface-700 text-surface-600 dark:text-surface-400 hover:bg-surface-100 dark:hover:bg-surface-800 hover:border-primary-300 dark:hover:border-primary-600 transition-all duration-200"
+            @click="toggleCurrency()"
+            class="px-3 py-1.5 text-xs font-bold rounded-xl border border-surface-200 dark:border-surface-700 text-surface-600 dark:text-surface-400 hover:bg-surface-100 dark:hover:bg-surface-800 hover:border-primary-300 dark:hover:border-primary-600 hover:text-primary-600 dark:hover:text-primary-400 transition-all duration-200"
+            :title="preferredCurrency === 'USD' ? 'Switch to KHR' : 'Switch to USD'"
           >
-            {{ i18n.t('nav.langToggle') }}
+            {{ preferredCurrency === 'USD' ? '៛ KHR' : '$ USD' }}
           </button>
 
           <!-- Dark Mode Toggle -->
@@ -126,7 +126,7 @@ function navigateAndClose(path: string) {
             @click="emit('toggle-dark')"
             :disabled="transitioning"
             class="relative p-2 rounded-xl text-surface-500 dark:text-surface-400 hover:bg-surface-100 dark:hover:bg-surface-800 hover:text-amber-500 dark:hover:text-amber-400 transition-all duration-200 disabled:opacity-50 disabled:cursor-wait"
-            :title="isDark ? i18n.t('nav.lightMode') : i18n.t('nav.darkMode')"
+            :title="isDark ? 'Switch to light mode' : 'Switch to dark mode'"
           >
             <!-- Sun icon (shown in dark mode, click to go light) -->
             <svg
@@ -197,7 +197,7 @@ function navigateAndClose(path: string) {
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
               </svg>
-              {{ i18n.t('nav.home') }}
+              Home
             </span>
           </router-link>
           <router-link

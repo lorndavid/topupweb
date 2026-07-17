@@ -16,10 +16,10 @@
     <meta name="application-name" content="GameTopUp" />
     <meta name="msapplication-TileColor" content="#0f172a" />
 
-    <!-- Khmer font preconnect -->
+    <!-- Creative fonts: Space Grotesk (headings) + Inter (body) + JetBrains Mono (code) -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Moul&family=Battambang:wght@300;400;700&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
 
     <!-- ═══ Tailwind CSS via CDN (build-time PostCSS pipeline incompatible with this Node.js setup) ═══ -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -42,7 +42,8 @@
             },
             fontFamily: {
               sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
-              khmer: ['Khmer OS', 'Moul', 'sans-serif'],
+              heading: ['Space Grotesk', 'Inter', 'system-ui', 'sans-serif'],
+              mono: ['JetBrains Mono', 'monospace'],
             },
             animation: {
               'fade-in': 'fadeIn 0.5s ease-out',

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { GameProduct } from '@/types'
+import { useFormattedPrice } from '@/composables/useCurrency'
 
 const props = defineProps<{
   product: GameProduct
@@ -9,6 +10,8 @@ const props = defineProps<{
 const emit = defineEmits<{
   select: []
 }>()
+
+const khrPrice = useFormattedPrice(props.product.sell_price)
 </script>
 
 <template>
@@ -58,12 +61,12 @@ const emit = defineEmits<{
           ? 'text-primary-600 dark:text-primary-400 scale-105'
           : 'text-surface-900 dark:text-surface-100'
       ]">
-        ${{ product.sell_price.toFixed(2) }}
+        {{ khrPrice.formatted }}
       </p>
       <p :class="[
         'text-[10px] uppercase tracking-wider transition-colors duration-200',
         selected ? 'text-primary-400 dark:text-primary-500' : 'text-surface-400 dark:text-surface-500'
-      ]">USD</p>
+      ]">{{ khrPrice.code }}</p>
     </div>
   </button>
 </template>

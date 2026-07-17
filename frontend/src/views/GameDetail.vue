@@ -9,6 +9,7 @@ import LoadingSkeleton from '@/components/LoadingSkeleton.vue'
 import { verifyPlayer } from '@/services/api'
 import type { GameProduct } from '@/types'
 import { useSavedPlayers } from '@/composables/useSavedPlayers'
+import { formatPrice } from '@/composables/useCurrency'
 import gsap from 'gsap'
 import { ScrollTrigger } from 'gsap/ScrollTrigger'
 
@@ -842,9 +843,9 @@ onUnmounted(() => {
                       </div>
                       <div class="ml-4 text-right shrink-0">
                         <p class="text-xl font-bold text-primary-600 dark:text-primary-400">
-                          ${{ selectedProduct.sell_price.toFixed(2) }}
+                          {{ formatPrice(selectedProduct.sell_price).formatted }}
                         </p>
-                        <p class="text-[10px] text-surface-400 dark:text-surface-500 uppercase tracking-wider">USD</p>
+                        <p class="text-[10px] text-surface-400 dark:text-surface-500 uppercase tracking-wider">{{ formatPrice(selectedProduct.sell_price).code }}</p>
                       </div>
                     </div>
                   </div>

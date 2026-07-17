@@ -5,6 +5,7 @@ import { useGameStore } from '@/stores/game'
 import { useI18nStore } from '@/stores/i18n'
 import { useToastStore } from '@/stores/toast'
 import { createPayment, getPaymentStatus, cancelOrder, getResellerBalance } from '@/services/api'
+import { formatPrice } from '@/composables/useCurrency'
 import { usePaymentWebSocket } from '@/composables/usePaymentWebSocket'
 import KHQRCard from '@/components/KHQRCard.vue'
 import gsap from 'gsap'
@@ -314,8 +315,8 @@ onUnmounted(() => {
                     <p class="text-sm font-semibold text-surface-900 dark:text-surface-100 truncate">{{ order.gameName }}</p>
                   </div>
                   <div class="text-right shrink-0">
-                    <p class="text-lg font-bold text-primary-600 dark:text-primary-400">${{ order.amount.toFixed(2) }}</p>
-                    <p class="text-[10px] text-surface-400 uppercase">USD</p>
+                    <p class="text-lg font-bold text-primary-600 dark:text-primary-400">{{ formatPrice(order.amount).formatted }}</p>
+                    <p class="text-[10px] text-surface-400 uppercase">{{ formatPrice(order.amount).code }}</p>
                   </div>
                 </div>
                 <div class="h-px bg-surface-100 dark:bg-surface-800"></div>
@@ -355,7 +356,7 @@ onUnmounted(() => {
                       <p class="text-xs text-surface-400 dark:text-surface-500">{{ i18n.t('checkout.package') }}</p>
                       <p class="text-sm font-semibold text-surface-900 dark:text-surface-100">{{ order.productName }}</p>
                     </div>
-                    <span class="text-base font-bold text-primary-600 dark:text-primary-400">${{ order.amount.toFixed(2) }}</span>
+                    <span class="text-base font-bold text-primary-600 dark:text-primary-400">{{ formatPrice(order.amount).formatted }}</span>
                   </div>
                   <div class="h-px bg-surface-100 dark:bg-surface-800"></div>
                   <div>
@@ -369,7 +370,7 @@ onUnmounted(() => {
                     <div class="flex items-center justify-between">
                       <p class="text-sm font-semibold text-surface-900 dark:text-surface-100">{{ i18n.t('checkout.total') }}</p>
                       <p class="text-xl font-bold text-primary-600 dark:text-primary-400">
-                        ${{ order.amount.toFixed(2) }} <span class="text-[10px] text-surface-400 font-normal">USD</span>
+                        {{ formatPrice(order.amount).formatted }} <span class="text-[10px] text-surface-400 font-normal">{{ formatPrice(order.amount).code }}</span>
                       </p>
                     </div>
                   </div>
@@ -460,8 +461,8 @@ onUnmounted(() => {
         <div>
           <p class="text-[10px] text-surface-400 dark:text-surface-500 uppercase tracking-wider font-medium">Total</p>
           <p class="text-xl font-bold text-surface-900 dark:text-white">
-            ${{ order.amount.toFixed(2) }}
-            <span class="text-xs text-surface-400 font-normal ml-0.5">USD</span>
+            {{ formatPrice(order.amount).formatted }}
+            <span class="text-xs text-surface-400 font-normal ml-0.5">{{ formatPrice(order.amount).code }}</span>
           </p>
         </div>
         <button
@@ -547,7 +548,7 @@ onUnmounted(() => {
           </div>
           <h2 class="text-3xl font-bold text-white mb-2">{{ i18n.t('payment.successTitle') }}</h2>
           <p class="text-emerald-100 text-lg mb-2">{{ i18n.t('payment.successMessage') }}</p>
-          <p class="text-2xl font-bold text-white mb-6">${{ order?.amount.toFixed(2) }}</p>
+          <p class="text-2xl font-bold text-white mb-6">{{ formatPrice(order?.amount || 0).formatted }}</p>
           <div class="inline-flex items-center gap-2 px-4 py-2 bg-white/10 backdrop-blur-sm rounded-xl text-emerald-100 text-sm font-mono mb-8">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />

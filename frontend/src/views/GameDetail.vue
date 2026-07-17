@@ -481,14 +481,7 @@ onUnmounted(() => {
 
       <!-- Loading State -->
       <template v-if="gameStore.loading">
-        <div class="flex items-center gap-4 mb-8 animate-pulse">
-          <div class="w-20 h-20 rounded-2xl skeleton"></div>
-          <div class="space-y-2 flex-1">
-            <div class="h-6 skeleton w-1/3"></div>
-            <div class="h-4 skeleton w-2/3"></div>
-          </div>
-        </div>
-        <LoadingSkeleton :count="4" />
+        <LoadingSkeleton variant="detail" :count="4" />
       </template>
 
       <!-- Error State -->
@@ -616,7 +609,7 @@ onUnmounted(() => {
 
                   <!-- Player ID Input -->
                   <div>
-                    <label class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1.5">
+                    <label for="player-id" class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1.5">
                       {{ i18n.t('detail.playerId') }} <span class="text-red-400">*</span>
                     </label>
                     <div class="relative">
@@ -626,6 +619,7 @@ onUnmounted(() => {
                         </svg>
                       </div>
                       <input
+                        id="player-id"
                         v-model="playerId"
                         type="text"
                         :placeholder="i18n.t('detail.playerIdPlaceholder')"
@@ -719,7 +713,7 @@ onUnmounted(() => {
 
                   <!-- Server / Zone ID -->
                   <div v-show="needsServerId" ref="serverIdRef" class="overflow-hidden">
-                    <label class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1.5">
+                    <label for="server-id" class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1.5">
                       {{ i18n.t('detail.serverId') }} <span class="text-red-400">*</span>
                     </label>
                     <div class="relative">
@@ -729,6 +723,7 @@ onUnmounted(() => {
                         </svg>
                       </div>
                       <input
+                        id="server-id"
                         v-model="serverId"
                         type="text"
                         inputmode="numeric"

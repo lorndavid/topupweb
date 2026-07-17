@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, onUnmounted } from 'vue'
+import { computed, ref, onMounted, watch, onUnmounted, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { useGameStore } from '@/stores/game'
 import { useI18nStore } from '@/stores/i18n'
@@ -7,6 +7,7 @@ import { useToastStore } from '@/stores/toast'
 import { createPayment, getPaymentStatus, cancelOrder, getResellerBalance } from '@/services/api'
 import { usePaymentWebSocket } from '@/composables/usePaymentWebSocket'
 import KHQRCard from '@/components/KHQRCard.vue'
+import gsap from 'gsap'
 
 const router = useRouter()
 const gameStore = useGameStore()
@@ -29,6 +30,42 @@ const redirectCountdown = ref(3)
 // Balance
 const balanceInfo = ref<{ balance: number; available: boolean } | null>(null)
 const balanceLoading = ref(false)
+
+// ─── Floating bar animation ───────────────────────────────────
+const floatingBarRef = ref<HTMLElement | null>(null)
+
+function animateFloatingBarIn(el: HTMLElement) {
+  // iOS-style slide-up entrance: starts below viewport, springs into place
+  gsap.fromTo(
+    el,
+    { y: '100%', opacity: 0 },
+    {
+      y: 0,
+      opacity: 1,
+      duration: 0.5,
+      ease: 'power4.out',
+      clearProps: 'transform',
+    }
+  )
+}
+
+onMounted(() => {
+  // Animate the floating bar on initial mount if visible
+  if (order.value && !checkoutStarted.value && floatingBarRef.value) {
+    nextTick(() => {
+      animateFloatingBarIn(floatingBarRef.value!)
+    })
+  }
+})
+
+watch(checkoutStarted, (val) => {
+  // When checkout is cancelled/reset and the bar reappears, re-animate it
+  if (!val && floatingBarRef.value) {
+    nextTick(() => {
+      animateFloatingBarIn(floatingBarRef.value!)
+    })
+  }
+})
 
 let pollInterval: ReturnType<typeof setInterval> | null = null
 let timerInterval: ReturnType<typeof setInterval> | null = null
@@ -409,6 +446,35 @@ onUnmounted(() => {
         </div>
       </div>
     </div>
+
+    <!-- ═══ iOS-style Floating Checkout Bar (mobile only, before checkout) ═══ -->
+    <div
+      ref="floatingBarRef"
+      v-if="order && !checkoutStarted"
+      class="fixed bottom-0 left-0 right-0 z-40 block lg:hidden safe-bottom"
+    >
+      <!-- Background blur -->
+      <div class="absolute inset-0 bg-white/90 dark:bg-surface-900/90 backdrop-blur-xl border-t border-surface-200 dark:border-surface-700"></div>
+      <!-- Content -->
+      <div class="relative flex items-center justify-between px-5 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom,0.75rem))]">
+        <div>
+          <p class="text-[10px] text-surface-400 dark:text-surface-500 uppercase tracking-wider font-medium">Total</p>
+          <p class="text-xl font-bold text-surface-900 dark:text-white">
+            ${{ order.amount.toFixed(2) }}
+            <span class="text-xs text-surface-400 font-normal ml-0.5">USD</span>
+          </p>
+        </div>
+        <button
+          @click="handleCheckout"
+          class="px-8 py-3 bg-gradient-to-r from-primary-500 to-primary-600 hover:from-primary-600 hover:to-primary-700 text-white font-semibold rounded-2xl shadow-lg shadow-primary-500/30 active:scale-[0.97] transition-all duration-200 text-sm"
+        >
+          {{ i18n.t('checkout.payNow') }}
+        </button>
+      </div>
+    </div>
+
+    <!-- Spacer for mobile floating bar -->
+    <div v-if="order && !checkoutStarted" class="h-20 lg:hidden"></div>
 
     <!-- Cancel Dialog -->
     <Teleport to="body">

@@ -3,6 +3,7 @@ import { ref, computed, onMounted, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { useGameStore } from '@/stores/game'
 import { getCambodiaGames } from '@/services/api'
+import LoadingSkeleton from '@/components/LoadingSkeleton.vue'
 import type { GameCategory } from '@/types'
 import gsap from 'gsap'
 
@@ -41,13 +42,7 @@ const totalGames = ref(0)
 // ─── Search ───
 const searchQuery = ref('')
 
-// ─── Game meta config ───
-const gameMeta: Record<string, { badge: string }> = {
-  mlbb: { badge: '🇰🇭 Top Game' },
-  freefire_sgmy: { badge: '🔥 Popular' },
-  pubgm: { badge: '⚔️ Battle Royale' },
-  hok: { badge: '👑 MOBA' },
-}
+
 
 // ─── Computed ───
 const filteredOthers = computed(() => {
@@ -190,15 +185,22 @@ onMounted(() => {
       </div>
 
       <!-- ═══ LOADING STATE ═══ -->
-      <div v-if="loading" class="max-w-6xl mx-auto">
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          <div v-for="i in 4" :key="i" class="rounded-2xl overflow-hidden bg-surface-100 dark:bg-surface-800 animate-pulse">
-            <div class="aspect-[4/3] bg-surface-200 dark:bg-surface-700"></div>
-            <div class="p-4 space-y-2">
-              <div class="h-4 bg-surface-200 dark:bg-surface-700 rounded w-2/3"></div>
-              <div class="h-3 bg-surface-200 dark:bg-surface-700 rounded w-1/3"></div>
-            </div>
+      <div v-if="loading" class="max-w-6xl mx-auto space-y-10">
+        <!-- Featured games skeleton -->
+        <div>
+          <div class="flex items-center gap-3 mb-5 sm:mb-6">
+            <div class="skeleton-shimmer h-5 sm:h-6 w-40 rounded-lg"></div>
           </div>
+          <LoadingSkeleton variant="game-card" :count="4" />
+        </div>
+        <!-- Divider -->
+        <div class="h-px bg-gradient-to-r from-transparent via-surface-300 dark:via-surface-600 to-transparent"></div>
+        <!-- All games skeleton -->
+        <div>
+          <div class="flex items-center gap-3 mb-5 sm:mb-6">
+            <div class="skeleton-shimmer h-5 sm:h-6 w-32 rounded-lg"></div>
+          </div>
+          <LoadingSkeleton variant="game-card" :count="12" />
         </div>
       </div>
 
@@ -227,7 +229,8 @@ onMounted(() => {
             <h2 class="text-base sm:text-lg font-bold text-surface-900 dark:text-white uppercase tracking-wider">Top Games 🇰🇭</h2>
           </div>
 
-          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+          <!-- Mobile: 2-column grid -->
+          <div class="grid grid-cols-2 gap-3 sm:gap-4 md:hidden">
             <div
               v-for="game in featured"
               :key="game.game_code"
@@ -246,29 +249,51 @@ onMounted(() => {
                   />
                   <div class="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent"></div>
 
-                  <!-- Badge -->
-                  <div class="absolute top-2 sm:top-3 left-2 sm:left-3">
-                    <span
-                      class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] font-bold uppercase tracking-wider backdrop-blur-md"
-                      :class="{
-                        'bg-blue-500/20 text-blue-200 border border-blue-400/30': game.game_code === 'mlbb',
-                        'bg-orange-500/20 text-orange-200 border border-orange-400/30': game.game_code === 'freefire_sgmy',
-                        'bg-yellow-500/20 text-yellow-200 border border-yellow-400/30': game.game_code === 'pubgm',
-                        'bg-emerald-500/20 text-emerald-200 border border-emerald-400/30': game.game_code === 'hok',
-                      }"
-                    >
-                      {{ gameMeta[game.game_code]?.badge || 'Game' }}
-                    </span>
+                  <!-- Name overlay -->
+                  <div class="absolute bottom-0 left-0 right-0 p-3 sm:p-4">
+                    <h3 class="text-sm sm:text-base font-bold text-white group-hover:text-amber-300 transition-colors duration-300 drop-shadow-lg">
+                      {{ game.name }}
+                    </h3>
                   </div>
+                </div>
 
-                  <!-- Fields hint -->
-                  <div class="absolute top-2 sm:top-3 right-2 sm:right-3 flex gap-1">
-                    <span
-                      v-for="field in game.game_fields"
-                      :key="field"
-                      class="px-1.5 py-0.5 bg-black/40 backdrop-blur-sm rounded text-[9px] sm:text-[10px] font-medium text-white/70 uppercase"
-                    >{{ field === 'userid' ? 'ID' : 'SV' }}</span>
+                <!-- Bottom bar -->
+                <div class="p-3 sm:p-3.5 flex items-center justify-between">
+                  <div class="flex items-center gap-2">
+                    <div class="w-6 h-6 sm:w-7 sm:h-7 rounded-lg overflow-hidden ring-1 ring-surface-200 dark:ring-surface-700 shrink-0">
+                      <img :src="game.image_url" :alt="game.name" class="w-full h-full object-cover" />
+                    </div>
                   </div>
+                  <div class="flex items-center gap-1 text-surface-400 dark:text-surface-500 group-hover:text-primary-500 dark:group-hover:text-primary-400 transition-all duration-300">
+                    <span class="text-[10px] font-medium hidden sm:inline">Top Up</span>
+                    <svg class="w-3.5 h-3.5 sm:w-4 sm:h-4 group-hover:translate-x-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3" />
+                    </svg>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Tablet+ : single horizontal row (scrollable) -->
+          <div class="hidden md:flex md:flex-row md:gap-4 md:overflow-x-auto md:pb-2">
+            <div
+              v-for="game in featured"
+              :key="game.game_code"
+              class="featured-card shrink-0 md:w-[calc(25%_-_12px)]"
+            >
+              <div
+                @click="navigateToGame(game.game_code)"
+                class="group relative cursor-pointer rounded-2xl overflow-hidden bg-white dark:bg-surface-900 border border-surface-200 dark:border-surface-700/80 hover:border-primary-300 dark:hover:border-primary-700 transition-all duration-300 hover:shadow-lg hover:shadow-primary-500/5 hover:-translate-y-0.5"
+              >
+                <div class="relative aspect-[4/3] overflow-hidden">
+                  <img
+                    :src="game.image_url"
+                    :alt="game.name"
+                    class="w-full h-full object-cover transition-all duration-500 group-hover:scale-105"
+                    loading="lazy"
+                  />
+                  <div class="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent"></div>
 
                   <!-- Name overlay -->
                   <div class="absolute bottom-0 left-0 right-0 p-3 sm:p-4">
@@ -284,7 +309,6 @@ onMounted(() => {
                     <div class="w-6 h-6 sm:w-7 sm:h-7 rounded-lg overflow-hidden ring-1 ring-surface-200 dark:ring-surface-700 shrink-0">
                       <img :src="game.image_url" :alt="game.name" class="w-full h-full object-cover" />
                     </div>
-                    <p class="text-xs text-surface-400 dark:text-surface-500 font-mono truncate max-w-[80px] sm:max-w-[100px]">{{ game.game_code }}</p>
                   </div>
                   <div class="flex items-center gap-1 text-surface-400 dark:text-surface-500 group-hover:text-primary-500 dark:group-hover:text-primary-400 transition-all duration-300">
                     <span class="text-[10px] font-medium hidden sm:inline">Top Up</span>
@@ -344,7 +368,7 @@ onMounted(() => {
           </div>
 
           <!-- Games Grid -->
-          <div v-if="filteredOthers.length > 0" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2.5 sm:gap-3">
+          <div v-if="filteredOthers.length > 0" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-2.5 sm:gap-3">
             <div
               v-for="game in filteredOthers"
               :key="game.game_code"
@@ -362,19 +386,11 @@ onMounted(() => {
                     loading="lazy"
                   />
                   <div class="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent"></div>
-                  <div class="absolute top-1.5 right-1.5 flex gap-0.5">
-                    <span
-                      v-for="field in game.game_fields"
-                      :key="field"
-                      class="px-1 py-0.5 bg-black/50 backdrop-blur-sm rounded text-[8px] font-medium text-white/70"
-                    >{{ field === 'userid' ? 'ID' : 'SV' }}</span>
-                  </div>
                 </div>
                 <div class="p-2 sm:p-2.5">
                   <p class="text-xs sm:text-[13px] font-semibold text-surface-800 dark:text-surface-100 truncate group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors duration-200">
                     {{ game.name }}
                   </p>
-                  <p class="text-[9px] sm:text-[10px] text-surface-400 dark:text-surface-500 font-mono truncate mt-0.5">{{ game.game_code }}</p>
                 </div>
               </div>
             </div>

@@ -22,10 +22,28 @@ const api = axios.create({
   },
 })
 
-// Response interceptor for error handling
-api.interceptors.response.use(
-  (response) => response,
+import { incrementApiRequest, decrementApiRequest } from '@/stores/loading'
+
+// ─── Request interceptor: track in-flight API calls for loading bar ──
+api.interceptors.request.use(
+  (config) => {
+    incrementApiRequest()
+    return config
+  },
   (error) => {
+    decrementApiRequest()
+    return Promise.reject(error)
+  }
+)
+
+// ─── Response interceptor: track in-flight API calls + error handling ──
+api.interceptors.response.use(
+  (response) => {
+    decrementApiRequest()
+    return response
+  },
+  (error) => {
+    decrementApiRequest()
     if (error.response) {
       const message = error.response.data?.message || 'An error occurred'
       return Promise.reject(new Error(message))

@@ -63,6 +63,7 @@ export const en = {
   'checkout.processing': 'Processing...',
   'checkout.paymentInfo': "Payment is processed through Bakong KHQR. You'll scan the QR code with your banking app to complete the payment.",
   'checkout.checkoutKHQR': 'Checkout with KHQR',
+  'checkout.payNow': 'Pay Now',
   'checkout.toast.proceedError': 'Failed to proceed to payment',
 
   // Payment
@@ -285,6 +286,7 @@ export const km: Record<TranslationKey, string> = {
   'checkout.processing': 'កំពុងដំណើរការ...',
   'checkout.paymentInfo': 'ការទូទាត់ត្រូវបានដំណើរការតាមរយៈ Bakong KHQR។ អ្នកនឹងស្កេន QR កូដជាមួយកម្មវិធីធនាគាររបស់អ្នកដើម្បីបញ្ចប់ការទូទាត់។',
   'checkout.checkoutKHQR': 'បញ្ជាទិញជាមួយ KHQR',
+  'checkout.payNow': 'ទូទាត់ឥឡូវនេះ',
   'checkout.toast.proceedError': 'បរាជ័យក្នុងការបន្តការទូទាត់',
 
   // Payment

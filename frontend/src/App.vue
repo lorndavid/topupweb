@@ -1,15 +1,38 @@
 <script setup lang="ts">
-import { onMounted, ref, watch, nextTick } from 'vue'
+import { onMounted, ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import Navbar from '@/components/Navbar.vue'
 import Footer from '@/components/Footer.vue'
 import ToastContainer from '@/components/ToastContainer.vue'
+import RouteLoadingBar from '@/components/RouteLoadingBar.vue'
 import { useI18nStore } from '@/stores/i18n'
+import { isAnyLoading, setRouteLoading } from '@/stores/loading'
 import gsap from 'gsap'
 
+const router = useRouter()
 const i18n = useI18nStore()
 const isDark = ref(false)
 const transitioning = ref(false)
 const overlayRef = ref<HTMLElement | null>(null)
+
+// ─── Universal loading progress bar ───────────────────────────
+// Combines route transitions + in-flight API calls into a single
+// loading indicator. The RouteLoadingBar watches `isAnyLoading`
+// which is true when either route is transitioning OR an API
+// request is in progress.
+router.beforeEach(() => {
+  setRouteLoading(true)
+})
+
+router.afterEach(() => {
+  // Brief delay to let the page transition animation play
+  // before the loading bar snaps to 100% and fades out
+  setTimeout(() => {
+    setRouteLoading(false)
+  }, 100)
+})
+
+
 
 function toggleDark() {
   if (transitioning.value) return
@@ -90,6 +113,9 @@ onMounted(() => {
 <template>
   <!-- Theme crossfade overlay — sits above everything during transitions -->
   <div ref="overlayRef" class="theme-overlay" style="opacity: 0;"></div>
+
+  <!-- Universal loading bar: route transitions + in-flight API calls -->
+  <RouteLoadingBar :loading="isAnyLoading" />
 
   <div class="min-h-screen flex flex-col">
     <Navbar

@@ -399,7 +399,7 @@ onUnmounted(() => {
       >
         <!-- Slides container -->
         <div
-          class="relative w-full overflow-hidden bg-surface-100 dark:bg-surface-900 aspect-[4/3] sm:aspect-[16/9] lg:aspect-[21/9] min-h-[180px] sm:min-h-[300px] lg:min-h-[360px]"
+          class="relative w-full overflow-hidden bg-surface-100 dark:bg-surface-900 aspect-[4/3] sm:aspect-[16/9] lg:aspect-[21/9] min-h-[180px] sm:min-h-[300px] lg:min-h-[360px] touch-pan-y"
           @touchstart="handleTouchStart"
           @touchmove="handleTouchMove"
           @touchend="handleTouchEnd"
@@ -505,9 +505,9 @@ onUnmounted(() => {
           </svg>
         </button>
 
-        <!-- Navigation dots -->
+        <!-- Navigation dots + counter -->
         <div
-          class="absolute bottom-3 sm:bottom-4 lg:bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-2 z-10"
+          class="absolute bottom-3 sm:bottom-4 lg:bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-3 z-10"
         >
           <button
             v-for="(_, idx) in banners"
@@ -521,6 +521,15 @@ onUnmounted(() => {
                 : 'w-2 h-2 sm:w-2.5 sm:h-2.5 bg-white/40 hover:bg-white/70',
             ]"
           ></button>
+
+          <!-- Slide counter -->
+          <span
+            class="text-[10px] sm:text-xs font-mono font-medium text-white/70 tracking-wider select-none"
+          >
+            {{ activeBanner + 1 }}
+            <span class="text-white/30 mx-px">/</span>
+            {{ banners.length }}
+          </span>
         </div>
       </div>
 

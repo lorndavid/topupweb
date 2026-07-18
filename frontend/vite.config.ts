@@ -8,7 +8,7 @@ export default defineConfig({
     vue(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['pwa-icon.svg'],
+      includeAssets: ['pwa-icon.svg', 'pwa-splash.html'],
       manifest: {
         name: 'GameTopUp - Game Top-Up Cambodia',
         short_name: 'GameTopUp',
@@ -19,7 +19,7 @@ export default defineConfig({
         display_override: ['window-controls-overlay', 'standalone'],
         orientation: 'portrait',
         scope: '/',
-        start_url: '/',
+        start_url: '/pwa-splash.html',
         id: '/',
         icons: [
           {

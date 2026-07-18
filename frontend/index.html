@@ -194,8 +194,104 @@
         40% { transform: scale(1); opacity: 1; }
       }
 
+      /* ─── Floating particles behind logo ─── */
+      .splash-particles {
+        position: absolute;
+        inset: -60px;
+        pointer-events: none;
+        overflow: visible;
+      }
+      .splash-particle {
+        position: absolute;
+        border-radius: 50%;
+        opacity: 0;
+        animation: particle-float var(--p-dur, 6s) ease-in-out infinite;
+        animation-delay: var(--p-delay, 0s);
+      }
+      .splash-particle:nth-child(1) {
+        width: 10px; height: 10px;
+        background: linear-gradient(135deg, #4d96ff, #2563eb);
+        top: 10%; left: 5%;
+        --p-dur: 7s; --p-delay: 0s;
+        --p-x: 30px; --p-y: -20px;
+      }
+      .splash-particle:nth-child(2) {
+        width: 6px; height: 6px;
+        background: linear-gradient(135deg, #8b5cf6, #c084fc);
+        top: 60%; left: 80%;
+        --p-dur: 8s; --p-delay: 0.3s;
+        --p-x: -25px; --p-y: 30px;
+      }
+      .splash-particle:nth-child(3) {
+        width: 8px; height: 8px;
+        background: linear-gradient(135deg, #f59e0b, #fbbf24);
+        top: 70%; left: 10%;
+        --p-dur: 6.5s; --p-delay: 0.6s;
+        --p-x: 40px; --p-y: -15px;
+      }
+      .splash-particle:nth-child(4) {
+        width: 5px; height: 5px;
+        background: linear-gradient(135deg, #10b981, #34d399);
+        top: 15%; left: 75%;
+        --p-dur: 9s; --p-delay: 0.9s;
+        --p-x: -35px; --p-y: 25px;
+      }
+      .splash-particle:nth-child(5) {
+        width: 7px; height: 7px;
+        background: linear-gradient(135deg, #f472b6, #ec4899);
+        top: 40%; left: 85%;
+        --p-dur: 7.5s; --p-delay: 1.2s;
+        --p-x: -20px; --p-y: -35px;
+      }
+      .splash-particle:nth-child(6) {
+        width: 9px; height: 9px;
+        background: linear-gradient(135deg, #38bdf8, #0ea5e9);
+        top: 80%; left: 70%;
+        --p-dur: 6s; --p-delay: 1.5s;
+        --p-x: 25px; --p-y: -25px;
+      }
+      .splash-particle:nth-child(7) {
+        width: 4px; height: 4px;
+        background: linear-gradient(135deg, #a78bfa, #8b5cf6);
+        top: 25%; left: 20%;
+        --p-dur: 8.5s; --p-delay: 0.15s;
+        --p-x: -15px; --p-y: 40px;
+      }
+      .splash-particle:nth-child(8) {
+        width: 6px; height: 6px;
+        background: linear-gradient(135deg, #fb923c, #f97316);
+        top: 50%; left: 30%;
+        --p-dur: 7.2s; --p-delay: 0.8s;
+        --p-x: 20px; --p-y: -30px;
+      }
+      @keyframes particle-float {
+        0% {
+          opacity: 0;
+          transform: translate(0, 0) scale(0.6);
+        }
+        15% {
+          opacity: 0.5;
+        }
+        30% {
+          opacity: 0.7;
+          transform: translate(var(--p-x, 30px), var(--p-y, -20px)) scale(1);
+        }
+        60% {
+          opacity: 0.4;
+          transform: translate(calc(var(--p-x, 30px) * -0.5), calc(var(--p-y, -20px) * 1.2)) scale(0.8);
+        }
+        85% {
+          opacity: 0.2;
+        }
+        100% {
+          opacity: 0;
+          transform: translate(calc(var(--p-x, 30px) * -0.8), calc(var(--p-y, -20px) * -0.6)) scale(0.4);
+        }
+      }
+
       /* ─── Entrance animation ─── */
       .splash-entrance {
+        position: relative;
         opacity: 0;
         transform: translateY(20px) scale(0.92);
         animation: splash-fade-in 0.6s cubic-bezier(0.33, 1, 0.68, 1) 0.1s forwards;
@@ -209,6 +305,17 @@
     <!-- Splash Screen -->
     <div id="app-splash">
       <div class="splash-entrance" style="display:flex;flex-direction:column;align-items:center;">
+        <!-- Floating particles behind logo -->
+        <div class="splash-particles">
+          <div class="splash-particle"></div>
+          <div class="splash-particle"></div>
+          <div class="splash-particle"></div>
+          <div class="splash-particle"></div>
+          <div class="splash-particle"></div>
+          <div class="splash-particle"></div>
+          <div class="splash-particle"></div>
+          <div class="splash-particle"></div>
+        </div>
         <div class="splash-logo">
           <div class="splash-ring"></div>
           <div class="splash-logo-inner">

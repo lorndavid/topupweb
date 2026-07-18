@@ -7,6 +7,14 @@ import LoadingSkeleton from '@/components/LoadingSkeleton.vue'
 import type { GameCategory } from '@/types'
 import gsap from 'gsap'
 
+interface BannerSlide {
+  src: string
+  title: string
+  subtitle: string
+  cta: string
+  ctaGameCode: string
+}
+
 const router = useRouter()
 
 // ─── Simple IntersectionObserver for scroll-triggered animations ───
@@ -38,18 +46,56 @@ const allGamesRef = ref<HTMLElement | null>(null)
 const ctaRef = ref<HTMLElement | null>(null)
 
 // ─── Hero banner carousel ───
-const banners = [
-  'https://i.postimg.cc/rmjqG1nH/banner-one.png',
-  'https://i.postimg.cc/gjrbvf6B/baner.png',
+const banners: BannerSlide[] = [
+  {
+    src: 'https://i.postimg.cc/rmjqG1nH/banner-one.png',
+    title: 'Top Up Mobile Legends',
+    subtitle: 'Fast & Secure Diamond Top-Up — Verified via Official API',
+    cta: 'Top Up Now',
+    ctaGameCode: 'mlbb',
+  },
+  {
+    src: 'https://i.postimg.cc/gjrbvf6B/baner.png',
+    title: 'Free Fire Diamonds',
+    subtitle: 'Exclusive Bundles & Weekly Passes at the Best Prices',
+    cta: 'Shop Now',
+    ctaGameCode: 'freefire_sgmy',
+  },
 ]
 const activeBanner = ref(0)
+const bannerSlideRef = ref<(HTMLElement | null)[] | null>(null)
 let bannerTimer: ReturnType<typeof setInterval> | null = null
+
+// ─── Touch swipe support ───
+let touchStartX = 0
+let touchDiffX = 0
+
+function handleTouchStart(e: TouchEvent) {
+  touchStartX = e.touches[0].clientX
+  touchDiffX = 0
+}
+
+function handleTouchMove(e: TouchEvent) {
+  if (!touchStartX) return
+  touchDiffX = e.touches[0].clientX - touchStartX
+}
+
+function handleTouchEnd() {
+  const threshold = 50 // minimum px to trigger a slide change
+  if (touchDiffX > threshold) {
+    previousBanner()
+  } else if (touchDiffX < -threshold) {
+    nextBanner()
+  }
+  touchStartX = 0
+  touchDiffX = 0
+}
 
 function startBannerAutoPlay() {
   stopBannerAutoPlay()
   bannerTimer = setInterval(() => {
     activeBanner.value = (activeBanner.value + 1) % banners.length
-  }, 4500)
+  }, 5000)
 }
 
 function stopBannerAutoPlay() {
@@ -64,6 +110,70 @@ function goToBanner(idx: number) {
   activeBanner.value = idx
   startBannerAutoPlay()
 }
+
+function previousBanner() {
+  const prev = activeBanner.value - 1
+  goToBanner(prev < 0 ? banners.length - 1 : prev)
+}
+
+function nextBanner() {
+  const next = activeBanner.value + 1
+  goToBanner(next >= banners.length ? 0 : next)
+}
+
+// Keyboard navigation
+function onBannerKeydown(e: KeyboardEvent) {
+  if (e.key === 'ArrowLeft') {
+    previousBanner()
+  } else if (e.key === 'ArrowRight') {
+    nextBanner()
+  }
+}
+
+// Animate overlay text when slide changes
+let captionTween: gsap.core.Timeline | null = null
+function animateBannerCaption() {
+  if (captionTween) {
+    captionTween.kill()
+    captionTween = null
+  }
+  // v-for refs produce arrays — access the active slide by index
+  const activeEl = bannerSlideRef.value?.[activeBanner.value]
+  if (!activeEl) return
+  const title = activeEl.querySelector('.banner-title')
+  const subtitle = activeEl.querySelector('.banner-subtitle')
+  const cta = activeEl.querySelector('.banner-cta')
+  if (!title && !subtitle && !cta) return
+  captionTween = gsap.timeline({ defaults: { ease: 'power3.out' } })
+  if (title) {
+    captionTween.fromTo(
+      title,
+      { y: 24, opacity: 0 },
+      { y: 0, opacity: 1, duration: 0.5 }
+    )
+  }
+  if (subtitle) {
+    captionTween.fromTo(
+      subtitle,
+      { y: 16, opacity: 0 },
+      { y: 0, opacity: 1, duration: 0.45 },
+      '-=0.15'
+    )
+  }
+  if (cta) {
+    captionTween.fromTo(
+      cta,
+      { y: 12, opacity: 0, scale: 0.95 },
+      { y: 0, opacity: 1, scale: 1, duration: 0.4, ease: 'back.out(1.6)' },
+      '-=0.1'
+    )
+  }
+}
+
+// Animate caption when active banner changes
+watch(activeBanner, () => {
+  nextTick(() => animateBannerCaption())
+})
 
 // ─── Featured scroll ───
 const featuredScrollRef = ref<HTMLElement | null>(null)
@@ -229,6 +339,9 @@ async function fetchData() {
 // ─── Entrance animations ───
 function initAnimations() {
   nextTick(() => {
+    // Banner caption animation on initial load
+    animateBannerCaption()
+
     // Featured cards (runs now if data already loaded; otherwise deferred to watch(featured))
     animateFeaturedCards()
 
@@ -259,10 +372,16 @@ onMounted(() => {
   fetchData()
   initAnimations()
   startBannerAutoPlay()
+  document.addEventListener('keydown', onBannerKeydown)
 })
 
 onUnmounted(() => {
   stopBannerAutoPlay()
+  document.removeEventListener('keydown', onBannerKeydown)
+  if (captionTween) {
+    captionTween.kill()
+    captionTween = null
+  }
 })
 </script>
 
@@ -281,10 +400,14 @@ onUnmounted(() => {
         <!-- Slides container -->
         <div
           class="relative w-full overflow-hidden bg-surface-100 dark:bg-surface-900 aspect-[4/3] sm:aspect-[16/9] lg:aspect-[21/9] min-h-[180px] sm:min-h-[300px] lg:min-h-[360px]"
+          @touchstart="handleTouchStart"
+          @touchmove="handleTouchMove"
+          @touchend="handleTouchEnd"
         >
           <div
-            v-for="(src, idx) in banners"
+            v-for="(slide, idx) in banners"
             :key="idx"
+            ref="bannerSlideRef"
             class="absolute inset-0 transition-all duration-700 ease-in-out will-change-transform"
             :class="
               idx === activeBanner
@@ -293,17 +416,94 @@ onUnmounted(() => {
             "
           >
             <img
-              :src="src"
-              :alt="'Promotional banner ' + (idx + 1)"
+              :src="slide.src"
+              :alt="slide.title"
               class="w-full h-full object-cover"
               :loading="idx === 0 ? 'eager' : 'lazy'"
             />
-            <!-- Soft gradient overlay -->
+
+            <!-- Gradient overlay for text readability -->
             <div
-              class="absolute inset-0 bg-gradient-to-t from-black/25 via-transparent to-black/5"
+              class="absolute inset-0 bg-gradient-to-r from-black/65 via-black/30 to-transparent"
             ></div>
+
+            <!-- Caption overlay -->
+            <div
+              class="absolute inset-0 flex items-center justify-start px-5 sm:px-8 md:px-10 lg:px-14"
+            >
+              <div
+                class="max-w-lg sm:max-w-xl text-left pointer-events-auto"
+              >
+                <!-- Badge pill -->
+                <div
+                  class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/20 backdrop-blur-sm border border-white/20 text-white/90 text-[10px] sm:text-xs font-semibold uppercase tracking-[0.15em] mb-3 sm:mb-4"
+                >
+                  <span class="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse"></span>
+                  Official Partner
+                </div>
+
+                <!-- Title -->
+                <h2
+                  class="banner-title text-xl sm:text-2xl md:text-3xl lg:text-4xl xl:text-5xl font-extrabold text-white leading-[1.1] text-balance drop-shadow-lg"
+                >
+                  {{ slide.title }}
+                </h2>
+
+                <!-- Subtitle -->
+                <p
+                  class="banner-subtitle mt-2 sm:mt-3 text-xs sm:text-sm md:text-base text-white/80 max-w-md text-balance leading-relaxed drop-shadow"
+                >
+                  {{ slide.subtitle }}
+                </p>
+
+                <!-- CTA Button -->
+                <div class="banner-cta mt-3 sm:mt-4 md:mt-5">
+                  <button
+                    @click="navigateToGame(slide.ctaGameCode)"
+                    class="inline-flex items-center gap-2 px-4 sm:px-6 py-2 sm:py-2.5 rounded-xl bg-gradient-to-r from-primary-500 to-primary-600 hover:from-primary-400 hover:to-primary-500 text-white text-xs sm:text-sm font-bold shadow-lg shadow-primary-500/30 hover:shadow-primary-500/40 transition-all duration-300 hover:scale-105 active:scale-95 cursor-pointer"
+                  >
+                    {{ slide.cta }}
+                    <svg
+                      class="w-3.5 h-3.5 sm:w-4 sm:h-4 transition-transform duration-300 group-hover:translate-x-1"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="2.5"
+                        d="M17 8l4 4m0 0l-4 4m4-4H3"
+                      />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
+
+        <!-- Left arrow -->
+        <button
+          @click="previousBanner"
+          aria-label="Previous slide"
+          class="absolute left-2 sm:left-3 top-1/2 -translate-y-1/2 z-20 w-9 h-9 sm:w-11 sm:h-11 rounded-full bg-white/80 dark:bg-surface-800/80 backdrop-blur-sm border border-white/30 dark:border-surface-700/30 shadow-lg flex items-center justify-center text-surface-600 dark:text-surface-300 opacity-100 md:opacity-0 md:group-hover:opacity-100 hover:bg-white dark:hover:bg-surface-800 hover:scale-105 active:scale-95 transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+        >
+          <svg class="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+          </svg>
+        </button>
+
+        <!-- Right arrow -->
+        <button
+          @click="nextBanner"
+          aria-label="Next slide"
+          class="absolute right-2 sm:right-3 top-1/2 -translate-y-1/2 z-20 w-9 h-9 sm:w-11 sm:h-11 rounded-full bg-white/80 dark:bg-surface-800/80 backdrop-blur-sm border border-white/30 dark:border-surface-700/30 shadow-lg flex items-center justify-center text-surface-600 dark:text-surface-300 opacity-100 md:opacity-0 md:group-hover:opacity-100 hover:bg-white dark:hover:bg-surface-800 hover:scale-105 active:scale-95 transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+        >
+          <svg class="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+          </svg>
+        </button>
 
         <!-- Navigation dots -->
         <div
@@ -326,7 +526,6 @@ onUnmounted(() => {
 
       <!-- ═══ LOADING STATE ═══ -->
       <div v-if="loading" class="max-w-6xl mx-auto space-y-10">
-        <!-- Featured games skeleton (matches top games layout) -->
         <div>
           <div class="flex items-center gap-3 mb-5 sm:mb-6">
             <div
@@ -338,11 +537,9 @@ onUnmounted(() => {
           </div>
           <LoadingSkeleton variant="featured-card" :count="4" />
         </div>
-        <!-- Divider -->
         <div
           class="h-px bg-gradient-to-r from-transparent via-surface-300 dark:via-surface-600 to-transparent"
         ></div>
-        <!-- All games skeleton (matches 3/4/6 column grid) -->
         <div>
           <div class="flex items-center gap-3 mb-5 sm:mb-6">
             <div
@@ -414,7 +611,7 @@ onUnmounted(() => {
             </h2>
           </div>
 
-          <!-- Mobile: horizontal scroll row (single row, smaller cards) -->
+          <!-- Mobile: horizontal scroll row -->
           <div
             ref="mobileFeaturedScrollRef"
             class="md:hidden flex overflow-x-auto gap-2.5 pb-2 -mx-4 px-4 snap-x snap-mandatory hide-scrollbar"
@@ -438,8 +635,6 @@ onUnmounted(() => {
                   <div
                     class="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent"
                   ></div>
-
-                  <!-- Name overlay -->
                   <div class="absolute bottom-0 left-0 right-0 p-2 sm:p-3">
                     <h3
                       class="text-xs sm:text-sm font-bold text-white group-hover:text-amber-300 transition-colors duration-300 drop-shadow-lg leading-tight"
@@ -448,8 +643,6 @@ onUnmounted(() => {
                     </h3>
                   </div>
                 </div>
-
-                <!-- Bottom bar -->
                 <div class="p-2 sm:p-2.5 flex items-center justify-between">
                   <div class="flex items-center gap-1.5">
                     <div
@@ -505,7 +698,6 @@ onUnmounted(() => {
 
           <!-- Tablet+ : horizontal scroll row with arrow navigation -->
           <div class="hidden md:block relative">
-            <!-- Left Arrow -->
             <button
               v-show="canScrollLeft"
               @click="scrollFeatured('left')"
@@ -527,7 +719,6 @@ onUnmounted(() => {
               </svg>
             </button>
 
-            <!-- Scroll Container -->
             <div
               ref="featuredScrollRef"
               class="flex flex-row gap-4 overflow-x-auto pb-2 hide-scrollbar"
@@ -551,8 +742,6 @@ onUnmounted(() => {
                     <div
                       class="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent"
                     ></div>
-
-                    <!-- Name overlay -->
                     <div class="absolute bottom-0 left-0 right-0 p-3 sm:p-4">
                       <h3
                         class="text-sm sm:text-base font-bold text-white group-hover:text-amber-300 transition-colors duration-300 drop-shadow-lg"
@@ -561,8 +750,6 @@ onUnmounted(() => {
                       </h3>
                     </div>
                   </div>
-
-                  <!-- Bottom bar -->
                   <div class="p-3 sm:p-3.5 flex items-center justify-between">
                     <div class="flex items-center gap-2">
                       <div
@@ -600,7 +787,6 @@ onUnmounted(() => {
               </div>
             </div>
 
-            <!-- Right Arrow -->
             <button
               v-show="canScrollRight"
               @click="scrollFeatured('right')"
@@ -650,7 +836,6 @@ onUnmounted(() => {
               >
             </div>
 
-            <!-- Search Bar -->
             <div class="relative w-full sm:w-64">
               <svg
                 class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-surface-400"
@@ -693,7 +878,6 @@ onUnmounted(() => {
             </div>
           </div>
 
-          <!-- No Results -->
           <div
             v-if="filteredOthers.length === 0 && searchQuery"
             class="text-center py-12"
@@ -723,7 +907,6 @@ onUnmounted(() => {
             </p>
           </div>
 
-          <!-- Games Grid: 3 cols mobile, 4 cols tablet, 6 cols desktop -->
           <div
             v-if="filteredOthers.length > 0"
             class="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2 sm:gap-3"

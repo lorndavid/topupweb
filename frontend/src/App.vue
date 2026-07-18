@@ -10,6 +10,7 @@ const router = useRouter()
 const isDark = ref(false)
 const transitioning = ref(false)
 const overlayRef = ref<HTMLElement | null>(null)
+const pageLoading = ref(false)
 
 // ─── Route order for directional slide hints ───────────────
 // Controls which direction pages slide (forward = left, back = right).
@@ -103,6 +104,17 @@ router.beforeEach((to, from) => {
   document.documentElement.style.setProperty('--page-enter-transform', enterProps.enterTransform(dir))
   document.documentElement.style.setProperty('--page-enter-duration', enterProps.enterDuration)
   document.documentElement.style.setProperty('--page-enter-ease', enterProps.enterEase)
+
+  // Show logo loading overlay during navigation
+  pageLoading.value = true
+})
+
+router.afterEach(() => {
+  // Hide the loading overlay after the enter animation is mostly complete
+  // 600ms covers the longest enter transition (400ms slide) + leave (250ms loading fade)
+  setTimeout(() => {
+    pageLoading.value = false
+  }, 600)
 })
 
 function toggleDark() {
@@ -176,6 +188,18 @@ onMounted(() => {
   <!-- Theme crossfade overlay — sits above everything during transitions -->
   <div ref="overlayRef" class="theme-overlay" style="opacity: 0;"></div>
 
+  <!-- ─── Logo Loading Overlay (fades in on navigation) ─── -->
+  <transition name="loading-fade">
+    <div v-if="pageLoading" class="page-loading-overlay">
+      <div class="loading-logo">
+        <div class="loading-ring"></div>
+        <div class="loading-inner">
+          <img src="/logo.png" alt="VidTopUp" />
+        </div>
+      </div>
+    </div>
+  </transition>
+
   <div class="min-h-screen flex flex-col">
     <Navbar
       :is-dark="isDark"
@@ -234,5 +258,80 @@ onMounted(() => {
 .page-enter-from {
   opacity: 0;
   transform: var(--page-enter-transform, translateX(calc(var(--page-dir, 1) * 60px)) scale(0.97));
+}
+
+/* ════════════════════════════════════════════════════════════
+ *  Logo Loading Overlay — shown briefly during page navigation
+ *  Uses the same ring+logo design as the splash screen.
+ * ════════════════════════════════════════════════════════════ */
+.page-loading-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(248, 250, 252, 0.85);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+@media (prefers-color-scheme: dark) {
+  .page-loading-overlay { background: rgba(2, 6, 23, 0.85); }
+}
+
+.loading-logo {
+  width: 56px;
+  height: 56px;
+  border-radius: 14px;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 4px 20px rgba(37, 99, 235, 0.12);
+}
+.loading-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+}
+.loading-ring::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: conic-gradient(from 0deg, #4d96ff, #2563eb, #8b5cf6, #c084fc, #2563eb, #4d96ff);
+  animation: loading-spin 1.2s linear infinite;
+}
+.loading-inner {
+  position: absolute;
+  inset: 2px;
+  border-radius: 12px;
+  background: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+@media (prefers-color-scheme: dark) {
+  .loading-inner { background: #0f172a; }
+}
+.loading-inner img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+@keyframes loading-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ─── Loading overlay fade transition ─── */
+.loading-fade-enter-active {
+  transition: opacity 0.15s ease-out;
+}
+.loading-fade-leave-active {
+  transition: opacity 0.25s ease-in;
+}
+.loading-fade-enter-from,
+.loading-fade-leave-to {
+  opacity: 0;
 }
 </style>

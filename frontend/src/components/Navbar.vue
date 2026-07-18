@@ -115,15 +115,13 @@ function navigateAndClose(path: string) {
             <div class="absolute inset-[2px] rounded-[10px] bg-white dark:bg-surface-900 flex items-center justify-center overflow-hidden shadow-lg shadow-primary-500/15 group-hover:shadow-primary-500/30 transition-shadow duration-500">
               <img
                 src="/logo.png"
-                alt="GameTopUp"
+                alt="VidTopUp"
                 class="w-full h-full object-contain"
               />
             </div>
           </div>
           <!-- Brand name with gradient -->
-          <span class="text-lg font-bold font-heading bg-gradient-to-r from-surface-900 to-surface-700 dark:from-white dark:to-surface-300 bg-clip-text text-transparent group-hover:from-primary-600 group-hover:to-primary-400 transition-all duration-300">
-            GameTopUp
-          </span>
+          <span class="text-lg font-bold font-heading bg-gradient-to-r from-surface-900 to-surface-700 dark:from-white dark:to-surface-300 bg-clip-text text-transparent group-hover:from-primary-600 group-hover:to-primary-400 transition-all duration-300">VidTopUp</span>
         </router-link>
 
         <!-- Desktop Nav -->

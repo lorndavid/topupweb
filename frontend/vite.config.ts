@@ -10,8 +10,8 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['pwa-icon.svg', 'pwa-splash.html'],
       manifest: {
-        name: 'GameTopUp - Game Top-Up Cambodia',
-        short_name: 'GameTopUp',
+        name: 'VidTopUp - Game Top-Up Cambodia',
+        short_name: 'VidTopUp',
         description: 'Fast & secure game top-ups in Cambodia. KHQR Payment — Instant Delivery.',
         theme_color: '#0f172a',
         background_color: '#0f172a',

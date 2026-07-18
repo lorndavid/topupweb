@@ -13,11 +13,11 @@ const i18n = useI18nStore()
             <div class="w-8 h-8 rounded-lg overflow-hidden shadow-md group-hover:shadow-primary-500/20 transition-all duration-300 group-hover:scale-105">
               <img
                 src="/logo.png"
-                alt="GameTopUp"
+                alt="VidTopUp"
                 class="w-full h-full object-contain bg-white dark:bg-surface-900"
               />
             </div>
-            <span class="font-semibold text-surface-900 dark:text-surface-100 group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors duration-200">GameTopUp</span>
+            <span class="font-semibold text-surface-900 dark:text-surface-100 group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors duration-200">VidTopUp</span>
           </router-link>
           <p class="text-sm text-surface-500 dark:text-surface-400">
             {{ i18n.t('footer.tagline') }}
@@ -62,7 +62,7 @@ const i18n = useI18nStore()
 
       <div class="mt-8 pt-6 border-t border-surface-200 dark:border-surface-700">
         <p class="text-center text-xs text-surface-400 dark:text-surface-500">
-          &copy; {{ new Date().getFullYear() }} GameTopUp. {{ i18n.t('footer.copyright') }}
+          &copy; {{ new Date().getFullYear() }} VidTopUp. {{ i18n.t('footer.copyright') }}
         </p>
       </div>
     </div>

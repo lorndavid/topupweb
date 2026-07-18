@@ -227,7 +227,7 @@ async function handleDownloadReceipt() {
       <!-- Footer -->
       <div class="px-6 py-3 bg-surface-50 border-t border-surface-100">
         <p class="text-center text-[10px] text-surface-400 font-medium">
-          Powered by GameTopUp Store — KHQR Payment
+          Powered by VidTopUp Store — KHQR Payment
         </p>
       </div>
     </div>

@@ -229,12 +229,12 @@ onMounted(() => {
             <h2 class="text-base sm:text-lg font-bold text-surface-900 dark:text-white uppercase tracking-wider">Top Games 🇰🇭</h2>
           </div>
 
-          <!-- Mobile: 2-column grid -->
-          <div class="grid grid-cols-2 gap-3 sm:gap-4 md:hidden">
+          <!-- Mobile: horizontal scroll row (single row) -->
+          <div class="md:hidden flex overflow-x-auto gap-3 pb-2 -mx-4 px-4 snap-x snap-mandatory hide-scrollbar">
             <div
               v-for="game in featured"
               :key="game.game_code"
-              class="featured-card"
+              class="featured-card shrink-0 w-[65vw] sm:w-[45vw] snap-start"
             >
               <div
                 @click="navigateToGame(game.game_code)"
@@ -367,8 +367,8 @@ onMounted(() => {
             <p class="text-sm text-surface-500 dark:text-surface-400">No games matching "<span class="text-surface-700 dark:text-surface-300 font-medium">{{ searchQuery }}</span>"</p>
           </div>
 
-          <!-- Games Grid -->
-          <div v-if="filteredOthers.length > 0" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-2.5 sm:gap-3">
+          <!-- Games Grid: 3 cols mobile, 4 cols tablet, 6 cols desktop -->
+          <div v-if="filteredOthers.length > 0" class="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2 sm:gap-3">
             <div
               v-for="game in filteredOthers"
               :key="game.game_code"

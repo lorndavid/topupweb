@@ -14,7 +14,7 @@ export interface SavedPlayer {
 /** Data needed to save a player. Timestamp is added automatically. */
 export type SavedPlayerInput = Omit<SavedPlayer, 'timestamp'>
 
-const STORAGE_KEY = 'gametopup_saved_players'
+const STORAGE_KEY = 'vidtopup_saved_players'
 
 /**
  * Load saved players from localStorage.

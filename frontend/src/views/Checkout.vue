@@ -483,7 +483,7 @@ onUnmounted(() => {
           <!-- ─── RIGHT COLUMN: KHQR Card (always rendered) ─── -->
           <div class="lg:col-span-3">
             <KHQRCard
-              :merchant-name="'GameTopUp Store'"
+              :merchant-name="'VidTopUp Store'"
               :amount="order.amount"
               :qr-image="qrImage"
               :payment-ref="paymentRef"

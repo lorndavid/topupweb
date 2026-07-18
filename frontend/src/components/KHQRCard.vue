@@ -303,7 +303,7 @@ async function handleDownloadQR() {
               </div>
               <!-- Powered By footer (captured) -->
               <p class="text-center text-[10px] text-gray-400 mt-4 font-medium">
-                Powered by GameTopUp Store
+                Powered by VidTopUp Store
               </p>
             </div>
           </div>

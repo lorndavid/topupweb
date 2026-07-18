@@ -2,8 +2,9 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/png" href="/logo.png" />
-    <link rel="apple-touch-icon" sizes="180x180" href="/logo.png" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/pwa-icon-180x180.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="description" content="Fast & secure game top-ups in Cambodia. KHQR Payment — Instant Delivery." />
 
@@ -80,8 +81,149 @@
     </script>
 
     <title>GameTopUp - Game Top-Up Cambodia</title>
+
+    <!-- ═══ App Splash Screen ═══ -->
+    <style>
+      /* ─── Splash: shown before Vue mounts, hidden via JS ─── */
+      #app-splash {
+        position: fixed;
+        inset: 0;
+        z-index: 999999;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        background: #f8fafc;
+        transition: opacity 0.5s ease, visibility 0.5s ease;
+      }
+      @media (prefers-color-scheme: dark) {
+        #app-splash { background: #020617; }
+      }
+      #app-splash.splash-hidden {
+        opacity: 0;
+        visibility: hidden;
+        pointer-events: none;
+      }
+
+      /* ─── Logo container ─── */
+      .splash-logo {
+        width: 88px;
+        height: 88px;
+        border-radius: 20px;
+        position: relative;
+        overflow: hidden;
+        box-shadow: 0 8px 32px rgba(37, 99, 235, 0.15);
+      }
+      .splash-logo-inner {
+        position: absolute;
+        inset: 3px;
+        border-radius: 17px;
+        background: #fff;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
+      }
+      @media (prefers-color-scheme: dark) {
+        .splash-logo-inner { background: #0f172a; }
+      }
+      .splash-logo-inner img {
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+      }
+
+      /* ─── Animated gradient ring ─── */
+      .splash-ring {
+        position: absolute;
+        inset: 0;
+        border-radius: inherit;
+      }
+      .splash-ring::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        border-radius: inherit;
+        background: conic-gradient(from 0deg, #4d96ff, #2563eb, #8b5cf6, #c084fc, #2563eb, #4d96ff);
+        animation: splash-spin 3s linear infinite;
+      }
+      @keyframes splash-spin {
+        to { transform: rotate(360deg); }
+      }
+
+      /* ─── Brand text ─── */
+      .splash-brand {
+        margin-top: 24px;
+        font-family: 'Space Grotesk', 'Inter', system-ui, sans-serif;
+        font-size: 22px;
+        font-weight: 700;
+        background: linear-gradient(135deg, #1e293b, #475569);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+      }
+      @media (prefers-color-scheme: dark) {
+        .splash-brand {
+          background: linear-gradient(135deg, #f1f5f9, #94a3b8);
+          -webkit-background-clip: text;
+          background-clip: text;
+        }
+      }
+
+      /* ─── Dot loader ─── */
+      .splash-loader {
+        margin-top: 20px;
+        display: flex;
+        gap: 6px;
+      }
+      .splash-loader span {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: #2563eb;
+        animation: splash-dot 1.4s ease-in-out infinite both;
+      }
+      @media (prefers-color-scheme: dark) {
+        .splash-loader span { background: #4d96ff; }
+      }
+      .splash-loader span:nth-child(1) { animation-delay: 0s; }
+      .splash-loader span:nth-child(2) { animation-delay: 0.16s; }
+      .splash-loader span:nth-child(3) { animation-delay: 0.32s; }
+      @keyframes splash-dot {
+        0%, 80%, 100% { transform: scale(0.6); opacity: 0.4; }
+        40% { transform: scale(1); opacity: 1; }
+      }
+
+      /* ─── Entrance animation ─── */
+      .splash-entrance {
+        opacity: 0;
+        transform: translateY(20px) scale(0.92);
+        animation: splash-fade-in 0.6s cubic-bezier(0.33, 1, 0.68, 1) 0.1s forwards;
+      }
+      @keyframes splash-fade-in {
+        to { opacity: 1; transform: translateY(0) scale(1); }
+      }
+    </style>
   </head>
   <body class="bg-surface-50 dark:bg-surface-950 text-surface-900 dark:text-surface-100 antialiased">
+    <!-- Splash Screen -->
+    <div id="app-splash">
+      <div class="splash-entrance" style="display:flex;flex-direction:column;align-items:center;">
+        <div class="splash-logo">
+          <div class="splash-ring"></div>
+          <div class="splash-logo-inner">
+            <img src="/logo.png" alt="GameTopUp" />
+          </div>
+        </div>
+        <div class="splash-brand">GameTopUp</div>
+        <div class="splash-loader">
+          <span></span>
+          <span></span>
+          <span></span>
+        </div>
+      </div>
+    </div>
+
     <div id="app"></div>
     <script type="module" src="/src/main.ts"></script>
   </body>

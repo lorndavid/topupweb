@@ -107,13 +107,18 @@ function navigateAndClose(path: string) {
       <div class="flex items-center justify-between h-16">
         <!-- Logo -->
         <router-link to="/" class="flex items-center gap-2.5 group" ref="logoRef">
-          <!-- Logo image with hover animation -->
-          <div ref="logoImgRef" class="relative w-9 h-9 rounded-xl overflow-hidden shadow-lg shadow-primary-500/15 group-hover:shadow-primary-500/30 transition-all duration-500 group-hover:scale-110 group-hover:rotate-[-4deg]">
-            <img
-              src="/logo.png"
-              alt="GameTopUp"
-              class="w-full h-full object-contain bg-white dark:bg-surface-900"
-            />
+          <!-- Logo image with animated gradient border -->
+          <div ref="logoImgRef" class="logo-ring relative w-10 h-10 transition-all duration-500 group-hover:scale-110 group-hover:rotate-[-4deg]">
+            <!-- Animated conic gradient border -->
+            <div class="logo-ring__gradient absolute inset-0 rounded-xl"></div>
+            <!-- Inner surface (2px inset creates border gap) -->
+            <div class="absolute inset-[2px] rounded-[10px] bg-white dark:bg-surface-900 flex items-center justify-center overflow-hidden shadow-lg shadow-primary-500/15 group-hover:shadow-primary-500/30 transition-shadow duration-500">
+              <img
+                src="/logo.png"
+                alt="GameTopUp"
+                class="w-full h-full object-contain"
+              />
+            </div>
           </div>
           <!-- Brand name with gradient -->
           <span class="text-lg font-bold font-heading bg-gradient-to-r from-surface-900 to-surface-700 dark:from-white dark:to-surface-300 bg-clip-text text-transparent group-hover:from-primary-600 group-hover:to-primary-400 transition-all duration-300">
@@ -269,3 +274,39 @@ function navigateAndClose(path: string) {
     </div>
   </header>
 </template>
+
+<style scoped>
+/* ═══ Animated gradient border ring ────────────────
+ * Uses a ::before pseudo-element with a spinning
+ * conic gradient. The inner inset mask creates the
+ * 2px border gap so only the edge is visible.
+ * ════════════════════════════════════════════════ */
+.logo-ring {
+  position: relative;
+  overflow: hidden;
+}
+
+.logo-ring__gradient::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: conic-gradient(
+    from 0deg,
+    #4d96ff,
+    #2563eb,
+    #8b5cf6,
+    #c084fc,
+    #2563eb,
+    #4d96ff
+  );
+  animation: logo-spin 3s linear infinite;
+  z-index: 0;
+}
+
+@keyframes logo-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+</style>

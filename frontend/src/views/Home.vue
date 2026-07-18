@@ -32,12 +32,38 @@ const loading = ref(true)
 const error = ref<string | null>(null)
 
 // ─── Refs ───
-const heroRef = ref<HTMLElement | null>(null)
+const bannerRef = ref<HTMLElement | null>(null)
 const featuredRef = ref<HTMLElement | null>(null)
 const allGamesRef = ref<HTMLElement | null>(null)
 const ctaRef = ref<HTMLElement | null>(null)
 
-const totalGames = ref(0)
+// ─── Hero banner carousel ───
+const banners = [
+  'https://i.postimg.cc/rmjqG1nH/banner-one.png',
+  'https://i.postimg.cc/gjrbvf6B/baner.png',
+]
+const activeBanner = ref(0)
+let bannerTimer: ReturnType<typeof setInterval> | null = null
+
+function startBannerAutoPlay() {
+  stopBannerAutoPlay()
+  bannerTimer = setInterval(() => {
+    activeBanner.value = (activeBanner.value + 1) % banners.length
+  }, 4500)
+}
+
+function stopBannerAutoPlay() {
+  if (bannerTimer) {
+    clearInterval(bannerTimer)
+    bannerTimer = null
+  }
+}
+
+function goToBanner(idx: number) {
+  if (idx === activeBanner.value) return
+  activeBanner.value = idx
+  startBannerAutoPlay()
+}
 
 // ─── Featured scroll ───
 const featuredScrollRef = ref<HTMLElement | null>(null)
@@ -59,7 +85,7 @@ function updateActiveDot() {
   const card = el.querySelector('.featured-card')
   if (!card) return
   const cardWidth = card.getBoundingClientRect().width
-  const gap = 10 // gap-2.5 = 10px
+  const gap = 10
   const step = cardWidth + gap
   if (step <= 0) return
   const idx = Math.round(el.scrollLeft / step)
@@ -96,18 +122,66 @@ function handleFeaturedScroll() {
   updateActiveDot()
 }
 
+// ─── Featured cards staggered entrance ───
+function animateFeaturedCards() {
+  if (!featuredRef.value) return
+  const tl = gsap.timeline({ defaults: { ease: 'power3.out' } })
+
+  const header = featuredRef.value.querySelector('.featured-header')
+  if (header) {
+    tl.fromTo(
+      header,
+      { opacity: 0, y: 12 },
+      { opacity: 1, y: 0, duration: 0.35, ease: 'power2.out' }
+    )
+  }
+
+  function animateCardSet(container: HTMLElement | null) {
+    if (!container) return
+    const cards = container.querySelectorAll('.featured-card')
+    const count = cards.length
+    if (count === 0) return
+    tl.fromTo(
+      cards,
+      {
+        opacity: 0,
+        y: (i: number) => (i % 2 === 0 ? -18 : 18),
+        x: (i: number) => {
+          const mid = (count - 1) / 2
+          return (i - mid) * 25
+        },
+        rotate: (i: number) => (i % 2 === 0 ? -2 : 2),
+        scale: 0.92,
+      },
+      {
+        opacity: 1,
+        y: 0,
+        x: 0,
+        rotate: 0,
+        scale: 1,
+        duration: 0.55,
+        stagger: { from: 'center', amount: 0.3 },
+        ease: 'back.out(1.6)',
+      },
+      '-=0.15'
+    )
+  }
+
+  animateCardSet(featuredScrollRef.value)
+  animateCardSet(mobileFeaturedScrollRef.value)
+}
+
 // Update scroll buttons + attach listeners when featured data loads
 watch(featured, () => {
   nextTick(() => {
+    animateFeaturedCards()
     updateScrollButtons()
     updateActiveDot()
-    // Attach desktop scroll listener (container doesn't exist at mount time)
     const desktopEl = featuredScrollRef.value
     if (desktopEl && !desktopEl.dataset.listenerAttached) {
       desktopEl.addEventListener('scroll', updateScrollButtons, { passive: true })
       desktopEl.dataset.listenerAttached = 'true'
     }
-    // Attach mobile scroll listener (container doesn't exist at mount time)
     const mobileEl = mobileFeaturedScrollRef.value
     if (mobileEl && !mobileEl.dataset.listenerAttached) {
       mobileEl.addEventListener('scroll', handleFeaturedScroll, { passive: true })
@@ -118,8 +192,6 @@ watch(featured, () => {
 
 // ─── Search ───
 const searchQuery = ref('')
-
-
 
 // ─── Computed ───
 const filteredOthers = computed(() => {
@@ -146,7 +218,6 @@ async function fetchData() {
     const data = await getCambodiaGames()
     featured.value = data.featured
     others.value = data.others
-    totalGames.value = data.total
     gameStore.categories = [...data.featured, ...data.others]
   } catch (err) {
     error.value = err instanceof Error ? err.message : 'Failed to load games'
@@ -158,30 +229,8 @@ async function fetchData() {
 // ─── Entrance animations ───
 function initAnimations() {
   nextTick(() => {
-    const tl = gsap.timeline({ defaults: { ease: 'power3.out' } })
-
-    // Hero entrance
-    if (heroRef.value) {
-      const els = heroRef.value.querySelectorAll('.hero-el')
-      tl.fromTo(
-        els,
-        { opacity: 0, y: 20 },
-        { opacity: 1, y: 0, duration: 0.45, stagger: 0.07 }
-      )
-    }
-
-    // Featured cards
-    if (featuredRef.value) {
-      const cards = featuredRef.value.querySelectorAll('.featured-card')
-      if (cards.length > 0) {
-        tl.fromTo(
-          cards,
-          { opacity: 0, y: 25, scale: 0.96 },
-          { opacity: 1, y: 0, scale: 1, duration: 0.45, stagger: 0.06, ease: 'back.out(1.5)' },
-          '-=0.1'
-        )
-      }
-    }
+    // Featured cards (runs now if data already loaded; otherwise deferred to watch(featured))
+    animateFeaturedCards()
 
     // All games cards (scroll-triggered via IntersectionObserver)
     if (allGamesRef.value) {
@@ -193,7 +242,8 @@ function initAnimations() {
             cards,
             { opacity: 0, y: 20 },
             {
-              opacity: 1, y: 0,
+              opacity: 1,
+              y: 0,
               duration: 0.35,
               stagger: { amount: 0.4, from: 'start' },
               ease: 'power2.out',
@@ -208,59 +258,69 @@ function initAnimations() {
 onMounted(() => {
   fetchData()
   initAnimations()
+  startBannerAutoPlay()
+})
 
-  // Listeners attached in watch(featured) after DOM renders —
-  // see the `watch` callback below which fires after async data loads.
+onUnmounted(() => {
+  stopBannerAutoPlay()
 })
 </script>
 
 <template>
-  <div class="min-h-screen bg-gradient-to-b from-surface-50 to-white dark:from-surface-950 dark:to-surface-900">
+  <div
+    class="min-h-screen bg-gradient-to-b from-surface-50 to-white dark:from-surface-950 dark:to-surface-900"
+  >
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10 lg:py-14">
-      <!-- ═══ HERO SECTION ═══ -->
-      <div ref="heroRef" class="text-center mb-10 sm:mb-14 lg:mb-16">
-        <!-- Badge -->
-        <div class="hero-el inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-primary-50 dark:bg-primary-900/20 border border-primary-200/50 dark:border-primary-800/30 mb-5">
-          <span class="flex gap-1">
-            <span class="w-2 h-2 rounded-full bg-primary-400 animate-pulse"></span>
-            <span class="w-2 h-2 rounded-full bg-red-400 animate-pulse" style="animation-delay: 0.3s;"></span>
-            <span class="w-2 h-2 rounded-full bg-primary-400 animate-pulse" style="animation-delay: 0.6s;"></span>
-          </span>
-          <span class="text-xs font-semibold text-primary-600 dark:text-primary-400 uppercase tracking-[0.15em]">🇰🇭 Cambodia Top-Up</span>
+      <!-- ═══ HERO BANNER CAROUSEL ═══ -->
+      <div
+        ref="bannerRef"
+        class="relative rounded-2xl overflow-hidden mb-10 sm:mb-14 lg:mb-16 bg-surface-200 dark:bg-surface-800 shadow-xl shadow-surface-300/20 dark:shadow-black/30 group"
+        @mouseenter="stopBannerAutoPlay"
+        @mouseleave="startBannerAutoPlay"
+      >
+        <!-- Slides container -->
+        <div
+          class="relative w-full overflow-hidden bg-surface-100 dark:bg-surface-900 aspect-[4/3] sm:aspect-[16/9] lg:aspect-[21/9] min-h-[180px] sm:min-h-[300px] lg:min-h-[360px]"
+        >
+          <div
+            v-for="(src, idx) in banners"
+            :key="idx"
+            class="absolute inset-0 transition-all duration-700 ease-in-out will-change-transform"
+            :class="
+              idx === activeBanner
+                ? 'opacity-100 scale-100'
+                : 'opacity-0 scale-105'
+            "
+          >
+            <img
+              :src="src"
+              :alt="'Promotional banner ' + (idx + 1)"
+              class="w-full h-full object-cover"
+              :loading="idx === 0 ? 'eager' : 'lazy'"
+            />
+            <!-- Soft gradient overlay -->
+            <div
+              class="absolute inset-0 bg-gradient-to-t from-black/25 via-transparent to-black/5"
+            ></div>
+          </div>
         </div>
 
-        <!-- Headline -->
-        <h1 class="hero-el text-3xl sm:text-4xl lg:text-6xl font-extrabold tracking-tight leading-[1.1] text-balance">
-          <span class="text-surface-900 dark:text-white">{{ 'Top Up' }}</span>
-          <br class="sm:hidden" />
-          <span class="bg-gradient-to-r from-primary-500 to-blue-600 dark:from-amber-300 to-blue-400 bg-clip-text text-transparent">{{ 'Your Favorite Games' }}</span>
-        </h1>
-
-        <p class="hero-el mt-3 sm:mt-4 text-sm sm:text-base lg:text-lg text-surface-500 dark:text-surface-400 max-w-lg mx-auto">
-          Fast &amp; secure game top-ups in Cambodia.
-          <span class="text-surface-700 dark:text-surface-300 font-medium">KHQR Payment — Instant Delivery.</span>
-        </p>
-
-        <!-- Stats -->
-        <div class="hero-el mt-6 flex items-center justify-center gap-5 sm:gap-8 text-center">
-          <div>
-            <p class="text-xl sm:text-2xl font-bold text-surface-900 dark:text-white tabular-nums">{{ totalGames }}</p>
-            <p class="text-xs text-surface-400 dark:text-surface-500 mt-0.5">Games</p>
-          </div>
-          <div class="w-px h-8 bg-surface-200 dark:bg-surface-700"></div>
-          <div>
-            <p class="text-xl sm:text-2xl font-bold text-primary-600 dark:text-primary-400">KHQR</p>
-            <p class="text-xs text-surface-400 dark:text-surface-500 mt-0.5">Payment</p>
-          </div>
-          <div class="w-px h-8 bg-surface-200 dark:bg-surface-700"></div>
-          <div>
-            <p class="text-xl sm:text-2xl font-bold text-surface-900 dark:text-white">
-              <svg class="w-5 h-5 sm:w-6 sm:h-6 inline -mt-0.5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
-              </svg>
-            </p>
-            <p class="text-xs text-surface-400 dark:text-surface-500 mt-0.5">Delivery</p>
-          </div>
+        <!-- Navigation dots -->
+        <div
+          class="absolute bottom-3 sm:bottom-4 lg:bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-2 z-10"
+        >
+          <button
+            v-for="(_, idx) in banners"
+            :key="idx"
+            @click="goToBanner(idx)"
+            :aria-label="'Go to slide ' + (idx + 1)"
+            class="rounded-full transition-all duration-500 ease-out cursor-pointer"
+            :class="[
+              idx === activeBanner
+                ? 'w-6 sm:w-8 h-2 sm:h-2.5 bg-white shadow-md'
+                : 'w-2 h-2 sm:w-2.5 sm:h-2.5 bg-white/40 hover:bg-white/70',
+            ]"
+          ></button>
         </div>
       </div>
 
@@ -269,18 +329,28 @@ onMounted(() => {
         <!-- Featured games skeleton (matches top games layout) -->
         <div>
           <div class="flex items-center gap-3 mb-5 sm:mb-6">
-            <div class="w-1 h-5 sm:h-6 rounded-full bg-gradient-to-b from-amber-400/40 to-orange-500/40"></div>
-            <div class="h-5 sm:h-6 w-36 rounded-lg bg-surface-200 dark:bg-surface-700/60 skeleton-subtle"></div>
+            <div
+              class="w-1 h-5 sm:h-6 rounded-full bg-gradient-to-b from-amber-400/40 to-orange-500/40"
+            ></div>
+            <div
+              class="h-5 sm:h-6 w-36 rounded-lg bg-surface-200 dark:bg-surface-700/60 skeleton-subtle"
+            ></div>
           </div>
           <LoadingSkeleton variant="featured-card" :count="4" />
         </div>
         <!-- Divider -->
-        <div class="h-px bg-gradient-to-r from-transparent via-surface-300 dark:via-surface-600 to-transparent"></div>
+        <div
+          class="h-px bg-gradient-to-r from-transparent via-surface-300 dark:via-surface-600 to-transparent"
+        ></div>
         <!-- All games skeleton (matches 3/4/6 column grid) -->
         <div>
           <div class="flex items-center gap-3 mb-5 sm:mb-6">
-            <div class="w-1 h-5 sm:h-6 rounded-full bg-gradient-to-b from-primary-400/40 to-primary-600/40"></div>
-            <div class="h-5 sm:h-6 w-28 rounded-lg bg-surface-200 dark:bg-surface-700/60 skeleton-subtle"></div>
+            <div
+              class="w-1 h-5 sm:h-6 rounded-full bg-gradient-to-b from-primary-400/40 to-primary-600/40"
+            ></div>
+            <div
+              class="h-5 sm:h-6 w-28 rounded-lg bg-surface-200 dark:bg-surface-700/60 skeleton-subtle"
+            ></div>
           </div>
           <LoadingSkeleton variant="game-card" :count="12" />
         </div>
@@ -288,27 +358,60 @@ onMounted(() => {
 
       <!-- ═══ ERROR STATE ═══ -->
       <div v-else-if="error" class="text-center py-16">
-        <div class="inline-flex items-center justify-center w-14 h-14 rounded-full bg-red-100 dark:bg-red-900/20 mb-4">
-          <svg class="w-7 h-7 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        <div
+          class="inline-flex items-center justify-center w-14 h-14 rounded-full bg-red-100 dark:bg-red-900/20 mb-4"
+        >
+          <svg
+            class="w-7 h-7 text-red-500"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+            />
           </svg>
         </div>
-        <p class="text-surface-500 dark:text-surface-400 text-sm mb-4">{{ error }}</p>
+        <p class="text-surface-500 dark:text-surface-400 text-sm mb-4">
+          {{ error }}
+        </p>
         <button @click="fetchData" class="btn-primary text-sm">
-          <svg class="w-4 h-4 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          <svg
+            class="w-4 h-4 inline mr-2"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+            />
           </svg>
           Try Again
         </button>
       </div>
 
       <!-- ═══ GAMES CONTENT ═══ -->
-      <div v-else class="max-w-6xl mx-auto space-y-10 sm:space-y-12 lg:space-y-16">
+      <div
+        v-else
+        class="max-w-6xl mx-auto space-y-10 sm:space-y-12 lg:space-y-16"
+      >
         <!-- ─── FEATURED GAMES ─── -->
         <div v-if="featured.length > 0" ref="featuredRef">
-          <div class="flex items-center gap-3 mb-5 sm:mb-6">
-            <div class="w-1 h-5 sm:h-6 rounded-full bg-gradient-to-b from-amber-400 to-orange-500"></div>
-            <h2 class="text-base sm:text-lg font-bold text-surface-900 dark:text-white uppercase tracking-wider">Top Games 🇰🇭</h2>
+          <div class="featured-header flex items-center gap-3 mb-5 sm:mb-6">
+            <div
+              class="w-1 h-5 sm:h-6 rounded-full bg-gradient-to-b from-amber-400 to-orange-500"
+            ></div>
+            <h2
+              class="text-base sm:text-lg font-bold text-surface-900 dark:text-white uppercase tracking-wider"
+            >
+              Top Games 🇰🇭
+            </h2>
           </div>
 
           <!-- Mobile: horizontal scroll row (single row, smaller cards) -->
@@ -332,11 +435,15 @@ onMounted(() => {
                     class="w-full h-full object-cover transition-all duration-500 group-hover:scale-105"
                     loading="lazy"
                   />
-                  <div class="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent"></div>
+                  <div
+                    class="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent"
+                  ></div>
 
                   <!-- Name overlay -->
                   <div class="absolute bottom-0 left-0 right-0 p-2 sm:p-3">
-                    <h3 class="text-xs sm:text-sm font-bold text-white group-hover:text-amber-300 transition-colors duration-300 drop-shadow-lg leading-tight">
+                    <h3
+                      class="text-xs sm:text-sm font-bold text-white group-hover:text-amber-300 transition-colors duration-300 drop-shadow-lg leading-tight"
+                    >
                       {{ game.name }}
                     </h3>
                   </div>
@@ -345,13 +452,31 @@ onMounted(() => {
                 <!-- Bottom bar -->
                 <div class="p-2 sm:p-2.5 flex items-center justify-between">
                   <div class="flex items-center gap-1.5">
-                    <div class="w-5 h-5 sm:w-6 sm:h-6 rounded-lg overflow-hidden ring-1 ring-surface-200 dark:ring-surface-700 shrink-0">
-                      <img :src="game.image_url" :alt="game.name" class="w-full h-full object-cover" />
+                    <div
+                      class="w-5 h-5 sm:w-6 sm:h-6 rounded-lg overflow-hidden ring-1 ring-surface-200 dark:ring-surface-700 shrink-0"
+                    >
+                      <img
+                        :src="game.image_url"
+                        :alt="game.name"
+                        class="w-full h-full object-cover"
+                      />
                     </div>
                   </div>
-                  <div class="flex items-center gap-0.5 text-surface-400 dark:text-surface-500 group-hover:text-primary-500 dark:group-hover:text-primary-400 transition-all duration-300">
-                    <svg class="w-3 h-3 sm:w-3.5 sm:h-3.5 group-hover:translate-x-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3" />
+                  <div
+                    class="flex items-center gap-0.5 text-surface-400 dark:text-surface-500 group-hover:text-primary-500 dark:group-hover:text-primary-400 transition-all duration-300"
+                  >
+                    <svg
+                      class="w-3 h-3 sm:w-3.5 sm:h-3.5 group-hover:translate-x-0.5 transition-transform"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="2"
+                        d="M17 8l4 4m0 0l-4 4m4-4H3"
+                      />
                     </svg>
                   </div>
                 </div>
@@ -360,7 +485,10 @@ onMounted(() => {
           </div>
 
           <!-- Mobile: pagination dot indicators -->
-          <div v-if="featured.length > 1" class="md:hidden flex items-center justify-center gap-1.5 mt-1.5">
+          <div
+            v-if="featured.length > 1"
+            class="md:hidden flex items-center justify-center gap-1.5 mt-1.5"
+          >
             <button
               v-for="(_, idx) in featured"
               :key="idx"
@@ -369,7 +497,7 @@ onMounted(() => {
                 'rounded-full transition-all duration-300',
                 idx === activeDotIndex
                   ? 'w-5 h-1.5 bg-primary-500 dark:bg-primary-400'
-                  : 'w-1.5 h-1.5 bg-surface-300 dark:bg-surface-600 hover:bg-surface-400 dark:hover:bg-surface-500'
+                  : 'w-1.5 h-1.5 bg-surface-300 dark:bg-surface-600 hover:bg-surface-400 dark:hover:bg-surface-500',
               ]"
               :aria-label="'Go to card ' + (idx + 1)"
             ></button>
@@ -384,8 +512,18 @@ onMounted(() => {
               class="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-3 z-10 w-10 h-10 rounded-full bg-white dark:bg-surface-800 border border-surface-200 dark:border-surface-600 shadow-lg flex items-center justify-center text-surface-500 hover:text-primary-500 hover:border-primary-300 dark:hover:text-primary-400 dark:hover:border-primary-600 transition-all duration-200 hover:scale-105 active:scale-95"
               aria-label="Scroll left"
             >
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+              <svg
+                class="w-5 h-5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M15 19l-7-7 7-7"
+                />
               </svg>
             </button>
 
@@ -410,11 +548,15 @@ onMounted(() => {
                       class="w-full h-full object-cover transition-all duration-500 group-hover:scale-105"
                       loading="lazy"
                     />
-                    <div class="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent"></div>
+                    <div
+                      class="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent"
+                    ></div>
 
                     <!-- Name overlay -->
                     <div class="absolute bottom-0 left-0 right-0 p-3 sm:p-4">
-                      <h3 class="text-sm sm:text-base font-bold text-white group-hover:text-amber-300 transition-colors duration-300 drop-shadow-lg">
+                      <h3
+                        class="text-sm sm:text-base font-bold text-white group-hover:text-amber-300 transition-colors duration-300 drop-shadow-lg"
+                      >
                         {{ game.name }}
                       </h3>
                     </div>
@@ -423,14 +565,34 @@ onMounted(() => {
                   <!-- Bottom bar -->
                   <div class="p-3 sm:p-3.5 flex items-center justify-between">
                     <div class="flex items-center gap-2">
-                      <div class="w-6 h-6 sm:w-7 sm:h-7 rounded-lg overflow-hidden ring-1 ring-surface-200 dark:ring-surface-700 shrink-0">
-                        <img :src="game.image_url" :alt="game.name" class="w-full h-full object-cover" />
+                      <div
+                        class="w-6 h-6 sm:w-7 sm:h-7 rounded-lg overflow-hidden ring-1 ring-surface-200 dark:ring-surface-700 shrink-0"
+                      >
+                        <img
+                          :src="game.image_url"
+                          :alt="game.name"
+                          class="w-full h-full object-cover"
+                        />
                       </div>
                     </div>
-                    <div class="flex items-center gap-1 text-surface-400 dark:text-surface-500 group-hover:text-primary-500 dark:group-hover:text-primary-400 transition-all duration-300">
-                      <span class="text-[10px] font-medium hidden sm:inline">Top Up</span>
-                      <svg class="w-3.5 h-3.5 sm:w-4 sm:h-4 group-hover:translate-x-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3" />
+                    <div
+                      class="flex items-center gap-1 text-surface-400 dark:text-surface-500 group-hover:text-primary-500 dark:group-hover:text-primary-400 transition-all duration-300"
+                    >
+                      <span class="text-[10px] font-medium hidden sm:inline"
+                        >Top Up</span
+                      >
+                      <svg
+                        class="w-3.5 h-3.5 sm:w-4 sm:h-4 group-hover:translate-x-0.5 transition-transform"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                          stroke-width="2"
+                          d="M17 8l4 4m0 0l-4 4m4-4H3"
+                        />
                       </svg>
                     </div>
                   </div>
@@ -445,29 +607,63 @@ onMounted(() => {
               class="absolute right-0 top-1/2 -translate-y-1/2 translate-x-3 z-10 w-10 h-10 rounded-full bg-white dark:bg-surface-800 border border-surface-200 dark:border-surface-600 shadow-lg flex items-center justify-center text-surface-500 hover:text-primary-500 hover:border-primary-300 dark:hover:text-primary-400 dark:hover:border-primary-600 transition-all duration-200 hover:scale-105 active:scale-95"
               aria-label="Scroll right"
             >
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+              <svg
+                class="w-5 h-5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M9 5l7 7-7 7"
+                />
               </svg>
             </button>
           </div>
         </div>
 
         <!-- ─── DIVIDER ─── -->
-        <div v-if="others.length > 0" class="h-px bg-gradient-to-r from-transparent via-surface-300 dark:via-surface-600 to-transparent"></div>
+        <div
+          v-if="others.length > 0"
+          class="h-px bg-gradient-to-r from-transparent via-surface-300 dark:via-surface-600 to-transparent"
+        ></div>
 
         <!-- ─── ALL GAMES ─── -->
         <div v-if="others.length > 0" ref="allGamesRef">
-          <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-5 sm:mb-6">
+          <div
+            class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-5 sm:mb-6"
+          >
             <div class="flex items-center gap-3">
-              <div class="w-1 h-5 sm:h-6 rounded-full bg-gradient-to-b from-primary-400 to-primary-600"></div>
-              <h2 class="text-base sm:text-lg font-bold text-surface-900 dark:text-white uppercase tracking-wider">All Games</h2>
-              <span class="text-xs text-surface-400 dark:text-surface-500 font-mono">({{ filteredOthers.length }})</span>
+              <div
+                class="w-1 h-5 sm:h-6 rounded-full bg-gradient-to-b from-primary-400 to-primary-600"
+              ></div>
+              <h2
+                class="text-base sm:text-lg font-bold text-surface-900 dark:text-white uppercase tracking-wider"
+              >
+                All Games
+              </h2>
+              <span
+                class="text-xs text-surface-400 dark:text-surface-500 font-mono"
+                >({{ filteredOthers.length }})</span
+              >
             </div>
 
             <!-- Search Bar -->
             <div class="relative w-full sm:w-64">
-              <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-surface-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              <svg
+                class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-surface-400"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                />
               </svg>
               <input
                 v-model="searchQuery"
@@ -480,25 +676,58 @@ onMounted(() => {
                 @click="searchQuery = ''"
                 class="absolute right-3 top-1/2 -translate-y-1/2 text-surface-400 hover:text-surface-600 dark:hover:text-surface-300 transition-colors"
               >
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                <svg
+                  class="w-4 h-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    d="M6 18L18 6M6 6l12 12"
+                  />
                 </svg>
               </button>
             </div>
           </div>
 
           <!-- No Results -->
-          <div v-if="filteredOthers.length === 0 && searchQuery" class="text-center py-12">
-            <div class="inline-flex items-center justify-center w-12 h-12 rounded-full bg-surface-100 dark:bg-surface-800 mb-3">
-              <svg class="w-6 h-6 text-surface-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          <div
+            v-if="filteredOthers.length === 0 && searchQuery"
+            class="text-center py-12"
+          >
+            <div
+              class="inline-flex items-center justify-center w-12 h-12 rounded-full bg-surface-100 dark:bg-surface-800 mb-3"
+            >
+              <svg
+                class="w-6 h-6 text-surface-400"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                />
               </svg>
             </div>
-            <p class="text-sm text-surface-500 dark:text-surface-400">No games matching "<span class="text-surface-700 dark:text-surface-300 font-medium">{{ searchQuery }}</span>"</p>
+            <p class="text-sm text-surface-500 dark:text-surface-400">
+              No games matching
+              "<span class="text-surface-700 dark:text-surface-300 font-medium">{{
+                searchQuery
+              }}</span>"
+            </p>
           </div>
 
           <!-- Games Grid: 3 cols mobile, 4 cols tablet, 6 cols desktop -->
-          <div v-if="filteredOthers.length > 0" class="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2 sm:gap-3">
+          <div
+            v-if="filteredOthers.length > 0"
+            class="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2 sm:gap-3"
+          >
             <div
               v-for="game in filteredOthers"
               :key="game.game_code"
@@ -515,10 +744,14 @@ onMounted(() => {
                     class="w-full h-full object-cover transition-all duration-500 group-hover:scale-105"
                     loading="lazy"
                   />
-                  <div class="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent"></div>
+                  <div
+                    class="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent"
+                  ></div>
                 </div>
                 <div class="p-2 sm:p-2.5">
-                  <p class="text-xs sm:text-[13px] font-semibold text-surface-800 dark:text-surface-100 truncate group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors duration-200">
+                  <p
+                    class="text-xs sm:text-[13px] font-semibold text-surface-800 dark:text-surface-100 truncate group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors duration-200"
+                  >
                     {{ game.name }}
                   </p>
                 </div>
@@ -530,43 +763,102 @@ onMounted(() => {
         <!-- ═══ TRUST SECTION ═══ -->
         <div ref="ctaRef">
           <div class="max-w-lg mx-auto text-center">
-            <div class="p-5 sm:p-8 rounded-2xl bg-white dark:bg-surface-900 border border-surface-200 dark:border-surface-700/80 shadow-sm">
+            <div
+              class="p-5 sm:p-8 rounded-2xl bg-white dark:bg-surface-900 border border-surface-200 dark:border-surface-700/80 shadow-sm"
+            >
               <div class="flex items-center justify-center gap-2 mb-5">
-                <svg class="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                <svg
+                  class="w-4 h-4 text-emerald-500"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
+                  />
                 </svg>
-                <span class="text-xs text-surface-500 dark:text-surface-400 uppercase tracking-[0.2em] font-semibold">Trusted &amp; Secure</span>
+                <span
+                  class="text-xs text-surface-500 dark:text-surface-400 uppercase tracking-[0.2em] font-semibold"
+                  >Trusted &amp; Secure</span
+                >
               </div>
 
               <div class="grid grid-cols-3 gap-4 sm:gap-6">
                 <div class="text-center">
-                  <div class="w-10 h-10 mx-auto rounded-xl bg-primary-50 dark:bg-primary-900/20 flex items-center justify-center mb-2">
-                    <svg class="w-5 h-5 text-primary-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                  <div
+                    class="w-10 h-10 mx-auto rounded-xl bg-primary-50 dark:bg-primary-900/20 flex items-center justify-center mb-2"
+                  >
+                    <svg
+                      class="w-5 h-5 text-primary-500"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="2"
+                        d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+                      />
                     </svg>
                   </div>
-                  <p class="text-[11px] text-surface-500 dark:text-surface-400 font-medium">Secure<br/>KHQR Pay</p>
+                  <p class="text-[11px] text-surface-500 dark:text-surface-400 font-medium">
+                    Secure<br />KHQR Pay
+                  </p>
                 </div>
                 <div class="text-center">
-                  <div class="w-10 h-10 mx-auto rounded-xl bg-emerald-50 dark:bg-emerald-900/20 flex items-center justify-center mb-2">
-                    <svg class="w-5 h-5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                  <div
+                    class="w-10 h-10 mx-auto rounded-xl bg-emerald-50 dark:bg-emerald-900/20 flex items-center justify-center mb-2"
+                  >
+                    <svg
+                      class="w-5 h-5 text-emerald-500"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="2"
+                        d="M13 10V3L4 14h7v7l9-11h-7z"
+                      />
                     </svg>
                   </div>
-                  <p class="text-[11px] text-surface-500 dark:text-surface-400 font-medium">Instant<br/>Delivery</p>
+                  <p class="text-[11px] text-surface-500 dark:text-surface-400 font-medium">
+                    Instant<br />Delivery
+                  </p>
                 </div>
                 <div class="text-center">
-                  <div class="w-10 h-10 mx-auto rounded-xl bg-amber-50 dark:bg-amber-900/20 flex items-center justify-center mb-2">
-                    <svg class="w-5 h-5 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  <div
+                    class="w-10 h-10 mx-auto rounded-xl bg-amber-50 dark:bg-amber-900/20 flex items-center justify-center mb-2"
+                  >
+                    <svg
+                      class="w-5 h-5 text-amber-500"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="2"
+                        d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                      />
                     </svg>
                   </div>
-                  <p class="text-[11px] text-surface-500 dark:text-surface-400 font-medium">Best<br/>Prices</p>
+                  <p class="text-[11px] text-surface-500 dark:text-surface-400 font-medium">
+                    Best<br />Prices
+                  </p>
                 </div>
               </div>
             </div>
 
-            <p class="mt-5 text-[10px] text-surface-400 dark:text-surface-500 font-medium tracking-wider">
+            <p
+              class="mt-5 text-[10px] text-surface-400 dark:text-surface-500 font-medium tracking-wider"
+            >
               🇰🇭 Powered for Cambodian Gamers — KHQR Payment via Bakong
             </p>
           </div>

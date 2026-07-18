@@ -388,4 +388,14 @@
     0% { transform: scale(1); opacity: 1; }
     100% { transform: scale(1.15); opacity: 0; }
   }
+
+  /* ─── Gradient shimmer for hero headline ─── */
+  @keyframes shimmer-slide {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+  }
+
+  .animate-shimmer {
+    animation: shimmer-slide 4s ease-in-out infinite;
+  }
 }

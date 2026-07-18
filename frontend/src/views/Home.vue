@@ -41,14 +41,29 @@ const totalGames = ref(0)
 
 // ─── Featured scroll ───
 const featuredScrollRef = ref<HTMLElement | null>(null)
+const mobileFeaturedScrollRef = ref<HTMLElement | null>(null)
 const canScrollLeft = ref(false)
 const canScrollRight = ref(true)
+const activeDotIndex = ref(0)
 
 function updateScrollButtons() {
   const el = featuredScrollRef.value
   if (!el) return
   canScrollLeft.value = el.scrollLeft > 4
   canScrollRight.value = el.scrollLeft < el.scrollWidth - el.clientWidth - 4
+}
+
+function updateActiveDot() {
+  const el = mobileFeaturedScrollRef.value
+  if (!el) return
+  const card = el.querySelector('.featured-card')
+  if (!card) return
+  const cardWidth = card.getBoundingClientRect().width
+  const gap = 10 // gap-2.5 = 10px
+  const step = cardWidth + gap
+  if (step <= 0) return
+  const idx = Math.round(el.scrollLeft / step)
+  activeDotIndex.value = Math.min(idx, featured.value.length - 1)
 }
 
 function scrollFeatured(direction: 'left' | 'right') {
@@ -63,9 +78,42 @@ function scrollFeatured(direction: 'left' | 'right') {
   })
 }
 
-// Update scroll buttons when featured data loads
+function scrollFeaturedToIndex(index: number) {
+  const el = mobileFeaturedScrollRef.value
+  if (!el) return
+  const card = el.querySelector('.featured-card')
+  if (!card) return
+  const cardWidth = card.getBoundingClientRect().width
+  const gap = 10
+  el.scrollTo({
+    left: index * (cardWidth + gap),
+    behavior: 'smooth',
+  })
+}
+
+function handleFeaturedScroll() {
+  updateScrollButtons()
+  updateActiveDot()
+}
+
+// Update scroll buttons + attach listeners when featured data loads
 watch(featured, () => {
-  nextTick(() => updateScrollButtons())
+  nextTick(() => {
+    updateScrollButtons()
+    updateActiveDot()
+    // Attach desktop scroll listener (container doesn't exist at mount time)
+    const desktopEl = featuredScrollRef.value
+    if (desktopEl && !desktopEl.dataset.listenerAttached) {
+      desktopEl.addEventListener('scroll', updateScrollButtons, { passive: true })
+      desktopEl.dataset.listenerAttached = 'true'
+    }
+    // Attach mobile scroll listener (container doesn't exist at mount time)
+    const mobileEl = mobileFeaturedScrollRef.value
+    if (mobileEl && !mobileEl.dataset.listenerAttached) {
+      mobileEl.addEventListener('scroll', handleFeaturedScroll, { passive: true })
+      mobileEl.dataset.listenerAttached = 'true'
+    }
+  })
 })
 
 // ─── Search ───
@@ -161,20 +209,8 @@ onMounted(() => {
   fetchData()
   initAnimations()
 
-  // Scroll event listener for featured arrows
-  const el = featuredScrollRef.value
-  if (el) {
-    el.addEventListener('scroll', updateScrollButtons, { passive: true })
-    // Initial check after a tick (content may not be rendered yet)
-    nextTick(() => updateScrollButtons())
-  }
-})
-
-onUnmounted(() => {
-  const el = featuredScrollRef.value
-  if (el) {
-    el.removeEventListener('scroll', updateScrollButtons)
-  }
+  // Listeners attached in watch(featured) after DOM renders —
+  // see the `watch` callback below which fires after async data loads.
 })
 </script>
 
@@ -276,7 +312,10 @@ onUnmounted(() => {
           </div>
 
           <!-- Mobile: horizontal scroll row (single row, smaller cards) -->
-          <div class="md:hidden flex overflow-x-auto gap-2.5 pb-2 -mx-4 px-4 snap-x snap-mandatory hide-scrollbar">
+          <div
+            ref="mobileFeaturedScrollRef"
+            class="md:hidden flex overflow-x-auto gap-2.5 pb-2 -mx-4 px-4 snap-x snap-mandatory hide-scrollbar"
+          >
             <div
               v-for="game in featured"
               :key="game.game_code"
@@ -318,6 +357,22 @@ onUnmounted(() => {
                 </div>
               </div>
             </div>
+          </div>
+
+          <!-- Mobile: pagination dot indicators -->
+          <div v-if="featured.length > 1" class="md:hidden flex items-center justify-center gap-1.5 mt-1.5">
+            <button
+              v-for="(_, idx) in featured"
+              :key="idx"
+              @click="scrollFeaturedToIndex(idx)"
+              :class="[
+                'rounded-full transition-all duration-300',
+                idx === activeDotIndex
+                  ? 'w-5 h-1.5 bg-primary-500 dark:bg-primary-400'
+                  : 'w-1.5 h-1.5 bg-surface-300 dark:bg-surface-600 hover:bg-surface-400 dark:hover:bg-surface-500'
+              ]"
+              :aria-label="'Go to card ' + (idx + 1)"
+            ></button>
           </div>
 
           <!-- Tablet+ : horizontal scroll row with arrow navigation -->

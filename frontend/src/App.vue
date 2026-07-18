@@ -11,64 +11,99 @@ const isDark = ref(false)
 const transitioning = ref(false)
 const overlayRef = ref<HTMLElement | null>(null)
 
-// ─── Page transition loading overlay ────────────────────────
-// Shows a centered loading spinner between route transitions.
-// The overlay is GSAP-animated so it's buttery smooth.
-const loadingOverlayRef = ref<HTMLElement | null>(null)
+// ─── Route order for directional slide hints ───────────────
+// Controls which direction pages slide (forward = left, back = right).
+// Must stay in sync with the router's named routes.
+const ROUTE_ORDER = [
+  'home',
+  'game-detail',
+  'checkout',
+  'payment',
+  'payment-success',
+  'order-status',
+  'order-history',
+] as const
 
-router.beforeEach(() => {
-  // Show the loading overlay immediately
-  if (loadingOverlayRef.value) {
-    gsap.to(loadingOverlayRef.value, {
-      opacity: 1,
-      duration: 0.08,
-      ease: 'power2.out',
-    })
+// Track navigation direction for directional slide hints
+// 'forward' = slide left (exit) / right (enter) — default
+// 'back' = slide right (exit) / left (enter)
+const navDirection = ref<'forward' | 'back'>('forward')
+
+// ─── Map transition types to CSS custom property values ─────
+const TRANSITION_PROPS: Record<string, {
+  enterTransform: (dir?: number) => string
+  enterDuration: string
+  enterEase: string
+  leaveTransform: (dir?: number) => string
+  leaveDuration: string
+  leaveEase: string
+}> = {
+  slide: {
+    enterTransform: (dir = 1) => `translateX(${dir * 60}px) scale(0.97)`,
+    enterDuration: '400ms',
+    enterEase: 'cubic-bezier(0.33, 1, 0.68, 1)',
+    leaveTransform: (dir = 1) => `translateX(${dir * -30}px) scale(0.96)`,
+    leaveDuration: '220ms',
+    leaveEase: 'ease-in',
+  },
+  fade: {
+    enterTransform: () => 'none',
+    enterDuration: '300ms',
+    enterEase: 'ease-in-out',
+    leaveTransform: () => 'none',
+    leaveDuration: '200ms',
+    leaveEase: 'ease-in-out',
+  },
+  scale: {
+    enterTransform: () => 'scale(0.92)',
+    enterDuration: '350ms',
+    enterEase: 'cubic-bezier(0.34, 1.56, 0.64, 1)', // spring-like
+    leaveTransform: () => 'scale(1.08)',
+    leaveDuration: '200ms',
+    leaveEase: 'ease-in',
+  },
+  'slide-up': {
+    enterTransform: () => 'translateY(40px)',
+    enterDuration: '350ms',
+    enterEase: 'cubic-bezier(0.33, 1, 0.68, 1)',
+    leaveTransform: () => 'translateY(-20px)',
+    leaveDuration: '200ms',
+    leaveEase: 'ease-in',
+  },
+}
+
+router.beforeEach((to, from) => {
+  // Detect navigation direction — only when BOTH routes are known
+  let dir = 1
+  if (from?.name && to?.name) {
+    const fromIdx = ROUTE_ORDER.indexOf(from.name as typeof ROUTE_ORDER[number])
+    const toIdx = ROUTE_ORDER.indexOf(to.name as typeof ROUTE_ORDER[number])
+    if (fromIdx !== -1 && toIdx !== -1) {
+      navDirection.value = toIdx > fromIdx ? 'forward' : 'back'
+    }
+    dir = navDirection.value === 'forward' ? 1 : -1
   }
+  document.documentElement.style.setProperty('--page-dir', String(dir))
+
+  // ── Read route meta transition types ──
+  // Leave transition uses the FROM route's meta (the page leaving)
+  // Enter transition uses the TO route's meta (the page arriving)
+  const leaveType = (from?.meta?.transition as string) || 'slide'
+  const enterType = (to?.meta?.transition as string) || 'slide'
+
+  const leaveProps = TRANSITION_PROPS[leaveType] || TRANSITION_PROPS.slide
+  const enterProps = TRANSITION_PROPS[enterType] || TRANSITION_PROPS.slide
+
+  // Set CSS custom properties for the leave animation
+  document.documentElement.style.setProperty('--page-leave-transform', leaveProps.leaveTransform(dir))
+  document.documentElement.style.setProperty('--page-leave-duration', leaveProps.leaveDuration)
+  document.documentElement.style.setProperty('--page-leave-ease', leaveProps.leaveEase)
+
+  // Set CSS custom properties for the enter animation
+  document.documentElement.style.setProperty('--page-enter-transform', enterProps.enterTransform(dir))
+  document.documentElement.style.setProperty('--page-enter-duration', enterProps.enterDuration)
+  document.documentElement.style.setProperty('--page-enter-ease', enterProps.enterEase)
 })
-
-function onPageLeave(el: Element, done: () => void) {
-  gsap.to(el, {
-    opacity: 0,
-    y: -8,
-    scale: 0.97,
-    duration: 0.12,
-    ease: 'power2.in',
-    onComplete: done,
-  })
-}
-
-function onPageEnter(el: Element, done: () => void) {
-  const overlay = loadingOverlayRef.value
-  const tl = gsap.timeline({ onComplete: done })
-
-  // Brief hold so the spinner is seen at least briefly (no flash)
-  tl.to({}, { duration: 0.2 })
-
-  // Fade out loading overlay
-  if (overlay) {
-    tl.to(overlay, {
-      opacity: 0,
-      duration: 0.12,
-      ease: 'power2.in',
-    })
-  }
-
-  // Animate page in
-  tl.fromTo(
-    el,
-    { opacity: 0, y: 20, scale: 0.97 },
-    {
-      opacity: 1,
-      y: 0,
-      scale: 1,
-      duration: 0.35,
-      ease: 'power3.out',
-      clearProps: 'transform',
-    },
-    '-=0.05'
-  )
-}
 
 function toggleDark() {
   if (transitioning.value) return
@@ -141,19 +176,6 @@ onMounted(() => {
   <!-- Theme crossfade overlay — sits above everything during transitions -->
   <div ref="overlayRef" class="theme-overlay" style="opacity: 0;"></div>
 
-  <!-- Page transition loading overlay -->
-  <div
-    ref="loadingOverlayRef"
-    class="page-loading-overlay"
-    style="opacity: 0;"
-    aria-hidden="true"
-  >
-    <div class="page-loading-inner">
-      <div class="page-loading-spinner"></div>
-      <p class="page-loading-text">Loading</p>
-    </div>
-  </div>
-
   <div class="min-h-screen flex flex-col">
     <Navbar
       :is-dark="isDark"
@@ -161,13 +183,12 @@ onMounted(() => {
       @toggle-dark="toggleDark"
     />
     <main class="flex-1">
-      <router-view v-slot="{ Component }">
+      <router-view v-slot="{ Component, route }">
         <transition
           mode="out-in"
-          @leave="onPageLeave"
-          @enter="onPageEnter"
+          name="page"
         >
-          <component :is="Component" />
+          <component :is="Component" :key="route.fullPath" />
         </transition>
       </router-view>
     </main>
@@ -177,64 +198,41 @@ onMounted(() => {
 </template>
 
 <style>
-/* ═══ Page transition loading overlay ═══ */
-.page-loading-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 99999;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  pointer-events: none;
-  background: rgba(248, 250, 252, 0.75);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  will-change: opacity;
+/* ════════════════════════════════════════════════════════════
+ *  Page Transitions (CSS Only — no GSAP dependency)
+ *
+ *  All transition values (transform, duration, easing) are
+ *  driven by CSS custom properties set dynamically in
+ *  router.beforeEach based on each route's meta.transition.
+ *
+ *  Available transition types (set per-route via meta):
+ *    'slide'     — Horizontal slide-fade (default, directional)
+ *    'fade'      — Crossfade only
+ *    'scale'     — Scale + fade (spring-like enter)
+ *    'slide-up'  — Vertical slide up + fade
+ *
+ *  Direction (--page-dir): 1 = forward, -1 = back
+ * ════════════════════════════════════════════════════════════ */
+
+/* ─── Leave: current page exits ─── */
+.page-leave-active {
+  transition: opacity var(--page-leave-duration, 220ms) var(--page-leave-ease, ease-in),
+              transform var(--page-leave-duration, 220ms) var(--page-leave-ease, ease-in);
 }
 
-.dark .page-loading-overlay {
-  background: rgba(2, 6, 23, 0.75);
+.page-leave-to {
+  opacity: 0;
+  transform: var(--page-leave-transform, translateX(calc(var(--page-dir, 1) * -30px)) scale(0.96));
 }
 
-.page-loading-inner {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 12px;
+/* ─── Enter: new page arrives ─── */
+.page-enter-active {
+  transition: opacity var(--page-enter-duration, 400ms) var(--page-enter-ease, cubic-bezier(0.33, 1, 0.68, 1)),
+              transform var(--page-enter-duration, 400ms) var(--page-enter-ease, cubic-bezier(0.33, 1, 0.68, 1));
 }
 
-.page-loading-spinner {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  border: 3px solid theme('colors.surface.200');
-  border-top-color: theme('colors.primary.500');
-  animation: page-spin 0.8s linear infinite;
-}
-
-.dark .page-loading-spinner {
-  border-color: theme('colors.surface.700');
-  border-top-color: theme('colors.primary.400');
-}
-
-.page-loading-text {
-  font-size: 13px;
-  font-weight: 500;
-  color: theme('colors.surface.400');
-  letter-spacing: 0.05em;
-  animation: page-pulse 1.5s ease-in-out infinite;
-}
-
-.dark .page-loading-text {
-  color: theme('colors.surface.500');
-}
-
-@keyframes page-spin {
-  to { transform: rotate(360deg); }
-}
-
-@keyframes page-pulse {
-  0%, 100% { opacity: 0.5; }
-  50% { opacity: 1; }
+.page-enter-from {
+  opacity: 0;
+  transform: var(--page-enter-transform, translateX(calc(var(--page-dir, 1) * 60px)) scale(0.97));
 }
 </style>

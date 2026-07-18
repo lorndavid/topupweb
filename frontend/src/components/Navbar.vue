@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { preferredCurrency, toggleCurrency } from '@/composables/useCurrency'
 import gsap from 'gsap'
@@ -18,6 +18,38 @@ const route = useRoute()
 const mobileMenuOpen = ref(false)
 const scrolled = ref(false)
 
+// ─── Logo ref for entrance + nav animations ───
+const logoRef = ref<HTMLElement | null>(null)
+const logoImgRef = ref<HTMLElement | null>(null)
+
+// ─── Animate logo: entrance on mount, pulse on every navigation ───
+function animateLogoEntrance() {
+  if (!logoRef.value) return
+  gsap.fromTo(
+    logoRef.value,
+    { opacity: 0, y: -10, scale: 0.85, rotate: -5 },
+    { opacity: 1, y: 0, scale: 1, rotate: 0, duration: 0.5, ease: 'back.out(1.7)', delay: 0.15 }
+  )
+}
+
+function animateLogoNavPulse() {
+  if (!logoImgRef.value) return
+  gsap.fromTo(
+    logoImgRef.value,
+    { scale: 1 },
+    {
+      scale: 1.08,
+      duration: 0.2,
+      ease: 'power2.out',
+      yoyo: true,
+      repeat: 1,
+      onComplete: () => {
+        gsap.set(logoImgRef.value, { scale: 1, clearProps: 'scale' })
+      },
+    }
+  )
+}
+
 // ─── Scroll-aware shadow ───
 let scrollHandler: (() => void) | null = null
 
@@ -26,11 +58,22 @@ onMounted(() => {
     scrolled.value = window.scrollY > 20
   }
   window.addEventListener('scroll', scrollHandler, { passive: true })
+
+  // Entrance animation on first load
+  animateLogoEntrance()
 })
 
 onUnmounted(() => {
   if (scrollHandler) window.removeEventListener('scroll', scrollHandler)
 })
+
+// ─── Replay logo pulse on every route change ───
+watch(
+  () => route.fullPath,
+  () => {
+    nextTick(() => animateLogoNavPulse())
+  }
+)
 
 // ─── Route active check ───
 const isActive = (path: string) => route.path === path
@@ -63,13 +106,17 @@ function navigateAndClose(path: string) {
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <div class="flex items-center justify-between h-16">
         <!-- Logo -->
-        <router-link to="/" class="flex items-center gap-2 group">
-          <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-primary-400 to-primary-600 flex items-center justify-center shadow-lg shadow-primary-500/20 group-hover:shadow-primary-500/30 transition-all duration-300 group-hover:scale-105 group-hover:rotate-[-3deg]">
-            <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
-            </svg>
+        <router-link to="/" class="flex items-center gap-2.5 group" ref="logoRef">
+          <!-- Logo image with hover animation -->
+          <div ref="logoImgRef" class="relative w-9 h-9 rounded-xl overflow-hidden shadow-lg shadow-primary-500/15 group-hover:shadow-primary-500/30 transition-all duration-500 group-hover:scale-110 group-hover:rotate-[-4deg]">
+            <img
+              src="/logo.png"
+              alt="GameTopUp"
+              class="w-full h-full object-contain bg-white dark:bg-surface-900"
+            />
           </div>
-          <span class="text-lg font-bold bg-gradient-to-r from-surface-900 to-surface-700 dark:from-surface-100 dark:to-surface-300 bg-clip-text text-transparent group-hover:from-primary-600 group-hover:to-primary-400 transition-all duration-300">
+          <!-- Brand name with gradient -->
+          <span class="text-lg font-bold font-heading bg-gradient-to-r from-surface-900 to-surface-700 dark:from-white dark:to-surface-300 bg-clip-text text-transparent group-hover:from-primary-600 group-hover:to-primary-400 transition-all duration-300">
             GameTopUp
           </span>
         </router-link>

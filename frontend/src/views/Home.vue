@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, nextTick } from 'vue'
+import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useGameStore } from '@/stores/game'
 import { getCambodiaGames } from '@/services/api'
@@ -38,6 +38,35 @@ const allGamesRef = ref<HTMLElement | null>(null)
 const ctaRef = ref<HTMLElement | null>(null)
 
 const totalGames = ref(0)
+
+// ─── Featured scroll ───
+const featuredScrollRef = ref<HTMLElement | null>(null)
+const canScrollLeft = ref(false)
+const canScrollRight = ref(true)
+
+function updateScrollButtons() {
+  const el = featuredScrollRef.value
+  if (!el) return
+  canScrollLeft.value = el.scrollLeft > 4
+  canScrollRight.value = el.scrollLeft < el.scrollWidth - el.clientWidth - 4
+}
+
+function scrollFeatured(direction: 'left' | 'right') {
+  const el = featuredScrollRef.value
+  if (!el) return
+  const cardWidth = el.querySelector('.featured-card')?.getBoundingClientRect().width || 260
+  const gap = 16
+  const scrollAmount = cardWidth + gap
+  el.scrollBy({
+    left: direction === 'left' ? -scrollAmount : scrollAmount,
+    behavior: 'smooth',
+  })
+}
+
+// Update scroll buttons when featured data loads
+watch(featured, () => {
+  nextTick(() => updateScrollButtons())
+})
 
 // ─── Search ───
 const searchQuery = ref('')
@@ -131,6 +160,21 @@ function initAnimations() {
 onMounted(() => {
   fetchData()
   initAnimations()
+
+  // Scroll event listener for featured arrows
+  const el = featuredScrollRef.value
+  if (el) {
+    el.addEventListener('scroll', updateScrollButtons, { passive: true })
+    // Initial check after a tick (content may not be rendered yet)
+    nextTick(() => updateScrollButtons())
+  }
+})
+
+onUnmounted(() => {
+  const el = featuredScrollRef.value
+  if (el) {
+    el.removeEventListener('scroll', updateScrollButtons)
+  }
 })
 </script>
 
@@ -186,19 +230,21 @@ onMounted(() => {
 
       <!-- ═══ LOADING STATE ═══ -->
       <div v-if="loading" class="max-w-6xl mx-auto space-y-10">
-        <!-- Featured games skeleton -->
+        <!-- Featured games skeleton (matches top games layout) -->
         <div>
           <div class="flex items-center gap-3 mb-5 sm:mb-6">
-            <div class="skeleton-shimmer h-5 sm:h-6 w-40 rounded-lg"></div>
+            <div class="w-1 h-5 sm:h-6 rounded-full bg-gradient-to-b from-amber-400/40 to-orange-500/40"></div>
+            <div class="h-5 sm:h-6 w-36 rounded-lg bg-surface-200 dark:bg-surface-700/60 skeleton-subtle"></div>
           </div>
-          <LoadingSkeleton variant="game-card" :count="4" />
+          <LoadingSkeleton variant="featured-card" :count="4" />
         </div>
         <!-- Divider -->
         <div class="h-px bg-gradient-to-r from-transparent via-surface-300 dark:via-surface-600 to-transparent"></div>
-        <!-- All games skeleton -->
+        <!-- All games skeleton (matches 3/4/6 column grid) -->
         <div>
           <div class="flex items-center gap-3 mb-5 sm:mb-6">
-            <div class="skeleton-shimmer h-5 sm:h-6 w-32 rounded-lg"></div>
+            <div class="w-1 h-5 sm:h-6 rounded-full bg-gradient-to-b from-primary-400/40 to-primary-600/40"></div>
+            <div class="h-5 sm:h-6 w-28 rounded-lg bg-surface-200 dark:bg-surface-700/60 skeleton-subtle"></div>
           </div>
           <LoadingSkeleton variant="game-card" :count="12" />
         </div>
@@ -229,16 +275,16 @@ onMounted(() => {
             <h2 class="text-base sm:text-lg font-bold text-surface-900 dark:text-white uppercase tracking-wider">Top Games 🇰🇭</h2>
           </div>
 
-          <!-- Mobile: horizontal scroll row (single row) -->
-          <div class="md:hidden flex overflow-x-auto gap-3 pb-2 -mx-4 px-4 snap-x snap-mandatory hide-scrollbar">
+          <!-- Mobile: horizontal scroll row (single row, smaller cards) -->
+          <div class="md:hidden flex overflow-x-auto gap-2.5 pb-2 -mx-4 px-4 snap-x snap-mandatory hide-scrollbar">
             <div
               v-for="game in featured"
               :key="game.game_code"
-              class="featured-card shrink-0 w-[65vw] sm:w-[45vw] snap-start"
+              class="featured-card shrink-0 w-[42vw] sm:w-[36vw] snap-start"
             >
               <div
                 @click="navigateToGame(game.game_code)"
-                class="group relative cursor-pointer rounded-2xl overflow-hidden bg-white dark:bg-surface-900 border border-surface-200 dark:border-surface-700/80 hover:border-primary-300 dark:hover:border-primary-700 transition-all duration-300 hover:shadow-lg hover:shadow-primary-500/5 hover:-translate-y-0.5"
+                class="group relative cursor-pointer rounded-xl overflow-hidden bg-white dark:bg-surface-900 border border-surface-200 dark:border-surface-700/80 hover:border-primary-300 dark:hover:border-primary-700 transition-all duration-300 hover:shadow-lg hover:shadow-primary-500/5 hover:-translate-y-0.5"
               >
                 <div class="relative aspect-[4/3] overflow-hidden">
                   <img
@@ -250,23 +296,22 @@ onMounted(() => {
                   <div class="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent"></div>
 
                   <!-- Name overlay -->
-                  <div class="absolute bottom-0 left-0 right-0 p-3 sm:p-4">
-                    <h3 class="text-sm sm:text-base font-bold text-white group-hover:text-amber-300 transition-colors duration-300 drop-shadow-lg">
+                  <div class="absolute bottom-0 left-0 right-0 p-2 sm:p-3">
+                    <h3 class="text-xs sm:text-sm font-bold text-white group-hover:text-amber-300 transition-colors duration-300 drop-shadow-lg leading-tight">
                       {{ game.name }}
                     </h3>
                   </div>
                 </div>
 
                 <!-- Bottom bar -->
-                <div class="p-3 sm:p-3.5 flex items-center justify-between">
-                  <div class="flex items-center gap-2">
-                    <div class="w-6 h-6 sm:w-7 sm:h-7 rounded-lg overflow-hidden ring-1 ring-surface-200 dark:ring-surface-700 shrink-0">
+                <div class="p-2 sm:p-2.5 flex items-center justify-between">
+                  <div class="flex items-center gap-1.5">
+                    <div class="w-5 h-5 sm:w-6 sm:h-6 rounded-lg overflow-hidden ring-1 ring-surface-200 dark:ring-surface-700 shrink-0">
                       <img :src="game.image_url" :alt="game.name" class="w-full h-full object-cover" />
                     </div>
                   </div>
-                  <div class="flex items-center gap-1 text-surface-400 dark:text-surface-500 group-hover:text-primary-500 dark:group-hover:text-primary-400 transition-all duration-300">
-                    <span class="text-[10px] font-medium hidden sm:inline">Top Up</span>
-                    <svg class="w-3.5 h-3.5 sm:w-4 sm:h-4 group-hover:translate-x-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <div class="flex items-center gap-0.5 text-surface-400 dark:text-surface-500 group-hover:text-primary-500 dark:group-hover:text-primary-400 transition-all duration-300">
+                    <svg class="w-3 h-3 sm:w-3.5 sm:h-3.5 group-hover:translate-x-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3" />
                     </svg>
                   </div>
@@ -275,50 +320,80 @@ onMounted(() => {
             </div>
           </div>
 
-          <!-- Tablet+ : single horizontal row (scrollable) -->
-          <div class="hidden md:flex md:flex-row md:gap-4 md:overflow-x-auto md:pb-2">
+          <!-- Tablet+ : horizontal scroll row with arrow navigation -->
+          <div class="hidden md:block relative">
+            <!-- Left Arrow -->
+            <button
+              v-show="canScrollLeft"
+              @click="scrollFeatured('left')"
+              class="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-3 z-10 w-10 h-10 rounded-full bg-white dark:bg-surface-800 border border-surface-200 dark:border-surface-600 shadow-lg flex items-center justify-center text-surface-500 hover:text-primary-500 hover:border-primary-300 dark:hover:text-primary-400 dark:hover:border-primary-600 transition-all duration-200 hover:scale-105 active:scale-95"
+              aria-label="Scroll left"
+            >
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+              </svg>
+            </button>
+
+            <!-- Scroll Container -->
             <div
-              v-for="game in featured"
-              :key="game.game_code"
-              class="featured-card shrink-0 md:w-[calc(25%_-_12px)]"
+              ref="featuredScrollRef"
+              class="flex flex-row gap-4 overflow-x-auto pb-2 hide-scrollbar"
             >
               <div
-                @click="navigateToGame(game.game_code)"
-                class="group relative cursor-pointer rounded-2xl overflow-hidden bg-white dark:bg-surface-900 border border-surface-200 dark:border-surface-700/80 hover:border-primary-300 dark:hover:border-primary-700 transition-all duration-300 hover:shadow-lg hover:shadow-primary-500/5 hover:-translate-y-0.5"
+                v-for="game in featured"
+                :key="game.game_code"
+                class="featured-card shrink-0 w-[calc(25%_-_12px)]"
               >
-                <div class="relative aspect-[4/3] overflow-hidden">
-                  <img
-                    :src="game.image_url"
-                    :alt="game.name"
-                    class="w-full h-full object-cover transition-all duration-500 group-hover:scale-105"
-                    loading="lazy"
-                  />
-                  <div class="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent"></div>
+                <div
+                  @click="navigateToGame(game.game_code)"
+                  class="group relative cursor-pointer rounded-2xl overflow-hidden bg-white dark:bg-surface-900 border border-surface-200 dark:border-surface-700/80 hover:border-primary-300 dark:hover:border-primary-700 transition-all duration-300 hover:shadow-lg hover:shadow-primary-500/5 hover:-translate-y-0.5"
+                >
+                  <div class="relative aspect-[4/3] overflow-hidden">
+                    <img
+                      :src="game.image_url"
+                      :alt="game.name"
+                      class="w-full h-full object-cover transition-all duration-500 group-hover:scale-105"
+                      loading="lazy"
+                    />
+                    <div class="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent"></div>
 
-                  <!-- Name overlay -->
-                  <div class="absolute bottom-0 left-0 right-0 p-3 sm:p-4">
-                    <h3 class="text-sm sm:text-base font-bold text-white group-hover:text-amber-300 transition-colors duration-300 drop-shadow-lg">
-                      {{ game.name }}
-                    </h3>
-                  </div>
-                </div>
-
-                <!-- Bottom bar -->
-                <div class="p-3 sm:p-3.5 flex items-center justify-between">
-                  <div class="flex items-center gap-2">
-                    <div class="w-6 h-6 sm:w-7 sm:h-7 rounded-lg overflow-hidden ring-1 ring-surface-200 dark:ring-surface-700 shrink-0">
-                      <img :src="game.image_url" :alt="game.name" class="w-full h-full object-cover" />
+                    <!-- Name overlay -->
+                    <div class="absolute bottom-0 left-0 right-0 p-3 sm:p-4">
+                      <h3 class="text-sm sm:text-base font-bold text-white group-hover:text-amber-300 transition-colors duration-300 drop-shadow-lg">
+                        {{ game.name }}
+                      </h3>
                     </div>
                   </div>
-                  <div class="flex items-center gap-1 text-surface-400 dark:text-surface-500 group-hover:text-primary-500 dark:group-hover:text-primary-400 transition-all duration-300">
-                    <span class="text-[10px] font-medium hidden sm:inline">Top Up</span>
-                    <svg class="w-3.5 h-3.5 sm:w-4 sm:h-4 group-hover:translate-x-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3" />
-                    </svg>
+
+                  <!-- Bottom bar -->
+                  <div class="p-3 sm:p-3.5 flex items-center justify-between">
+                    <div class="flex items-center gap-2">
+                      <div class="w-6 h-6 sm:w-7 sm:h-7 rounded-lg overflow-hidden ring-1 ring-surface-200 dark:ring-surface-700 shrink-0">
+                        <img :src="game.image_url" :alt="game.name" class="w-full h-full object-cover" />
+                      </div>
+                    </div>
+                    <div class="flex items-center gap-1 text-surface-400 dark:text-surface-500 group-hover:text-primary-500 dark:group-hover:text-primary-400 transition-all duration-300">
+                      <span class="text-[10px] font-medium hidden sm:inline">Top Up</span>
+                      <svg class="w-3.5 h-3.5 sm:w-4 sm:h-4 group-hover:translate-x-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3" />
+                      </svg>
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
+
+            <!-- Right Arrow -->
+            <button
+              v-show="canScrollRight"
+              @click="scrollFeatured('right')"
+              class="absolute right-0 top-1/2 -translate-y-1/2 translate-x-3 z-10 w-10 h-10 rounded-full bg-white dark:bg-surface-800 border border-surface-200 dark:border-surface-600 shadow-lg flex items-center justify-center text-surface-500 hover:text-primary-500 hover:border-primary-300 dark:hover:text-primary-400 dark:hover:border-primary-600 transition-all duration-200 hover:scale-105 active:scale-95"
+              aria-label="Scroll right"
+            >
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+              </svg>
+            </button>
           </div>
         </div>
 

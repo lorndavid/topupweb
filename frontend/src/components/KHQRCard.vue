@@ -26,6 +26,7 @@ const toast = useToastStore()
 
 const showCard = ref(false)
 const cardRef = ref<HTMLElement | null>(null)
+const khqrCaptureRef = ref<HTMLElement | null>(null)
 const qrContainerRef = ref<HTMLElement | null>(null)
 const checkoutBtnRef = ref<HTMLElement | null>(null)
 
@@ -115,11 +116,12 @@ const canShare = computed(() => {
   } catch { return false }
 })
 
-// ─── Shared: capture card as canvas ────────────────────────
-async function captureCardCanvas(): Promise<HTMLCanvasElement | null> {
-  if (!cardRef.value) return null
+// ─── Capture the clean KHQR content (header + merchant/amount + QR) ──
+//     Excludes action buttons (pay/scan/download/share/cancel) from the output.
+async function captureKHQRCanvas(): Promise<HTMLCanvasElement | null> {
+  if (!khqrCaptureRef.value) return null
   try {
-    return await html2canvas(cardRef.value, {
+    return await html2canvas(khqrCaptureRef.value, {
       useCORS: true,
       scale: 2,
       backgroundColor: '#ffffff',
@@ -129,7 +131,7 @@ async function captureCardCanvas(): Promise<HTMLCanvasElement | null> {
 
 // ─── Share card via native share sheet ─────────────────────
 async function handleShareQR() {
-  const canvas = await captureCardCanvas()
+  const canvas = await captureKHQRCanvas()
   if (!canvas) return
   try {
     const blob = await new Promise<Blob | null>((resolve) =>
@@ -155,9 +157,9 @@ async function handleShareQR() {
   }
 }
 
-// ─── Download full card as image ────────────────────────────
+// ─── Download clean KHQR card as image ───────────────────────
 async function handleDownloadQR() {
-  const canvas = await captureCardCanvas()
+  const canvas = await captureKHQRCanvas()
   if (!canvas) return
   try {
     const link = document.createElement('a')
@@ -223,106 +225,93 @@ async function handleDownloadQR() {
           class="bg-white overflow-hidden border border-gray-100"
           :class="isMobile ? 'rounded-t-2xl shadow-2xl' : 'rounded-2xl shadow-2xl'"
         >
-          <!-- ═══ RED HEADER (bigger icon + circular timer ring) ═══ -->
-          <div class="bg-gradient-to-r from-red-600 to-red-500 px-6 pt-6 pb-5 text-center relative overflow-hidden">
-            <!-- decorative blobs -->
-            <div class="absolute -top-6 -right-6 w-24 h-24 rounded-full bg-white/5"></div>
-            <div class="absolute -bottom-4 -left-4 w-16 h-16 rounded-full bg-white/5"></div>
-
-            <!-- Bigger KHQR icon -->
-            <div class="flex justify-center">
-              <img
-                src="https://checkout.payway.com.kh/images/khqr-icon.svg"
-                alt="KHQR"
-                class="w-14 h-14 brightness-0 invert"
-              />
-            </div>
-
-            <!-- Circular timer ring (top-right, no text) -->
-            <div v-if="timeLeft !== undefined && timeLeft !== null" class="absolute top-3 right-3">
-              <svg class="w-8 h-8 -rotate-90" viewBox="0 0 36 36">
-                <!-- background ring -->
-                <path
-                  class="text-white/20"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="3"
-                  d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+          <!-- ═══ CAPTURE CONTENT (header + merchant/amount + QR) ═══ -->
+          <!--     This section is captured by html2canvas for download/share.
+               It contains ONLY the KHQR header, merchant name, amount, and QR code.
+               Action buttons (pay/scan/download/share/cancel) stay OUTSIDE this ref
+               so they never appear in the downloaded image. -->
+          <div ref="khqrCaptureRef">
+            <!-- Red Header with KHQR icon -->
+            <div class="bg-gradient-to-r from-red-600 to-red-500 px-6 pt-6 pb-5 text-center relative overflow-hidden">
+              <div class="absolute -top-6 -right-6 w-24 h-24 rounded-full bg-white/5"></div>
+              <div class="absolute -bottom-4 -left-4 w-16 h-16 rounded-full bg-white/5"></div>
+              <div class="flex justify-center">
+                <img
+                  src="https://checkout.payway.com.kh/images/khqr-icon.svg"
+                  alt="KHQR"
+                  class="w-14 h-14 brightness-0 invert"
                 />
-                <!-- progress ring -->
-                <path
-                  :class="isUrgent ? 'text-red-300 animate-pulse' : 'text-white/90'"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="3"
-                  stroke-linecap="round"
-                  :stroke-dasharray="`${progressPercent}, 100`"
-                  class="transition-all duration-1000 ease-linear"
-                  d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                />
-              </svg>
-            </div>
-          </div>
-
-          <!-- Dashed Separator -->
-          <div class="relative px-6">
-            <div class="border-t-2 border-dashed border-gray-200 -mx-6"></div>
-            <div class="absolute -top-2 -left-2 w-4 h-4 rounded-full bg-gray-50"></div>
-            <div class="absolute -top-2 -right-2 w-4 h-4 rounded-full bg-gray-50"></div>
-          </div>
-
-          <!-- ═══ WHITE BODY ═══ -->
-          <div class="px-6 pb-6 pt-4 bg-white">
-            <!-- Merchant + Amount Row -->
-            <div class="flex items-center justify-between mb-4">
-              <div class="min-w-0 flex-1">
-                <p class="text-sm font-bold text-gray-800 truncate">{{ merchantName }}</p>
               </div>
-              <div class="text-right shrink-0 ml-4">
-                <p class="text-xl font-extrabold text-gray-900">${{ amount.toFixed(2) }}</p>
+              <div v-if="timeLeft !== undefined && timeLeft !== null" class="absolute top-3 right-3">
+                <svg class="w-8 h-8 -rotate-90" viewBox="0 0 36 36">
+                  <path class="text-white/20" fill="none" stroke="currentColor" stroke-width="3" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                  <path
+                    :class="isUrgent ? 'text-red-300 animate-pulse' : 'text-white/90'"
+                    fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"
+                    :stroke-dasharray="`${progressPercent}, 100`"
+                    class="transition-all duration-1000 ease-linear"
+                    d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                  />
+                </svg>
               </div>
             </div>
 
-            <!-- QR Code -->
-            <div ref="qrContainerRef" class="flex justify-center mb-3">
-              <div class="relative p-3 bg-white rounded-xl border border-gray-100 shadow-sm">
-                <div class="w-52 h-52 flex items-center justify-center">
-                  <!-- Loading -->
-                  <template v-if="loading">
-                    <div class="text-center">
-                      <svg class="w-10 h-10 mx-auto text-gray-300 animate-spin" fill="none" viewBox="0 0 24 24">
-                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                      </svg>
-                      <p class="text-[10px] text-gray-400 mt-2">Generating QR...</p>
-                    </div>
-                  </template>
+            <!-- Dashed Separator -->
+            <div class="relative px-6">
+              <div class="border-t-2 border-dashed border-gray-200 -mx-6"></div>
+              <div class="absolute -top-2 -left-2 w-4 h-4 rounded-full bg-gray-50"></div>
+              <div class="absolute -top-2 -right-2 w-4 h-4 rounded-full bg-gray-50"></div>
+            </div>
 
-                  <!-- QR Image -->
-                  <template v-else-if="qrImage">
-                    <img :src="qrImage" alt="KHQR Code" class="w-full h-full object-contain" />
-                  </template>
-
-                  <!-- Placeholder -->
-                  <template v-else>
-                    <div class="w-full h-full flex items-center justify-center bg-gray-50 rounded-lg">
-                      <img src="https://checkout.payway.com.kh/images/usd-khqr-logo.svg" alt="USD-KHQR" class="w-24 h-24 opacity-30" />
-                    </div>
-                  </template>
+            <!-- White Body: Merchant + Amount + QR -->
+            <div class="px-6 pb-5 pt-4 bg-white">
+              <div class="flex items-center justify-between mb-4">
+                <div class="min-w-0 flex-1">
+                  <p class="text-sm font-bold text-gray-800 truncate">{{ merchantName }}</p>
                 </div>
-
-                <!-- USD-KHQR Logo overlay -->
-                <div v-if="qrImage" class="absolute inset-0 flex items-center justify-center pointer-events-none">
-                  <div class="w-10 h-10 bg-white rounded-lg shadow-sm flex items-center justify-center p-1.5">
-                    <img src="https://checkout.payway.com.kh/images/usd-khqr-logo.svg" alt="USD-KHQR" class="w-full h-full" />
+                <div class="text-right shrink-0 ml-4">
+                  <p class="text-xl font-extrabold text-gray-900">${{ amount.toFixed(2) }}</p>
+                </div>
+              </div>
+              <div ref="qrContainerRef" class="flex justify-center">
+                <div class="relative p-3 bg-white rounded-xl border border-gray-100 shadow-sm">
+                  <div class="w-52 h-52 flex items-center justify-center">
+                    <template v-if="loading">
+                      <div class="text-center">
+                        <svg class="w-10 h-10 mx-auto text-gray-300 animate-spin" fill="none" viewBox="0 0 24 24">
+                          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+                          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                        </svg>
+                        <p class="text-[10px] text-gray-400 mt-2">Generating QR...</p>
+                      </div>
+                    </template>
+                    <template v-else-if="qrImage">
+                      <img :src="qrImage" alt="KHQR Code" class="w-full h-full object-contain" />
+                    </template>
+                    <template v-else>
+                      <div class="w-full h-full flex items-center justify-center bg-gray-50 rounded-lg">
+                        <img src="https://checkout.payway.com.kh/images/usd-khqr-logo.svg" alt="USD-KHQR" class="w-24 h-24 opacity-30" />
+                      </div>
+                    </template>
+                  </div>
+                  <div v-if="qrImage" class="absolute inset-0 flex items-center justify-center pointer-events-none">
+                    <div class="w-10 h-10 bg-white rounded-lg shadow-sm flex items-center justify-center p-1.5">
+                      <img src="https://checkout.payway.com.kh/images/usd-khqr-logo.svg" alt="USD-KHQR" class="w-full h-full" />
+                    </div>
                   </div>
                 </div>
               </div>
+              <!-- Powered By footer (captured) -->
+              <p class="text-center text-[10px] text-gray-400 mt-4 font-medium">
+                Powered by GameTopUp Store
+              </p>
             </div>
+          </div>
 
+          <!-- ═══ NON-CAPTURED CONTENT (action buttons only, never in download) ═══ -->
+          <div class="px-6 pb-5 bg-white">
             <!-- Payment Status Indicator -->
             <div v-if="paymentStatus && paymentStatus !== 'pending'" class="mb-3">
-              <!-- Paid -->
               <div v-if="paymentStatus === 'paid'" class="flex items-center justify-center gap-2 p-2.5 bg-emerald-50 rounded-xl border border-emerald-200">
                 <div class="w-6 h-6 rounded-full bg-emerald-500 flex items-center justify-center">
                   <svg class="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -331,7 +320,6 @@ async function handleDownloadQR() {
                 </div>
                 <span class="text-sm font-semibold text-emerald-700">Payment Received!</span>
               </div>
-              <!-- Failed -->
               <div v-if="paymentStatus === 'failed'" class="flex items-center justify-center gap-2 p-2.5 bg-red-50 rounded-xl border border-red-200">
                 <div class="w-6 h-6 rounded-full bg-red-500 flex items-center justify-center">
                   <svg class="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -342,17 +330,14 @@ async function handleDownloadQR() {
               </div>
             </div>
 
-            <!-- Three-row Download Section (only show when pending) -->
+            <!-- Three-row Actions Section (only show when pending) -->
             <div v-if="paymentStatus === 'pending' || !paymentStatus" class="text-center space-y-3">
-              <!-- Row 1: Pay with banks -->
               <p class="text-xs text-gray-500 font-medium">Pay with any Cambodian banking app</p>
-              <!-- Row 2: or divider -->
               <div class="flex items-center gap-3">
                 <div class="flex-1 h-px bg-gray-200"></div>
                 <span class="text-[10px] text-gray-300 uppercase tracking-wider font-medium">or</span>
                 <div class="flex-1 h-px bg-gray-200"></div>
               </div>
-              <!-- Row 3: Actions row (Download + Share) -->
               <div class="flex items-center justify-center gap-2">
                 <button
                   @click="handleDownloadQR"
@@ -365,7 +350,6 @@ async function handleDownloadQR() {
                   />
                   <span class="text-xs font-medium text-gray-500 group-hover:text-gray-700 transition-colors">Download QR</span>
                 </button>
-
                 <button
                   v-if="canShare"
                   @click="handleShareQR"
@@ -382,20 +366,14 @@ async function handleDownloadQR() {
             <!-- Error with Retry -->
             <div v-if="error" class="mt-3 p-3 bg-red-50 border border-red-200 rounded-xl text-center">
               <p class="text-xs text-red-600 mb-2">{{ error }}</p>
-              <button
-                @click="handleRetry"
-                class="px-4 py-1.5 bg-red-500 hover:bg-red-600 text-white text-xs font-semibold rounded-lg transition-all duration-200 active:scale-95"
-              >
+              <button @click="handleRetry" class="px-4 py-1.5 bg-red-500 hover:bg-red-600 text-white text-xs font-semibold rounded-lg transition-all duration-200 active:scale-95">
                 Try Again
               </button>
             </div>
 
             <!-- Cancel Button (only when pending) -->
             <div v-if="paymentStatus === 'pending' && paymentRef" class="mt-3 text-center">
-              <button
-                @click="emit('cancel')"
-                class="text-xs text-gray-400 hover:text-red-500 transition-colors duration-200 underline underline-offset-2"
-              >
+              <button @click="emit('cancel')" class="text-xs text-gray-400 hover:text-red-500 transition-colors duration-200 underline underline-offset-2">
                 Cancel Order
               </button>
             </div>

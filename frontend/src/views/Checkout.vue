@@ -4,10 +4,11 @@ import { useRouter } from 'vue-router'
 import { useGameStore } from '@/stores/game'
 import { useI18nStore } from '@/stores/i18n'
 import { useToastStore } from '@/stores/toast'
-import { createPayment, getPaymentStatus, cancelOrder, getResellerBalance } from '@/services/api'
+import { createPayment, getPaymentStatus, cancelOrder, getResellerBalance, getOrder } from '@/services/api'
 import { formatPrice } from '@/composables/useCurrency'
 import { usePaymentWebSocket } from '@/composables/usePaymentWebSocket'
 import KHQRCard from '@/components/KHQRCard.vue'
+import ReceiptCard from '@/components/ReceiptCard.vue'
 import gsap from 'gsap'
 
 const router = useRouter()
@@ -27,6 +28,21 @@ const showCancelDialog = ref(false)
 const cancelling = ref(false)
 const showSuccessOverlay = ref(false)
 const redirectCountdown = ref(3)
+
+// Receipt data (fetched from API when payment succeeds)
+const checkoutOrderData = ref<{
+  reference: string
+  game_name: string
+  product_name: string
+  player_id: string
+  server_id?: string | null
+  amount: number
+  payment_status: string
+  order_status: string
+  created_at: string
+  completed_at?: string | null
+} | null>(null)
+const checkoutReceiptLoading = ref(false)
 
 // Balance
 const balanceInfo = ref<{ balance: number; available: boolean } | null>(null)
@@ -256,8 +272,9 @@ function onPaymentReceived() {
   stopPolling()
   playSuccessSound()
   showSuccessOverlay.value = true
-  gameStore.clearOrder()
   redirectCountdown.value = 3
+  fetchCheckoutOrderData()
+  gameStore.clearOrder()
   redirectInterval = setInterval(() => {
     redirectCountdown.value--
     if (redirectCountdown.value <= 0) {
@@ -265,6 +282,42 @@ function onPaymentReceived() {
       router.push(`/order/${paymentRef.value}`)
     }
   }, 1000)
+}
+
+async function fetchCheckoutOrderData() {
+  if (!paymentRef.value) return
+  checkoutReceiptLoading.value = true
+  try {
+    const data = await getOrder(paymentRef.value)
+    checkoutOrderData.value = {
+      reference: data.reference,
+      game_name: data.game_name,
+      product_name: data.product_name,
+      player_id: data.player_id,
+      server_id: data.server_id || null,
+      amount: data.amount,
+      payment_status: data.payment_status,
+      order_status: data.order_status,
+      created_at: data.created_at,
+      completed_at: data.completed_at || null,
+    }
+  } catch {
+    // Fallback to local data if API fetch fails
+    checkoutOrderData.value = {
+      reference: paymentRef.value,
+      game_name: order.value?.gameName || '',
+      product_name: order.value?.productName || '',
+      player_id: order.value?.playerId || '',
+      server_id: order.value?.serverId || null,
+      amount: order.value?.amount || 0,
+      payment_status: 'paid',
+      order_status: 'paid',
+      created_at: new Date().toISOString(),
+      completed_at: new Date().toISOString(),
+    }
+  } finally {
+    checkoutReceiptLoading.value = false
+  }
 }
 
 onUnmounted(() => {
@@ -521,7 +574,7 @@ onUnmounted(() => {
     <Teleport to="body">
       <div
         v-if="showSuccessOverlay"
-        class="fixed inset-0 z-50 flex items-center justify-center p-4"
+        class="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto"
       >
         <div class="absolute inset-0 bg-gradient-to-br from-emerald-500/90 via-emerald-600/85 to-teal-700/90 backdrop-blur-md"></div>
         <div class="absolute inset-0 overflow-hidden pointer-events-none" aria-hidden="true">
@@ -555,7 +608,30 @@ onUnmounted(() => {
             </svg>
             {{ paymentRef }}
           </div>
-          <div class="max-w-xs mx-auto">
+
+          <!-- Receipt download -->
+          <div v-if="checkoutOrderData" class="mt-6 max-w-sm mx-auto text-left">
+            <ReceiptCard
+              :reference="checkoutOrderData.reference"
+              :game-name="checkoutOrderData.game_name"
+              :product-name="checkoutOrderData.product_name"
+              :player-id="checkoutOrderData.player_id"
+              :server-id="checkoutOrderData.server_id"
+              :amount="checkoutOrderData.amount"
+              :payment-status="checkoutOrderData.payment_status"
+              :order-status="checkoutOrderData.order_status"
+              :created-at="checkoutOrderData.created_at"
+              :completed-at="checkoutOrderData.completed_at"
+            />
+          </div>
+          <div v-else-if="checkoutReceiptLoading" class="mt-6 flex justify-center">
+            <svg class="w-6 h-6 text-white/60 animate-spin" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+            </svg>
+          </div>
+
+          <div class="max-w-xs mx-auto mt-6">
             <div class="w-full h-1.5 bg-white/20 rounded-full overflow-hidden mb-3">
               <div
                 class="h-full bg-white rounded-full transition-all duration-1000 ease-linear"

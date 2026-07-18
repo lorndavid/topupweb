@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import html2canvas from 'html2canvas'
 import { useToastStore } from '@/stores/toast'
 
@@ -19,6 +19,59 @@ const props = defineProps<{
 const toast = useToastStore()
 const receiptRef = ref<HTMLElement | null>(null)
 const downloading = ref(false)
+const sharing = ref(false)
+
+// ─── Check if native share + files are available ──────────
+const canShare = computed(() => {
+  try {
+    return !!navigator.share && !!navigator.canShare &&
+      navigator.canShare({ files: [new File([''], 't.png', { type: 'image/png' })] })
+  } catch { return false }
+})
+
+// ─── Shared: capture receipt as canvas ─────────────────────
+async function captureReceiptCanvas(): Promise<HTMLCanvasElement | null> {
+  if (!receiptRef.value) return null
+  try {
+    return await html2canvas(receiptRef.value, {
+      useCORS: true,
+      scale: 2,
+      backgroundColor: '#ffffff',
+    })
+  } catch { return null }
+}
+
+// ─── Share receipt via native share sheet ─────────────────
+async function handleShareReceipt() {
+  const canvas = await captureReceiptCanvas()
+  if (!canvas) return
+
+  sharing.value = true
+  try {
+    const blob = await new Promise<Blob | null>((resolve) =>
+      canvas.toBlob(resolve, 'image/png')
+    )
+    if (!blob) return
+    const file = new File(
+      [blob],
+      'receipt-' + props.reference.toLowerCase() + '.png',
+      { type: 'image/png' }
+    )
+    await navigator.share({
+      title: 'Payment Receipt - ' + props.reference,
+      text: `Payment receipt for ${props.gameName} - $${props.amount.toFixed(2)}`,
+      files: [file],
+    })
+    toast.success('Receipt shared successfully')
+  } catch (err: any) {
+    // User cancelled share — not an error
+    if (err?.name !== 'AbortError') {
+      toast.error('Failed to share: ' + (err?.message || 'unknown error'))
+    }
+  } finally {
+    sharing.value = false
+  }
+}
 
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString('en-US', {
@@ -179,8 +232,9 @@ async function handleDownloadReceipt() {
       </div>
     </div>
 
-    <!-- Download Button -->
-    <div class="px-6 py-4 border-t border-gray-100 dark:border-surface-700">
+    <!-- Action Buttons -->
+    <div class="px-6 py-4 border-t border-gray-100 dark:border-surface-700 space-y-3">
+      <!-- Download Button -->
       <button
         @click="handleDownloadReceipt"
         :disabled="downloading"
@@ -194,6 +248,23 @@ async function handleDownloadReceipt() {
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
         </svg>
         <span>{{ downloading ? 'Generating...' : 'Download Receipt' }}</span>
+      </button>
+
+      <!-- Share Button (native share API, mobile only) -->
+      <button
+        v-if="canShare"
+        @click="handleShareReceipt"
+        :disabled="sharing"
+        class="w-full flex items-center justify-center gap-2.5 py-3 px-4 rounded-xl border border-surface-200 dark:border-surface-600 text-surface-500 dark:text-surface-400 hover:bg-surface-50 dark:hover:bg-surface-800 hover:text-surface-700 dark:hover:text-surface-300 font-medium text-sm transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+      >
+        <svg v-if="sharing" class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+        </svg>
+        <svg v-else class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+        </svg>
+        <span>{{ sharing ? 'Sharing...' : 'Share Receipt' }}</span>
       </button>
     </div>
   </div>

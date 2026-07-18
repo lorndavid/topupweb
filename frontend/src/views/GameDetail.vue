@@ -6,11 +6,12 @@ import { useI18nStore } from '@/stores/i18n'
 import { useToastStore } from '@/stores/toast'
 import ProductCard from '@/components/ProductCard.vue'
 import LoadingSkeleton from '@/components/LoadingSkeleton.vue'
-import { verifyPlayer, createPayment, getPaymentStatus, cancelOrder } from '@/services/api'
+import { verifyPlayer, createPayment, getPaymentStatus, cancelOrder, getOrder } from '@/services/api'
 import type { GameProduct } from '@/types'
 import { useSavedPlayers } from '@/composables/useSavedPlayers'
 import { formatPrice } from '@/composables/useCurrency'
 import { usePaymentWebSocket } from '@/composables/usePaymentWebSocket'
+import ReceiptCard from '@/components/ReceiptCard.vue'
 import gsap from 'gsap'
 import { ScrollTrigger } from 'gsap/ScrollTrigger'
 
@@ -321,6 +322,21 @@ const mobilePaymentStatus = ref<'pending' | 'paid' | 'failed'>('pending')
 const mobileTimeLeft = ref(5 * 60)
 const mobileUrgent = computed(() => mobileTimeLeft.value < 60 && mobilePaymentStatus.value === 'pending')
 
+// Receipt data (fetched from API when payment succeeds)
+const mobileOrderData = ref<{
+  reference: string
+  game_name: string
+  product_name: string
+  player_id: string
+  server_id?: string | null
+  amount: number
+  payment_status: string
+  order_status: string
+  created_at: string
+  completed_at?: string | null
+} | null>(null)
+const mobileReceiptLoading = ref(false)
+
 // WebSocket for real-time payment status (mobile checkout)
 const mobileWsRef = ref<string | null>(null)
 const mobileWs = usePaymentWebSocket(mobileWsRef)
@@ -328,16 +344,54 @@ mobileWs.setOnStatusChange((data) => {
   if (data.payment_status === 'paid') {
     mobilePaymentStatus.value = 'paid'
     stopMobilePolling()
+    playSuccessSound()
+    fetchMobileOrderData()
     toast.success('Payment received! Redirecting...')
     setTimeout(() => {
       router.push('/order/' + mobilePaymentRef.value)
-    }, 1500)
+    }, 3000)
   } else if (data.payment_status === 'failed') {
     mobilePaymentStatus.value = 'failed'
     stopMobilePolling()
     toast.error('Payment failed')
   }
 })
+
+async function fetchMobileOrderData() {
+  if (!mobilePaymentRef.value) return
+  mobileReceiptLoading.value = true
+  try {
+    const order = await getOrder(mobilePaymentRef.value)
+    mobileOrderData.value = {
+      reference: order.reference,
+      game_name: order.game_name,
+      product_name: order.product_name,
+      player_id: order.player_id,
+      server_id: order.server_id || null,
+      amount: order.amount,
+      payment_status: order.payment_status,
+      order_status: order.order_status,
+      created_at: order.created_at,
+      completed_at: order.completed_at || null,
+    }
+  } catch {
+    // If fetch fails, use local data as fallback
+    mobileOrderData.value = {
+      reference: mobilePaymentRef.value,
+      game_name: gameDisplayName.value,
+      product_name: selectedProduct.value?.name || '',
+      player_id: playerId.value,
+      server_id: serverId.value || null,
+      amount: selectedProduct.value?.sell_price || 0,
+      payment_status: 'paid',
+      order_status: 'paid',
+      created_at: new Date().toISOString(),
+      completed_at: new Date().toISOString(),
+    }
+  } finally {
+    mobileReceiptLoading.value = false
+  }
+}
 
 let mobilePollInterval: ReturnType<typeof setInterval> | null = null
 let mobileTimerInterval: ReturnType<typeof setInterval> | null = null
@@ -420,6 +474,7 @@ function startMobilePolling() {
       if (status.payment_status === 'paid') {
         stopMobilePolling()
         playSuccessSound()
+        fetchMobileOrderData()
         toast.success('Payment received! Redirecting...')
         setTimeout(() => router.push('/order/' + mobilePaymentRef.value), 1500)
       } else if (status.payment_status === 'failed') {
@@ -601,7 +656,8 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div ref="pageRef" class="min-h-screen relative overflow-hidden">
+  <div class="game-detail-root">
+    <div ref="pageRef" class="min-h-screen relative overflow-hidden">
     <!-- Background Particles -->
     <div class="absolute inset-0 pointer-events-none overflow-hidden opacity-20 dark:opacity-10">
       <div
@@ -1027,52 +1083,52 @@ onUnmounted(() => {
         </div>
       </template>
     </div>
-  </div>
-
-  <!-- ═══ Mobile Floating Checkout Bar (appears when product selected + verified) ═══ -->
-  <div
-    v-if="gameStore.selectedGame && canProceed && !mobileCheckoutActive"
-    class="fixed bottom-0 left-0 right-0 z-40 block lg:hidden safe-bottom"
-  >
-    <div class="absolute inset-0 bg-white/90 dark:bg-surface-900/90 backdrop-blur-xl border-t border-surface-200 dark:border-surface-700"></div>
-    <div class="relative flex items-center justify-between px-5 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom,0.75rem))]">
-      <div>
-        <p class="text-[10px] text-surface-400 dark:text-surface-500 uppercase tracking-wider font-medium">Total</p>
-        <p class="text-xl font-bold text-surface-900 dark:text-white">
-          {{ formatPrice(selectedProduct?.sell_price || 0).formatted }}
-          <span class="text-xs text-surface-400 font-normal ml-0.5">{{ formatPrice(selectedProduct?.sell_price || 0).code }}</span>
-        </p>
-        <p v-if="playerNickname" class="text-[11px] text-surface-400 dark:text-surface-500 mt-0.5">
-          {{ playerNickname }}
-        </p>
-      </div>
-      <button
-        @click="handleMobileCheckout"
-        class="px-8 py-3 bg-gradient-to-r from-primary-500 to-primary-600 hover:from-primary-600 hover:to-primary-700 text-white font-semibold rounded-2xl shadow-lg shadow-primary-500/30 active:scale-[0.97] transition-all duration-200 text-sm flex items-center gap-2"
-      >
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-        </svg>
-        Pay Now
-      </button>
     </div>
-  </div>
 
-  <!-- Spacer for mobile floating bar -->
-  <div v-if="gameStore.selectedGame && canProceed && !mobileCheckoutActive" class="h-20 lg:hidden"></div>
-
-  <!-- ═══ Mobile KHQR Bottom Sheet ═══ -->
-  <Teleport to="body">
+    <!-- ═══ Mobile Floating Checkout Bar (appears when product selected + verified) ═══ -->
     <div
-      v-if="mobileCheckoutActive"
-      class="fixed inset-0 z-50"
+      v-if="gameStore.selectedGame && canProceed && !mobileCheckoutActive"
+      class="fixed bottom-0 left-0 right-0 z-40 block lg:hidden safe-bottom"
     >
-      <!-- Backdrop -->
+      <div class="absolute inset-0 bg-white/90 dark:bg-surface-900/90 backdrop-blur-xl border-t border-surface-200 dark:border-surface-700"></div>
+      <div class="relative flex items-center justify-between px-5 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom,0.75rem))]">
+        <div>
+          <p class="text-[10px] text-surface-400 dark:text-surface-500 uppercase tracking-wider font-medium">Total</p>
+          <p class="text-xl font-bold text-surface-900 dark:text-white">
+            {{ formatPrice(selectedProduct?.sell_price || 0).formatted }}
+            <span class="text-xs text-surface-400 font-normal ml-0.5">{{ formatPrice(selectedProduct?.sell_price || 0).code }}</span>
+          </p>
+          <p v-if="playerNickname" class="text-[11px] text-surface-400 dark:text-surface-500 mt-0.5">
+            {{ playerNickname }}
+          </p>
+        </div>
+        <button
+          @click="handleMobileCheckout"
+          class="px-8 py-3 bg-gradient-to-r from-primary-500 to-primary-600 hover:from-primary-600 hover:to-primary-700 text-white font-semibold rounded-2xl shadow-lg shadow-primary-500/30 active:scale-[0.97] transition-all duration-200 text-sm flex items-center gap-2"
+        >
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          Pay Now
+        </button>
+      </div>
+    </div>
+
+    <!-- Spacer for mobile floating bar -->
+    <div v-if="gameStore.selectedGame && canProceed && !mobileCheckoutActive" class="h-20 lg:hidden"></div>
+
+    <!-- ═══ Mobile KHQR Bottom Sheet ═══ -->
+    <Teleport to="body">
       <div
-        class="absolute inset-0 bg-black/50 backdrop-blur-sm"
-        @click="closeMobileCheckout"
-      ></div>
+        v-if="mobileCheckoutActive"
+        class="fixed inset-0 z-50"
+      >
+        <!-- Backdrop -->
+        <div
+          class="absolute inset-0 bg-black/50 backdrop-blur-sm"
+          @click="closeMobileCheckout"
+        ></div>
 
       <!-- Bottom Sheet -->
       <div
@@ -1184,11 +1240,11 @@ onUnmounted(() => {
     </div>
   </Teleport>
 
-  <!-- Success overlay (mobile) -->
-  <Teleport to="body">
-    <div
-      v-if="mobilePaymentStatus === 'paid'"
-      class="fixed inset-0 z-[60] flex items-center justify-center p-4"
+    <!-- Success overlay (mobile) -->
+    <Teleport to="body">
+      <div
+        v-if="mobilePaymentStatus === 'paid'"
+        class="fixed inset-0 z-[60] flex items-center justify-center p-4 overflow-y-auto"
     >
       <div class="absolute inset-0 bg-gradient-to-br from-emerald-500/90 via-emerald-600/85 to-teal-700/90 backdrop-blur-md"></div>
       <!-- Confetti particles -->
@@ -1216,9 +1272,32 @@ onUnmounted(() => {
         </div>
         <h2 class="text-2xl font-bold text-white mb-1">Payment Successful!</h2>
         <p class="text-emerald-100 text-sm">Redirecting to order details...</p>
+
+        <!-- Receipt download (mobile) -->
+        <div v-if="mobileOrderData" class="mt-6 max-w-sm mx-auto">
+          <ReceiptCard
+            :reference="mobileOrderData.reference"
+            :game-name="mobileOrderData.game_name"
+            :product-name="mobileOrderData.product_name"
+            :player-id="mobileOrderData.player_id"
+            :server-id="mobileOrderData.server_id"
+            :amount="mobileOrderData.amount"
+            :payment-status="mobileOrderData.payment_status"
+            :order-status="mobileOrderData.order_status"
+            :created-at="mobileOrderData.created_at"
+            :completed-at="mobileOrderData.completed_at"
+          />
+        </div>
+        <div v-else-if="mobileReceiptLoading" class="mt-6 flex justify-center">
+          <svg class="w-6 h-6 text-white/60 animate-spin" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+          </svg>
+        </div>
       </div>
     </div>
-  </Teleport>
+    </Teleport>
+  </div>
 </template>
 
 <style scoped>

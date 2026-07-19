@@ -638,18 +638,18 @@ onUnmounted(() => {
                   <div
                     class="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent"
                   ></div>
-                  <div class="absolute bottom-0 left-0 right-0 p-2 sm:p-3">
+                  <div class="absolute bottom-0 left-0 right-0 p-1.5 sm:p-2.5">
                     <h3
-                      class="text-xs sm:text-sm font-bold text-white group-hover:text-amber-300 transition-colors duration-300 drop-shadow-lg leading-tight"
+                      class="text-[10px] sm:text-xs font-bold text-white group-hover:text-amber-300 transition-colors duration-300 drop-shadow-lg leading-tight"
                     >
                       {{ game.name }}
                     </h3>
                   </div>
                 </div>
-                <div class="p-2 sm:p-2.5 flex items-center justify-between">
+                <div class="p-1.5 sm:p-2 flex items-center justify-between">
                   <div class="flex items-center gap-1.5">
                     <div
-                      class="w-5 h-5 sm:w-6 sm:h-6 rounded-lg overflow-hidden ring-1 ring-surface-200 dark:ring-surface-700 shrink-0"
+                      class="w-4 h-4 sm:w-5 sm:h-5 rounded-lg overflow-hidden ring-1 ring-surface-200 dark:ring-surface-700 shrink-0"
                     >
                       <img
                         :src="game.image_url"
@@ -745,18 +745,18 @@ onUnmounted(() => {
                     <div
                       class="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent"
                     ></div>
-                    <div class="absolute bottom-0 left-0 right-0 p-3 sm:p-4">
+                    <div class="absolute bottom-0 left-0 right-0 p-2 sm:p-3">
                       <h3
-                        class="text-sm sm:text-base font-bold text-white group-hover:text-amber-300 transition-colors duration-300 drop-shadow-lg"
+                        class="text-xs sm:text-sm font-bold text-white group-hover:text-amber-300 transition-colors duration-300 drop-shadow-lg"
                       >
                         {{ game.name }}
                       </h3>
                     </div>
                   </div>
-                  <div class="p-3 sm:p-3.5 flex items-center justify-between">
+                  <div class="p-2 sm:p-3 flex items-center justify-between">
                     <div class="flex items-center gap-2">
                       <div
-                        class="w-6 h-6 sm:w-7 sm:h-7 rounded-lg overflow-hidden ring-1 ring-surface-200 dark:ring-surface-700 shrink-0"
+                        class="w-5 h-5 sm:w-6 sm:h-6 rounded-lg overflow-hidden ring-1 ring-surface-200 dark:ring-surface-700 shrink-0"
                       >
                         <img
                           :src="game.image_url"
@@ -934,9 +934,9 @@ onUnmounted(() => {
                     class="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent"
                   ></div>
                 </div>
-                <div class="p-2 sm:p-2.5">
+                <div class="p-1.5 sm:p-2">
                   <p
-                    class="text-xs sm:text-[13px] font-semibold text-surface-800 dark:text-surface-100 truncate group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors duration-200"
+                    class="text-[11px] sm:text-xs font-semibold text-surface-800 dark:text-surface-100 truncate group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors duration-200"
                   >
                     {{ game.name }}
                   </p>

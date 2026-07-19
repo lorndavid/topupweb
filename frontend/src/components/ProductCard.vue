@@ -18,7 +18,7 @@ const khrPrice = useFormattedPrice(props.product.sell_price)
   <button
     @click="emit('select')"
     :class="[
-      'relative flex items-center justify-between p-4 rounded-xl border-2 transition-all duration-300 text-left w-full group',
+      'relative flex items-center justify-between p-3 sm:p-4 rounded-xl border-2 transition-all duration-300 text-left w-full group',
       selected
         ? 'border-primary-500 bg-gradient-to-r from-primary-50 to-blue-50 dark:from-primary-900/20 dark:to-blue-900/20 shadow-lg shadow-primary-500/10 scale-[1.01]'
         : 'border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-900 hover:border-primary-300 dark:hover:border-primary-700 hover:shadow-lg hover:shadow-primary-500/5 hover:-translate-y-0.5'
@@ -33,9 +33,9 @@ const khrPrice = useFormattedPrice(props.product.sell_price)
     <!-- Selected indicator -->
     <div
       v-if="selected"
-      class="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-primary-500 flex items-center justify-center shadow-lg shadow-primary-500/30 animate-bounce-in"
+      class="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-primary-500 flex items-center justify-center shadow-lg shadow-primary-500/30 animate-bounce-in"
     >
-      <svg class="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <svg class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7" />
       </svg>
     </div>
@@ -43,7 +43,7 @@ const khrPrice = useFormattedPrice(props.product.sell_price)
     <!-- Product info -->
     <div class="flex-1 min-w-0">
       <p :class="[
-        'font-semibold transition-colors duration-200',
+        'text-xs sm:text-sm font-semibold transition-colors duration-200',
         selected ? 'text-primary-700 dark:text-primary-300' : 'text-surface-900 dark:text-surface-100 group-hover:text-primary-700 dark:group-hover:text-primary-300'
       ]">
         {{ product.name }}
@@ -52,9 +52,9 @@ const khrPrice = useFormattedPrice(props.product.sell_price)
     </div>
 
     <!-- Price -->
-    <div class="ml-4 text-right shrink-0">
+    <div class="ml-2 sm:ml-3 text-right shrink-0">
       <p :class="[
-        'text-lg font-bold transition-all duration-300',
+        'text-sm sm:text-base font-bold transition-all duration-300',
         selected
           ? 'text-primary-600 dark:text-primary-400 scale-105'
           : 'text-surface-900 dark:text-surface-100'

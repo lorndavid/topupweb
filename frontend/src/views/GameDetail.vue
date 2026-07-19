@@ -32,7 +32,6 @@ const formRef = ref<HTMLElement | null>(null)
 const productsContainerRef = ref<HTMLElement | null>(null)
 const productsListRef = ref<HTMLElement | null>(null)
 const resultRef = ref<HTMLElement | null>(null)
-const verifyBtnRef = ref<HTMLElement | null>(null)
 const errorRef = ref<HTMLElement | null>(null)
 const serverIdRef = ref<HTMLElement | null>(null)
 const proceedBtnRef = ref<HTMLElement | null>(null)
@@ -41,6 +40,7 @@ const savedChipsRef = ref<HTMLElement | null>(null)
 const selectedProduct = ref<GameProduct | null>(null)
 const playerId = ref('')
 const serverId = ref('')
+const skipAutoVerify = ref(false)
 
 // Verification state
 const verifying = ref(false)
@@ -108,7 +108,19 @@ watch(
 )
 
 // ─── Watchers ────────────────────────────────────────────────
-watch(playerId, () => {
+// ─── Auto-verify when user fills in ID fields ───
+let verifyDebounce: ReturnType<typeof setTimeout> | null = null
+
+watch([playerId, serverId], () => {
+  // Skip auto-verify when restoring a saved player from localStorage
+  if (skipAutoVerify.value) {
+    skipAutoVerify.value = false
+    return
+  }
+  if (verifyDebounce) {
+    clearTimeout(verifyDebounce)
+    verifyDebounce = null
+  }
   if (verified.value) {
     verified.value = false
     verifyError.value = null
@@ -117,6 +129,12 @@ watch(playerId, () => {
     playerGameTitle.value = null
     verifyProvider.value = null
   }
+  const id = playerId.value.trim()
+  if (!id) return
+  if (needsServerId.value && !serverId.value.trim()) return
+  verifyDebounce = setTimeout(() => {
+    handleVerify()
+  }, 600)
 })
 
 // Simple slide-in for verify success card (handled by Transition CSS)
@@ -191,22 +209,12 @@ async function handleVerify() {
   const id = playerId.value.trim()
   if (!id) {
     toast.warning(i18n.t('detail.toast.enterPlayerId'))
-    shakeElement(verifyBtnRef.value)
     return
   }
 
   verifying.value = true
   verifyError.value = null
   verified.value = false
-
-  // Animate verify button to pressed state
-  if (verifyBtnRef.value) {
-    gsap.to(verifyBtnRef.value, {
-      scale: 0.95,
-      duration: 0.12,
-      ease: 'power2.in',
-    })
-  }
 
   try {
     const result = await verifyPlayer({
@@ -235,43 +243,14 @@ async function handleVerify() {
       })
       // Refresh the saved players list
       loadSavedPlayers()
-
-      // Success bounce on button (morphs to verified badge via v-if)
-      if (verifyBtnRef.value) {
-        gsap.to(verifyBtnRef.value, {
-          scale: 1.08,
-          duration: 0.25,
-          ease: 'back.out(2.5)',
-          onComplete: () => {
-            gsap.to(verifyBtnRef.value, { scale: 1, duration: 0.15 })
-          },
-        })
-      }
     } else {
       verifyError.value = i18n.t('verify.error.notFound')
-      shakeElement(verifyBtnRef.value)
     }
   } catch {
     verifyError.value = i18n.t('verify.error.generic')
-    shakeElement(verifyBtnRef.value)
   } finally {
     verifying.value = false
   }
-}
-
-function shakeElement(el: HTMLElement | null) {
-  if (!el) return
-  gsap.to(el, {
-    keyframes: [
-      { x: -5, duration: 0.06 },
-      { x: 5, duration: 0.06 },
-      { x: -4, duration: 0.06 },
-      { x: 4, duration: 0.06 },
-      { x: -2, duration: 0.06 },
-      { x: 2, duration: 0.06 },
-      { x: 0, duration: 0.04 },
-    ],
-  })
 }
 
 // ─── Mobile One-Step Checkout ───────────────────────
@@ -482,6 +461,7 @@ function loadSavedPlayers() {
 
 /** Select a saved player: auto-fill ID, server, and restore cached verification instantly. */
 function selectSavedPlayer(saved: ReturnType<typeof getByGame>[number]) {
+  skipAutoVerify.value = true
   playerId.value = saved.playerId
   serverId.value = saved.serverId || ''
   verified.value = true
@@ -610,6 +590,7 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  if (verifyDebounce) clearTimeout(verifyDebounce)
   ScrollTrigger.getAll().forEach((st) => st.kill())
   gsap.killTweensOf('.bg-particle')
   gsap.killTweensOf('.product-card, .saved-chip, .result-accent-bar')
@@ -673,7 +654,7 @@ onUnmounted(() => {
       <!-- Game Detail -->
       <template v-else-if="gameStore.selectedGame">
         <!-- Game Header -->
-        <div ref="headerRef" class="relative overflow-hidden rounded-2xl bg-gradient-to-br from-surface-900 via-surface-800 to-primary-900 dark:from-surface-950 dark:via-surface-900 dark:to-primary-950 mb-6 sm:mb-8 p-4 sm:p-6 lg:p-8 shadow-xl max-h-[200px] sm:max-h-[260px]">
+        <div ref="headerRef" class="relative overflow-hidden rounded-2xl bg-gradient-to-br from-surface-900 via-surface-800 to-primary-900 dark:from-surface-950 dark:via-surface-900 dark:to-primary-950 mb-6 sm:mb-8 p-4 sm:p-6 lg:p-8 shadow-xl max-h-[140px] sm:max-h-[200px]">
           <!-- Background image with parallax overlay -->
           <div class="parallax-header-bg absolute inset-0 opacity-10 will-change-transform">
             <img
@@ -683,10 +664,10 @@ onUnmounted(() => {
             />
           </div>
 
-          <div              class="relative flex items-center gap-4 sm:gap-5"
+          <div              class="relative flex items-center gap-3 sm:gap-5"
             >
             <!-- Game Icon -->
-            <div class="anim-item w-14 h-14 sm:w-20 sm:h-24 rounded-xl sm:rounded-2xl overflow-hidden ring-2 ring-white/20 shadow-lg shrink-0 transform hover:scale-105 transition-transform duration-300">
+            <div class="anim-item w-12 h-12 sm:w-20 sm:h-24 rounded-xl sm:rounded-2xl overflow-hidden ring-2 ring-white/20 shadow-lg shrink-0 transform hover:scale-105 transition-transform duration-300">
               <img
                 :src="gameStore.selectedGame.image_url"
                 :alt="gameStore.selectedGame.name"
@@ -694,14 +675,14 @@ onUnmounted(() => {
               />
             </div>
             <div class="anim-item min-w-0">
-              <div class="inline-flex items-center gap-1.5 px-2 py-0.5 sm:px-2.5 sm:py-1 bg-white/10 backdrop-blur-sm rounded-full text-[9px] sm:text-[10px] font-medium text-white/80 mb-0">
+              <div class="inline-flex items-center gap-1.5 px-2 py-0.5 sm:px-2.5 sm:py-1 bg-white/10 backdrop-blur-sm rounded-full text-[10px] sm:text-xs font-medium text-white/80 mb-0">
                 <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
                 {{ gameStore.categories.find(c => c.game_code === gameCode)?.game_fields?.join(' + ') || 'ID' }}
               </div>
-              <h1 class="text-lg sm:text-2xl lg:text-3xl font-bold text-white truncate">
+              <h1 class="text-base sm:text-xl lg:text-2xl font-bold text-white truncate">
                 {{ gameStore.selectedGame.name }}
               </h1>
-              <p class="mt-1 sm:mt-2 text-xs sm:text-sm text-white/60 line-clamp-1 max-w-xl">
+              <p class="mt-1 sm:mt-2 text-[11px] sm:text-sm text-white/60 line-clamp-1 max-w-xl">
                 {{ gameStore.selectedGame.description }}
               </p>
 
@@ -731,7 +712,7 @@ onUnmounted(() => {
               <p class="text-sm text-surface-500 dark:text-surface-400">No packages available yet</p>
             </div>
 
-            <div ref="productsListRef" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-2 sm:gap-3">
+            <div ref="productsListRef" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-3">
               <ProductCard
                 v-for="product in gameStore.products"
                 :key="product.product_code"
@@ -748,10 +729,10 @@ onUnmounted(() => {
             <div class="sticky top-24 space-y-5">
               <!-- Player ID Card -->
               <div class="bg-white dark:bg-surface-900 rounded-2xl border border-surface-200 dark:border-surface-700 shadow-sm overflow-hidden">
-                <div class="p-5 sm:p-6 space-y-5">
+                <div class="p-4 sm:p-5 space-y-4 sm:space-y-5">
                   <div class="flex items-center gap-3">
-                    <div class="w-9 h-9 rounded-xl bg-primary-100 dark:bg-primary-900/30 flex items-center justify-center">
-                      <svg class="w-5 h-5 text-primary-600 dark:text-primary-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <div class="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-primary-100 dark:bg-primary-900/30 flex items-center justify-center">
+                      <svg class="w-4 h-4 sm:w-5 sm:h-5 text-primary-600 dark:text-primary-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                       </svg>
                     </div>
@@ -761,137 +742,105 @@ onUnmounted(() => {
                     </div>
                   </div>
 
-                  <!-- Player ID Input -->
-                  <div>
-                    <label for="player-id" class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1.5">
-                      {{ i18n.t('detail.playerId') }} <span class="text-red-400">*</span>
-                    </label>
-                    <div class="relative">
-                      <div class="absolute left-3.5 top-1/2 -translate-y-1/2 text-surface-400">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 114 0v1m-4 0a2 2 0 104 0" />
-                        </svg>
-                      </div>
-                      <input
-                        id="player-id"
-                        v-model="playerId"
-                        type="text"
-                        :placeholder="i18n.t('detail.playerIdPlaceholder')"
-                        class="input-field pl-10 pr-24 h-11 text-sm"
-                        :disabled="verifying"
-                        @keyup.enter="handleVerify"
-                      />
-                      <!-- Verify Button -->
-                      <button
-                        v-if="!verified"
-                        ref="verifyBtnRef"
-                        @click="handleVerify"
-                        :disabled="verifying || !playerId.trim()"
-                        class="absolute right-1.5 top-1/2 -translate-y-1/2 px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5"
-                        :class="verifying
-                          ? 'bg-surface-200 dark:bg-surface-600 text-surface-500 dark:text-surface-400'
-                          : 'bg-gradient-to-r from-primary-500 to-primary-600 hover:from-primary-600 hover:to-primary-700 text-white shadow-sm shadow-primary-500/20 hover:shadow-primary-500/30 active:scale-95'"
-                      >
-                        <template v-if="verifying">
-                          <svg class="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+                  <!-- Player ID + Server ID in one row -->
+                  <div class="grid grid-cols-2 gap-3">
+                    <!-- Player ID (spans full width when no server ID needed) -->
+                    <div :class="needsServerId ? 'col-span-1' : 'col-span-2'">
+                      <label for="player-id" class="block text-xs sm:text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">
+                        {{ i18n.t('detail.playerId') }} <span class="text-red-400">*</span>
+                      </label>
+                      <div class="relative">
+                        <div class="absolute left-3 top-1/2 -translate-y-1/2 text-surface-400">
+                          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 114 0v1m-4 0a2 2 0 104 0" />
+                          </svg>
+                        </div>
+                        <input
+                          id="player-id"
+                          v-model="playerId"
+                          type="text"
+                          :placeholder="i18n.t('detail.playerIdPlaceholder')"
+                          class="input-field pl-9 pr-10 h-10 text-xs sm:text-sm"
+                          :disabled="verifying"
+                        />
+                        <!-- Auto-verify status indicator -->
+                        <div v-if="verifying" class="absolute right-3 top-1/2 -translate-y-1/2">
+                          <svg class="w-4 h-4 animate-spin text-primary-500" fill="none" viewBox="0 0 24 24">
                             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
                             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                           </svg>
-                          <span>{{ i18n.t('verify.verifying') }}</span>
-                        </template>
-                        <template v-else>
+                        </div>
+                        <div v-else-if="verified" class="absolute right-3 top-1/2 -translate-y-1/2">
+                          <svg class="w-4 h-4 text-emerald-500" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
+                          </svg>
+                        </div>
+                      </div>
+                    </div>
+                    <!-- Server / Zone ID -->
+                    <div v-show="needsServerId" ref="serverIdRef" class="overflow-hidden">
+                      <label for="server-id" class="block text-xs sm:text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">
+                        {{ i18n.t('detail.serverId') }} <span class="text-red-400">*</span>
+                      </label>
+                      <div class="relative">
+                        <div class="absolute left-3 top-1/2 -translate-y-1/2 text-surface-400">
                           <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4" />
                           </svg>
-                          <span>{{ i18n.t('verify.verify') }}</span>
-                        </template>
-                      </button>
-                      <!-- Verified Badge -->
-                      <div
-                        v-else
-                        class="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1.5 px-2.5 py-1 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 rounded-lg text-xs font-medium"
-                      >
-                        <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
-                          <path fill-rule="evenodd" d="M6.267 3.455a3.066 3.066 0 001.745-.723 3.066 3.066 0 013.976 0 3.066 3.066 0 001.745.723 3.066 3.066 0 012.812 2.812c.051.643.304 1.254.723 1.745a3.066 3.066 0 010 3.976 3.066 3.066 0 00-.723 1.745 3.066 3.066 0 01-2.812 2.812 3.066 3.066 0 00-1.745.723 3.066 3.066 0 01-3.976 0 3.066 3.066 0 00-1.745-.723 3.066 3.066 0 01-2.812-2.812 3.066 3.066 0 00-.723-1.745 3.066 3.066 0 010-3.976 3.066 3.066 0 00.723-1.745 3.066 3.066 0 012.812-2.812zm7.44 5.252a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
-                        </svg>
-                        {{ i18n.t('verify.verified') }}
+                        </div>
+                        <input
+                          id="server-id"
+                          v-model="serverId"
+                          type="text"
+                          inputmode="numeric"
+                          :placeholder="i18n.t('detail.serverIdPlaceholder')"
+                          class="input-field pl-9 h-10 text-xs sm:text-sm"
+                          :disabled="verifying"
+                        />
                       </div>
-                    </div>
-                    <p class="mt-1.5 text-xs text-surface-400 dark:text-surface-500 flex items-center gap-1">
-                      <svg class="w-3 h-3 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M12 2a10 10 0 100 20 10 10 0 000-20z" />
-                      </svg>
-                      {{ i18n.t('verify.hint') }}
-                    </p>
-
-                    <!-- Saved Players (localStorage) -->
-                    <div v-if="savedForGame.length > 0 && !verified" ref="savedChipsRef" class="pt-2">
-                      <p class="text-[10px] text-surface-400 dark:text-surface-500 font-medium uppercase tracking-wider mb-2">
-                        Previously Verified
-                      </p>
-                      <div class="flex flex-wrap gap-2">
-                        <button
-                          v-for="saved in savedForGame"
-                          :key="saved.playerId + (saved.serverId || '')"
-                          @click="selectSavedPlayer(saved)"
-                          class="saved-chip group inline-flex items-center gap-2 px-3 py-2 rounded-xl border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800 hover:border-primary-300 dark:hover:border-primary-600 hover:bg-primary-50 dark:hover:bg-primary-900/20 transition-all duration-200 text-left"
-                        >
-                          <div class="w-7 h-7 rounded-full bg-gradient-to-br from-emerald-400 to-primary-500 flex items-center justify-center text-white font-bold text-xs shrink-0">
-                            {{ (saved.nickname[0] || '?').toUpperCase() }}
-                          </div>
-                          <div class="min-w-0">
-                            <p class="text-xs font-semibold text-surface-800 dark:text-surface-200 truncate max-w-[120px]">
-                              {{ saved.nickname }}
-                            </p>
-                            <p class="text-[10px] text-surface-400 dark:text-surface-500 font-mono">
-                              {{ saved.playerId }}<span v-if="saved.serverId"> ({{ saved.serverId }})</span>
-                            </p>
-                          </div>
-                          <svg class="w-3.5 h-3.5 text-surface-300 dark:text-surface-600 group-hover:text-primary-400 transition-colors shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
-                          </svg>
-                        </button>
-                      </div>
-                    </div>
-
-                    <!-- Saved Players Badge (when verified but one exists) -->
-                    <div v-if="savedForGame.length > 0 && verified" class="pt-1">
-                      <span class="inline-flex items-center gap-1.5 text-[10px] text-emerald-600 dark:text-emerald-400">
-                        <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                          <path fill-rule="evenodd" d="M6.267 3.455a3.066 3.066 0 001.745-.723 3.066 3.066 0 013.976 0 3.066 3.066 0 001.745.723 3.066 3.066 0 012.812 2.812c.051.643.304 1.254.723 1.745a3.066 3.066 0 010 3.976 3.066 3.066 0 00-.723 1.745 3.066 3.066 0 01-2.812 2.812 3.066 3.066 0 00-1.745.723 3.066 3.066 0 01-3.976 0 3.066 3.066 0 00-1.745-.723 3.066 3.066 0 01-2.812-2.812 3.066 3.066 0 00-.723-1.745 3.066 3.066 0 010-3.976 3.066 3.066 0 00.723-1.745 3.066 3.066 0 012.812-2.812zm7.44 5.252a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
-                        </svg>
-                        Saved for quick access on your next visit
-                      </span>
                     </div>
                   </div>
 
-                  <!-- Server / Zone ID -->
-                  <div v-show="needsServerId" ref="serverIdRef" class="overflow-hidden">
-                    <label for="server-id" class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1.5">
-                      {{ i18n.t('detail.serverId') }} <span class="text-red-400">*</span>
-                    </label>
-                    <div class="relative">
-                      <div class="absolute left-3.5 top-1/2 -translate-y-1/2 text-surface-400">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4" />
-                        </svg>
-                      </div>
-                      <input
-                        id="server-id"
-                        v-model="serverId"
-                        type="text"
-                        inputmode="numeric"
-                        :placeholder="i18n.t('detail.serverIdPlaceholder')"
-                        class="input-field pl-10 h-11 text-sm"
-                        :disabled="verifying"
-                      />
-                    </div>
-                    <p class="mt-1.5 text-xs text-surface-400 dark:text-surface-500 flex items-center gap-1">
-                      <svg class="w-3 h-3 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M12 2a10 10 0 100 20 10 10 0 000-20z" />
-                      </svg>
-                      {{ i18n.t('detail.serverIdHint') }}
+
+
+                  <!-- Saved Players (localStorage) -->
+                  <div v-if="savedForGame.length > 0 && !verified" ref="savedChipsRef" class="pt-2">
+                    <p class="text-[10px] text-surface-400 dark:text-surface-500 font-medium uppercase tracking-wider mb-2">
+                      Previously Verified
                     </p>
+                    <div class="flex flex-wrap gap-2">
+                      <button
+                        v-for="saved in savedForGame"
+                        :key="saved.playerId + (saved.serverId || '')"
+                        @click="selectSavedPlayer(saved)"
+                        class="saved-chip group inline-flex items-center gap-2 px-3 py-2 rounded-xl border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800 hover:border-primary-300 dark:hover:border-primary-600 hover:bg-primary-50 dark:hover:bg-primary-900/20 transition-all duration-200 text-left"
+                      >
+                        <div class="w-7 h-7 rounded-full bg-gradient-to-br from-emerald-400 to-primary-500 flex items-center justify-center text-white font-bold text-xs shrink-0">
+                          {{ (saved.nickname[0] || '?').toUpperCase() }}
+                        </div>
+                        <div class="min-w-0">
+                          <p class="text-xs font-semibold text-surface-800 dark:text-surface-200 truncate max-w-[120px]">
+                            {{ saved.nickname }}
+                          </p>
+                          <p class="text-[10px] text-surface-400 dark:text-surface-500 font-mono">
+                            {{ saved.playerId }}<span v-if="saved.serverId"> ({{ saved.serverId }})</span>
+                          </p>
+                        </div>
+                        <svg class="w-3.5 h-3.5 text-surface-300 dark:text-surface-600 group-hover:text-primary-400 transition-colors shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+
+                  <!-- Saved Players Badge (when verified but one exists) -->
+                  <div v-if="savedForGame.length > 0 && verified" class="pt-1">
+                    <span class="inline-flex items-center gap-1.5 text-[10px] text-emerald-600 dark:text-emerald-400">
+                      <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M6.267 3.455a3.066 3.066 0 001.745-.723 3.066 3.066 0 013.976 0 3.066 3.066 0 001.745.723 3.066 3.066 0 012.812 2.812c.051.643.304 1.254.723 1.745a3.066 3.066 0 010 3.976 3.066 3.066 0 00-.723 1.745 3.066 3.066 0 01-2.812 2.812 3.066 3.066 0 00-1.745.723 3.066 3.066 0 01-3.976 0 3.066 3.066 0 00-1.745-.723 3.066 3.066 0 01-2.812-2.812 3.066 3.066 0 00-.723-1.745 3.066 3.066 0 010-3.976 3.066 3.066 0 00.723-1.745 3.066 3.066 0 012.812-2.812zm7.44 5.252a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
+                      </svg>
+                      Saved for quick access on your next visit
+                    </span>
                   </div>
 
                   <!-- Verification Error -->

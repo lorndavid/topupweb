@@ -399,7 +399,7 @@ onUnmounted(() => {
       >
         <!-- Slides container -->
         <div
-          class="relative w-full overflow-hidden bg-surface-100 dark:bg-surface-900 aspect-[4/3] sm:aspect-[16/9] lg:aspect-[21/9] min-h-[180px] sm:min-h-[300px] lg:min-h-[360px] touch-pan-y"
+          class="relative w-full overflow-hidden bg-surface-100 dark:bg-surface-900 aspect-[5/3] sm:aspect-[16/9] lg:aspect-[21/9] min-h-[140px] sm:min-h-[220px] lg:min-h-[300px] touch-pan-y"
           @touchstart="handleTouchStart"
           @touchmove="handleTouchMove"
           @touchend="handleTouchEnd"
@@ -434,13 +434,7 @@ onUnmounted(() => {
               <div
                 class="max-w-lg sm:max-w-xl text-left pointer-events-auto"
               >
-                <!-- Badge pill -->
-                <div
-                  class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/20 backdrop-blur-sm border border-white/20 text-white/90 text-[10px] sm:text-xs font-semibold uppercase tracking-[0.15em] mb-3 sm:mb-4"
-                >
-                  <span class="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse"></span>
-                  Official Partner
-                </div>
+                
 
                 <!-- Title -->
                 <h2

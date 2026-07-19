@@ -119,45 +119,7 @@ watch(playerId, () => {
   }
 })
 
-// Multi-step result card reveal
-watch(verified, (val) => {
-  if (val && resultRef.value) {
-    nextTick(() => {
-      const card = resultRef.value
-      if (!card) return
-      const bar = card.querySelector('.result-accent-bar')
-      const avatar = card.querySelector('.result-avatar')
-      const info = card.querySelector('.result-info')
-      const badge = card.querySelector('.result-badge')
-
-      // Step 1: Card entrance with spring
-      gsap.fromTo(
-        card,
-        { opacity: 0, y: 24, scale: 0.93 },
-        { opacity: 1, y: 0, scale: 1, duration: 0.55, ease: 'back.out(1.8)' }
-      )
-
-      // Step 2: Accent bar sweeps in (slightly delayed)
-      if (bar) {
-        gsap.fromTo(bar, { scaleX: 0 }, { scaleX: 1, duration: 0.5, ease: 'power3.out', delay: 0.1 })
-      }
-
-      // Step 3: Content staggers in after card settles
-      const contentItems: HTMLElement[] = []
-      if (avatar) contentItems.push(avatar as HTMLElement)
-      if (info) contentItems.push(info as HTMLElement)
-      if (badge) contentItems.push(badge as HTMLElement)
-
-      if (contentItems.length > 0) {
-        gsap.fromTo(
-          contentItems,
-          { opacity: 0, y: 12 },
-          { opacity: 1, y: 0, duration: 0.35, stagger: 0.08, ease: 'power2.out', delay: 0.2 }
-        )
-      }
-    })
-  }
-})
+// Simple slide-in for verify success card (handled by Transition CSS)
 
 // Smooth error slide-in
 watch(verifyError, (err) => {
@@ -650,7 +612,7 @@ onMounted(() => {
 onUnmounted(() => {
   ScrollTrigger.getAll().forEach((st) => st.kill())
   gsap.killTweensOf('.bg-particle')
-  gsap.killTweensOf('.product-card, .saved-chip, .result-accent-bar, .result-avatar, .result-info, .result-badge')
+  gsap.killTweensOf('.product-card, .saved-chip, .result-accent-bar')
   stopMobilePolling()
 })
 </script>
@@ -711,7 +673,7 @@ onUnmounted(() => {
       <!-- Game Detail -->
       <template v-else-if="gameStore.selectedGame">
         <!-- Game Header -->
-        <div ref="headerRef" class="relative overflow-hidden rounded-2xl bg-gradient-to-br from-surface-900 via-surface-800 to-primary-900 dark:from-surface-950 dark:via-surface-900 dark:to-primary-950 mb-8 p-6 sm:p-8 shadow-xl">
+        <div ref="headerRef" class="relative overflow-hidden rounded-2xl bg-gradient-to-br from-surface-900 via-surface-800 to-primary-900 dark:from-surface-950 dark:via-surface-900 dark:to-primary-950 mb-6 sm:mb-8 p-4 sm:p-6 lg:p-8 shadow-xl max-h-[200px] sm:max-h-[260px]">
           <!-- Background image with parallax overlay -->
           <div class="parallax-header-bg absolute inset-0 opacity-10 will-change-transform">
             <img
@@ -721,9 +683,10 @@ onUnmounted(() => {
             />
           </div>
 
-          <div class="relative flex items-center gap-5 sm:gap-6">
+          <div              class="relative flex items-center gap-4 sm:gap-5"
+            >
             <!-- Game Icon -->
-            <div class="anim-item w-20 h-20 sm:w-24 sm:h-24 rounded-2xl overflow-hidden ring-2 ring-white/20 shadow-lg shrink-0 transform hover:scale-105 transition-transform duration-300">
+            <div class="anim-item w-14 h-14 sm:w-20 sm:h-24 rounded-xl sm:rounded-2xl overflow-hidden ring-2 ring-white/20 shadow-lg shrink-0 transform hover:scale-105 transition-transform duration-300">
               <img
                 :src="gameStore.selectedGame.image_url"
                 :alt="gameStore.selectedGame.name"
@@ -731,31 +694,17 @@ onUnmounted(() => {
               />
             </div>
             <div class="anim-item min-w-0">
-              <div class="inline-flex items-center gap-2 px-2.5 py-1 bg-white/10 backdrop-blur-sm rounded-full text-[10px] font-medium text-white/80 mb-3">
+              <div class="inline-flex items-center gap-1.5 px-2 py-0.5 sm:px-2.5 sm:py-1 bg-white/10 backdrop-blur-sm rounded-full text-[9px] sm:text-[10px] font-medium text-white/80 mb-0">
                 <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
                 {{ gameStore.categories.find(c => c.game_code === gameCode)?.game_fields?.join(' + ') || 'ID' }}
               </div>
-              <h1 class="text-2xl sm:text-3xl lg:text-4xl font-bold text-white">
+              <h1 class="text-lg sm:text-2xl lg:text-3xl font-bold text-white truncate">
                 {{ gameStore.selectedGame.name }}
               </h1>
-              <p class="mt-2 text-sm text-white/60 line-clamp-2 max-w-xl">
+              <p class="mt-1 sm:mt-2 text-xs sm:text-sm text-white/60 line-clamp-1 max-w-xl">
                 {{ gameStore.selectedGame.description }}
               </p>
-              <div class="mt-3 flex items-center gap-3 text-xs">
-                <span class="inline-flex items-center gap-1 text-white/40 font-mono">
-                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
-                  </svg>
-                  {{ gameStore.selectedGame.game_code }}
-                </span>
-                <span class="text-white/30">|</span>
-                <span class="inline-flex items-center gap-1 text-emerald-300/80">
-                  <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
-                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
-                  </svg>
-                  Real-time ID Check
-                </span>
-              </div>
+
             </div>
           </div>
         </div>
@@ -782,7 +731,7 @@ onUnmounted(() => {
               <p class="text-sm text-surface-500 dark:text-surface-400">No packages available yet</p>
             </div>
 
-            <div ref="productsListRef" class="space-y-3">
+            <div ref="productsListRef" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-2 sm:gap-3">
               <ProductCard
                 v-for="product in gameStore.products"
                 :key="product.product_code"
@@ -967,117 +916,59 @@ onUnmounted(() => {
                 </div>
               </div>
 
-              <!-- Verified Player Result Card -->
-              <div
-                v-if="verified && playerNickname"
-                ref="resultRef"
-                class="overflow-hidden rounded-2xl border border-emerald-200/50 dark:border-emerald-800/30 bg-gradient-to-br from-emerald-50/80 to-white dark:from-emerald-900/10 dark:to-surface-900 shadow-lg shadow-emerald-500/5"
-              >
-                <!-- Accent bar -->
-                <div class="result-accent-bar h-1.5 bg-gradient-to-r from-emerald-400 via-emerald-500 to-primary-500 origin-left"></div>
-
-                <div class="p-5 sm:p-6">
-                  <!-- Header -->
-                  <div class="flex items-center justify-between mb-4">
-                    <div class="flex items-center gap-2">
-                      <div class="w-8 h-8 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center">
-                        <svg class="w-4 h-4 text-emerald-600 dark:text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" />
-                        </svg>
-                      </div>
-                      <span class="text-sm font-semibold text-emerald-700 dark:text-emerald-300">
-                        {{ i18n.t('verify.success') }}
-                      </span>
-                    </div>
-                    <span
-                      v-if="playerRegion"
-                      class="inline-flex items-center gap-1 px-2.5 py-1 bg-white dark:bg-surface-800 rounded-full text-[10px] font-semibold uppercase tracking-wider text-surface-600 dark:text-surface-300 border border-surface-200 dark:border-surface-600"
-                    >
-                      <svg class="w-3 h-3 text-primary-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              <!-- Verified Player Result Card (simplified) -->
+              <Transition name="result-card">
+                <div
+                  v-if="verified && playerNickname"
+                  ref="resultRef"
+                  class="overflow-hidden rounded-xl border border-emerald-200/50 dark:border-emerald-800/30 bg-emerald-50/60 dark:bg-emerald-900/10 shadow-sm"
+                >
+                  <div class="flex items-center gap-3 px-4 py-3">
+                    <!-- Simple success checkmark -->
+                    <div class="w-7 h-7 rounded-full bg-emerald-500 flex items-center justify-center shrink-0 shadow-sm">
+                      <svg class="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7" />
                       </svg>
-                      {{ playerRegion }}
-                    </span>
-                  </div>
-
-                  <!-- Player Info -->
-                  <div class="flex items-center gap-4">
-                    <!-- Avatar -->
-                    <div class="result-avatar w-14 h-14 rounded-full bg-gradient-to-br from-emerald-400 to-primary-600 flex items-center justify-center text-white font-bold text-xl shadow-lg shrink-0">
-                      {{ (playerNickname[0] || '?').toUpperCase() }}
                     </div>
-                    <div class="result-info min-w-0 flex-1">
-                      <p class="text-xs text-surface-500 dark:text-surface-400 mb-0.5">{{ i18n.t('verify.nicknamePrefix') }}</p>
-                      <p class="font-bold text-lg text-surface-900 dark:text-surface-100 truncate">
+                    <!-- Nickname in banner -->
+                    <div class="min-w-0 flex-1">
+                      <p class="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium">{{ i18n.t('verify.success') }}</p>
+                      <p class="font-bold text-sm text-emerald-800 dark:text-emerald-200 truncate">
                         {{ playerNickname }}
                       </p>
-                      <p v-if="playerGameTitle" class="text-xs text-surface-400 dark:text-surface-500 mt-0.5">
-                        {{ playerGameTitle }}
-                      </p>
                     </div>
-                  </div>
-
-                  <!-- Provider badge -->
-                  <div v-if="verifyProvider" class="result-badge mt-4 pt-3 border-t border-emerald-200/30 dark:border-emerald-800/20">
-                    <span class="text-[10px] text-surface-400 dark:text-surface-500 font-medium uppercase tracking-wider">
-                      {{ i18n.t('verify.provider.prefix') }}
-                    </span>
-                    
+                    <!-- Region chip (compact) -->
+                    <span
+                      v-if="playerRegion"
+                      class="shrink-0 inline-flex items-center gap-1 px-2 py-0.5 bg-white/60 dark:bg-surface-800/60 rounded-full text-[9px] font-semibold text-surface-500 dark:text-surface-400 border border-surface-200/50 dark:border-surface-700/50"
+                    >
+                      <svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      {{ playerRegion }}                  </span>
                   </div>
                 </div>
-              </div>
+              </Transition>
 
-              <!-- Selected Package Summary -->
-              <div class="bg-white dark:bg-surface-900 rounded-2xl border border-surface-200 dark:border-surface-700 shadow-sm overflow-hidden">
-                <div class="p-5 sm:p-6 space-y-4">
-                  <div class="flex items-center gap-3">
-                    <div class="w-9 h-9 rounded-xl bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center">
-                      <svg class="w-5 h-5 text-amber-600 dark:text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-                      </svg>
-                    </div>
-                    <h3 class="font-semibold text-surface-900 dark:text-surface-100">{{ i18n.t('detail.selectedPackage') }}</h3>
-                  </div>
+              <!-- Desktop Proceed to Checkout (hidden on mobile) -->
+              <Transition name="proceed-btn">
+                <button
+                  ref="proceedBtnRef"
+                  v-if="canProceed"
+                  @click="proceedToCheckout"
+                  class="hidden lg:flex w-full items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-primary-500 to-primary-600 hover:from-primary-600 hover:to-primary-700 text-white font-semibold rounded-xl shadow-lg shadow-primary-500/20 hover:shadow-primary-500/30 transition-all duration-300 active:scale-[0.98] group"
+                >
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                  </svg>
+                  <span>{{ i18n.t('detail.continueCheckout') }}</span>
+                  <svg class="w-4 h-4 group-hover:translate-x-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                  </svg>
+                  <span class="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-700 bg-gradient-to-r from-transparent via-white/20 to-transparent"></span>
+                </button>
+              </Transition>
 
-                  <div v-if="selectedProduct" class="p-4 bg-surface-50 dark:bg-surface-800/50 rounded-xl">
-                    <div class="flex items-center justify-between">
-                      <div class="min-w-0 flex-1">
-                        <p class="font-semibold text-surface-900 dark:text-surface-100 truncate">{{ selectedProduct.name }}</p>
-                        <p class="text-xs text-surface-400 dark:text-surface-500 mt-0.5">{{ selectedProduct.product_code }}</p>
-                      </div>
-                      <div class="ml-4 text-right shrink-0">
-                        <p class="text-xl font-bold text-primary-600 dark:text-primary-400">
-                          {{ formatPrice(selectedProduct.sell_price).formatted }}
-                        </p>
-                        <p class="text-[10px] text-surface-400 dark:text-surface-500 uppercase tracking-wider">{{ formatPrice(selectedProduct.sell_price).code }}</p>
-                      </div>
-                    </div>
-                  </div>
-                  <p v-else class="text-sm text-surface-400 dark:text-surface-500 text-center py-2">
-                    {{ i18n.t('detail.selectPackageHint') }}
-                  </p>
-
-                  <!-- Proceed Button -->
-                  <button
-                    ref="proceedBtnRef"
-                    @click="proceedToCheckout"
-                    :disabled="!canProceed"
-                    class="btn-primary w-full relative overflow-hidden group"
-                    :class="{
-                      'opacity-100': canProceed,
-                    }"
-                  >
-                    <span class="relative z-10 flex items-center justify-center gap-2">
-                      <span>{{ i18n.t('detail.continueCheckout') }}</span>
-                      <svg class="w-4 h-4 group-hover:translate-x-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
-                      </svg>
-                    </span>
-                    <!-- Shine effect -->
-                    <span class="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-700 bg-gradient-to-r from-transparent via-white/20 to-transparent"></span>
-                  </button>
-                </div>
-              </div>
             </div>
           </div>
         </div>
@@ -1085,38 +976,80 @@ onUnmounted(() => {
     </div>
     </div>
 
-    <!-- ═══ Mobile Floating Checkout Bar (appears when product selected + verified) ═══ -->
-    <div
-      v-if="gameStore.selectedGame && canProceed && !mobileCheckoutActive"
-      class="fixed bottom-0 left-0 right-0 z-40 block lg:hidden safe-bottom"
-    >
-      <div class="absolute inset-0 bg-white/90 dark:bg-surface-900/90 backdrop-blur-xl border-t border-surface-200 dark:border-surface-700"></div>
-      <div class="relative flex items-center justify-between px-5 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom,0.75rem))]">
-        <div>
-          <p class="text-[10px] text-surface-400 dark:text-surface-500 uppercase tracking-wider font-medium">Total</p>
-          <p class="text-xl font-bold text-surface-900 dark:text-white">
-            {{ formatPrice(selectedProduct?.sell_price || 0).formatted }}
-            <span class="text-xs text-surface-400 font-normal ml-0.5">{{ formatPrice(selectedProduct?.sell_price || 0).code }}</span>
-          </p>
-          <p v-if="playerNickname" class="text-[11px] text-surface-400 dark:text-surface-500 mt-0.5">
-            {{ playerNickname }}
-          </p>
+    <!-- ═══ Mobile Floating Checkout Bar (phone only — state-aware) ═══ -->
+    <Transition name="float-bar">
+      <div
+        v-if="gameStore.selectedGame && !mobileCheckoutActive"
+        class="fixed bottom-0 left-0 right-0 z-40 block lg:hidden safe-bottom"
+      >
+        <div class="absolute inset-0 bg-white/95 dark:bg-surface-900/95 backdrop-blur-xl border-t border-surface-200 dark:border-surface-700 shadow-2xl shadow-black/5"></div>
+        <div class="relative flex items-center justify-between px-5 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom,0.75rem))]">
+          <!-- Left: state message or total -->
+          <div class="min-w-0 flex-1">
+            <!-- Not verified yet -->
+            <template v-if="!verified">
+              <p class="text-[10px] text-surface-400 dark:text-surface-500 uppercase tracking-wider font-medium">Need to Verify</p>
+              <p class="text-sm font-semibold text-surface-500 dark:text-surface-400 truncate flex items-center gap-1.5">
+                <svg class="w-3.5 h-3.5 text-amber-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                Enter your Player ID first
+              </p>
+            </template>
+            <!-- Verified but no package selected -->
+            <template v-else-if="!selectedProduct">
+              <p class="text-[10px] text-surface-400 dark:text-surface-500 uppercase tracking-wider font-medium">Almost Done</p>
+              <p class="text-sm font-semibold text-primary-500 dark:text-primary-400 truncate flex items-center gap-1.5">
+                <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                </svg>
+                Select a package below
+              </p>
+            </template>
+            <!-- Verified + package selected: show total -->
+            <template v-else>
+              <p class="text-[10px] text-surface-400 dark:text-surface-500 uppercase tracking-wider font-medium">Total</p>
+              <p class="text-xl font-bold text-surface-900 dark:text-white">
+                {{ formatPrice(selectedProduct.sell_price).formatted }}
+                <span class="text-xs text-surface-400 font-normal ml-0.5">{{ formatPrice(selectedProduct.sell_price).code }}</span>
+              </p>
+              <p v-if="playerNickname" class="text-[11px] text-surface-400 dark:text-surface-500 mt-0.5 truncate">
+                {{ playerNickname }}
+              </p>
+            </template>
+          </div>
+
+          <!-- Right: action button -->
+          <div class="shrink-0 ml-3">
+            <button
+              v-if="canProceed"
+              @click="handleMobileCheckout"
+              class="px-6 py-2.5 bg-gradient-to-r from-primary-500 to-primary-600 hover:from-primary-600 hover:to-primary-700 text-white font-semibold rounded-2xl shadow-lg shadow-primary-500/30 active:scale-[0.97] transition-all duration-200 text-sm flex items-center gap-2"
+            >
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              Pay Now
+            </button>
+            <button
+              v-else
+              :disabled="!verified"
+              class="px-5 py-2.5 rounded-2xl text-sm font-semibold transition-all duration-200 flex items-center gap-1.5"
+              :class="verified
+                ? 'bg-surface-100 dark:bg-surface-800 text-surface-400 dark:text-surface-500'
+                : 'bg-primary-500/10 text-primary-500/70'
+              "
+            >
+              <span>{{ verified ? 'Select Package' : 'Verify ID' }}</span>
+            </button>
+          </div>
         </div>
-        <button
-          @click="handleMobileCheckout"
-          class="px-8 py-3 bg-gradient-to-r from-primary-500 to-primary-600 hover:from-primary-600 hover:to-primary-700 text-white font-semibold rounded-2xl shadow-lg shadow-primary-500/30 active:scale-[0.97] transition-all duration-200 text-sm flex items-center gap-2"
-        >
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-          Pay Now
-        </button>
       </div>
-    </div>
+    </Transition>
 
     <!-- Spacer for mobile floating bar -->
-    <div v-if="gameStore.selectedGame && canProceed && !mobileCheckoutActive" class="h-20 lg:hidden"></div>
+    <div v-if="gameStore.selectedGame && !mobileCheckoutActive" class="h-20 lg:hidden"></div>
 
     <!-- ═══ Mobile KHQR Bottom Sheet ═══ -->
     <Teleport to="body">
@@ -1304,5 +1237,83 @@ onUnmounted(() => {
 .product-card {
   /* Initial state is set by GSAP; this ensures a static fallback */
   will-change: transform, opacity;
+}
+
+/* ─── Floating bar enter/leave transitions ─── */
+.float-bar-enter-active {
+  transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1),
+              opacity 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.float-bar-leave-active {
+  transition: transform 0.25s ease-in,
+              opacity 0.25s ease-in;
+}
+
+.float-bar-enter-from {
+  transform: translateY(100%);
+  opacity: 0;
+}
+
+.float-bar-leave-to {
+  transform: translateY(100%);
+  opacity: 0;
+}
+
+.float-bar-enter-to {
+  transform: translateY(0);
+  opacity: 1;
+}
+
+/* ─── Desktop proceed button slide-up ─── */
+.proceed-btn-enter-active {
+  transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1),
+              opacity 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.proceed-btn-leave-active {
+  transition: transform 0.2s ease-in,
+              opacity 0.2s ease-in;
+}
+
+.proceed-btn-enter-from {
+  transform: translateY(12px);
+  opacity: 0;
+}
+
+.proceed-btn-leave-to {
+  transform: translateY(-8px);
+  opacity: 0;
+}
+
+.proceed-btn-enter-to {
+  transform: translateY(0);
+  opacity: 1;
+}
+
+/* ─── Verify result card slide-in ─── */
+.result-card-enter-active {
+  transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1),
+              opacity 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.result-card-leave-active {
+  transition: transform 0.2s ease-in,
+              opacity 0.2s ease-in;
+}
+
+.result-card-enter-from {
+  transform: translateY(-12px) scale(0.97);
+  opacity: 0;
+}
+
+.result-card-leave-to {
+  transform: translateY(-8px) scale(0.97);
+  opacity: 0;
+}
+
+.result-card-enter-to {
+  transform: translateY(0) scale(1);
+  opacity: 1;
 }
 </style>

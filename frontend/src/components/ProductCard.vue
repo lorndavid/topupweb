@@ -48,9 +48,7 @@ const khrPrice = useFormattedPrice(props.product.sell_price)
       ]">
         {{ product.name }}
       </p>
-      <p class="mt-0.5 text-xs text-surface-400 dark:text-surface-500 font-mono">
-        {{ product.product_code }}
-      </p>
+
     </div>
 
     <!-- Price -->

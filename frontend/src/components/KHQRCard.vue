@@ -108,16 +108,8 @@ function playDownloadSound() {
   } catch { /* silent */ }
 }
 
-// ─── Check if native share + files are available ──────────
-const canShare = computed(() => {
-  try {
-    return !!navigator.share && !!navigator.canShare &&
-      navigator.canShare({ files: [new File([''], 't.png', { type: 'image/png' })] })
-  } catch { return false }
-})
-
 // ─── Capture the clean KHQR content (header + merchant/amount + QR) ──
-//     Excludes action buttons (pay/scan/download/share/cancel) from the output.
+//     Excludes action buttons (pay/scan/download/cancel) from the output.
 async function captureKHQRCanvas(): Promise<HTMLCanvasElement | null> {
   if (!khqrCaptureRef.value) return null
   try {
@@ -127,34 +119,6 @@ async function captureKHQRCanvas(): Promise<HTMLCanvasElement | null> {
       backgroundColor: '#ffffff',
     })
   } catch { return null }
-}
-
-// ─── Share card via native share sheet ─────────────────────
-async function handleShareQR() {
-  const canvas = await captureKHQRCanvas()
-  if (!canvas) return
-  try {
-    const blob = await new Promise<Blob | null>((resolve) =>
-      canvas.toBlob(resolve, 'image/png')
-    )
-    if (!blob) return
-    const file = new File(
-      [blob],
-      'khqr-payment-' + props.merchantName.replace(/\s+/g, '-').toLowerCase() + '.png',
-      { type: 'image/png' }
-    )
-    await navigator.share({
-      title: 'KHQR Payment - ' + props.merchantName,
-      text: 'Pay $' + props.amount.toFixed(2) + ' with any Cambodian banking app',
-      files: [file],
-    })
-    toast.success('KHQR card shared successfully')
-  } catch (err: any) {
-    // User cancelled share — not an error
-    if (err?.name !== 'AbortError') {
-      toast.error('Failed to share: ' + (err?.message || 'unknown error'))
-    }
-  }
 }
 
 // ─── Download clean KHQR card as image ───────────────────────
@@ -226,9 +190,9 @@ async function handleDownloadQR() {
           :class="isMobile ? 'rounded-t-2xl shadow-2xl' : 'rounded-2xl shadow-2xl'"
         >
           <!-- ═══ CAPTURE CONTENT (header + merchant/amount + QR) ═══ -->
-          <!--     This section is captured by html2canvas for download/share.
+          <!--     This section is captured by html2canvas for download.
                It contains ONLY the KHQR header, merchant name, amount, and QR code.
-               Action buttons (pay/scan/download/share/cancel) stay OUTSIDE this ref
+               Action buttons (pay/scan/download/cancel) stay OUTSIDE this ref
                so they never appear in the downloaded image. -->
           <div ref="khqrCaptureRef">
             <!-- Red Header with KHQR icon -->
@@ -333,32 +297,17 @@ async function handleDownloadQR() {
             <!-- Three-row Actions Section (only show when pending) -->
             <div v-if="paymentStatus === 'pending' || !paymentStatus" class="text-center space-y-3">
               <p class="text-xs text-gray-500 font-medium">Pay with any Cambodian banking app</p>
-              <div class="flex items-center gap-3">
-                <div class="flex-1 h-px bg-gray-200"></div>
-                <span class="text-[10px] text-gray-300 uppercase tracking-wider font-medium">or</span>
-                <div class="flex-1 h-px bg-gray-200"></div>
-              </div>
-              <div class="flex items-center justify-center gap-2">
+              <div class="flex items-center justify-center">
                 <button
                   @click="handleDownloadQR"
-                  class="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-200 hover:border-gray-300 hover:bg-gray-50 transition-all duration-200 group"
+                  class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl border-2 border-red-500/20 bg-red-50 hover:bg-red-100 hover:border-red-500/40 transition-all duration-200 group"
                 >
                   <img
                     src="https://checkout.payway.com.kh/images/download-icon-khqr.svg"
                     alt="Download"
-                    class="w-4 h-4 opacity-50 group-hover:opacity-80 transition-opacity"
+                    class="w-5 h-5 opacity-60 group-hover:opacity-100 transition-opacity"
                   />
-                  <span class="text-xs font-medium text-gray-500 group-hover:text-gray-700 transition-colors">Download QR</span>
-                </button>
-                <button
-                  v-if="canShare"
-                  @click="handleShareQR"
-                  class="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-200 hover:border-gray-300 hover:bg-gray-50 transition-all duration-200 group"
-                >
-                  <svg class="w-4 h-4 text-gray-400 group-hover:text-gray-600 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
-                  </svg>
-                  <span class="text-xs font-medium text-gray-500 group-hover:text-gray-700 transition-colors">Share</span>
+                  <span class="text-sm font-semibold text-red-600 group-hover:text-red-700 transition-colors">Download QR</span>
                 </button>
               </div>
             </div>

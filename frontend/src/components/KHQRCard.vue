@@ -68,7 +68,7 @@ function handleCheckout() {
         gsap.fromTo(
           qrContainerRef.value,
           { opacity: 0, scale: 0.85 },
-          { opacity: 1, scale: 1, duration: 0.4, delay: 0.25, ease: 'back.out(1.7)' }
+          { opacity: 1, scale: 1, duration: ANIM_TIMING.enterDuration, delay: 0.25, ease: 'back.out(1.7)' }
         )
       }
     })

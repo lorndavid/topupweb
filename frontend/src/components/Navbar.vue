@@ -3,6 +3,7 @@ import { ref, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { preferredCurrency, toggleCurrency } from '@/composables/useCurrency'
 import gsap from 'gsap'
+import { ANIM_TIMING } from '@/composables/useAnimationTiming'
 
 const props = defineProps<{
   isDark: boolean
@@ -28,7 +29,7 @@ function animateLogoEntrance() {
   gsap.fromTo(
     logoRef.value,
     { opacity: 0, y: -10, scale: 0.85, rotate: -5 },
-    { opacity: 1, y: 0, scale: 1, rotate: 0, duration: 0.4, ease: 'back.out(1.7)', delay: 0.15 }
+    { opacity: 1, y: 0, scale: 1, rotate: 0, duration: ANIM_TIMING.enterDuration, ease: 'back.out(1.7)', delay: 0.15 }
   )
 }
 

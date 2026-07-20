@@ -1,5 +1,14 @@
 /* ═══ Tailwind directives handled via CDN in index.html ═══ */
 
+/* ─── Centralized animation timing tokens ─── */
+:root {
+  --anim-enter-duration: 0.4s;
+  --anim-leave-duration: 0.25s;
+  --anim-enter-ease: cubic-bezier(0.16, 1, 0.3, 1);
+  --anim-leave-ease: ease-in;
+  --anim-backdrop-duration: 0.3s;
+}
+
 @layer base {
   /*
    * Universal selector border colors — using theme() instead of @apply

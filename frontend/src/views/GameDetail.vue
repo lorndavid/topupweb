@@ -1219,15 +1219,14 @@ onUnmounted(() => {
   will-change: transform, opacity;
 }
 
-/* ─── Floating bar enter/leave transitions ─── */
-.float-bar-enter-active {
-  transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1),
-              opacity 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+/* ─── Floating bar enter/leave transitions ─── */.float-bar-enter-active {
+  transition: transform var(--anim-enter-duration) var(--anim-enter-ease),
+               opacity var(--anim-enter-duration) var(--anim-enter-ease);
 }
 
 .float-bar-leave-active {
-  transition: transform 0.25s ease-in,
-              opacity 0.25s ease-in;
+  transition: transform var(--anim-leave-duration) var(--anim-leave-ease),
+               opacity var(--anim-leave-duration) var(--anim-leave-ease);
 }
 
 .float-bar-enter-from {
@@ -1246,13 +1245,13 @@ onUnmounted(() => {
 }
 
 /* ─── Desktop proceed button slide-up ─── */.proceed-btn-enter-active {
-  transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1),
-               opacity 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: transform var(--anim-enter-duration) var(--anim-enter-ease),
+               opacity var(--anim-enter-duration) var(--anim-enter-ease);
 }
 
 .proceed-btn-leave-active {
-  transition: transform 0.25s ease-in,
-               opacity 0.25s ease-in;
+  transition: transform var(--anim-leave-duration) var(--anim-leave-ease),
+               opacity var(--anim-leave-duration) var(--anim-leave-ease);
 }
 
 .proceed-btn-enter-from {
@@ -1294,8 +1293,8 @@ onUnmounted(() => {
     opacity: 1;
   }
 }.result-card-leave-active {
-  transition: transform 0.25s ease-in,
-               opacity 0.25s ease-in;
+  transition: transform var(--anim-leave-duration) var(--anim-leave-ease),
+               opacity var(--anim-leave-duration) var(--anim-leave-ease);
 }
 
 .result-card-leave-to {
@@ -1426,10 +1425,10 @@ onUnmounted(() => {
 
 /* ─── KHQR backdrop fade transition (unified 0.3s) ─── */
 .khqr-backdrop-enter-active {
-  transition: opacity 0.3s ease-out;
+  transition: opacity var(--anim-backdrop-duration) ease-out;
 }
 .khqr-backdrop-leave-active {
-  transition: opacity 0.25s ease-in;
+  transition: opacity var(--anim-leave-duration) var(--anim-leave-ease);
 }
 .khqr-backdrop-enter-from,
 .khqr-backdrop-leave-to {
@@ -1439,14 +1438,13 @@ onUnmounted(() => {
   opacity: 1;
 }
 
-/* ─── KHQR bottom sheet slide-up (unified 0.4s with spring easing) ─── */
-.khqr-sheet-enter-active {
-  transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1),
-              opacity 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+/* ─── KHQR bottom sheet slide-up (unified 0.4s with spring easing) ─── */.khqr-sheet-enter-active {
+  transition: transform var(--anim-enter-duration) var(--anim-enter-ease),
+               opacity var(--anim-enter-duration) var(--anim-enter-ease);
 }
 .khqr-sheet-leave-active {
-  transition: transform 0.25s ease-in,
-              opacity 0.25s ease-in;
+  transition: transform var(--anim-leave-duration) var(--anim-leave-ease),
+               opacity var(--anim-leave-duration) var(--anim-leave-ease);
 }
 .khqr-sheet-enter-from {
   transform: translateY(100%);

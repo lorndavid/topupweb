@@ -10,6 +10,7 @@ import { usePaymentWebSocket } from '@/composables/usePaymentWebSocket'
 import KHQRCard from '@/components/KHQRCard.vue'
 import ReceiptCard from '@/components/ReceiptCard.vue'
 import gsap from 'gsap'
+import { ANIM_TIMING } from '@/composables/useAnimationTiming'
 
 const router = useRouter()
 const gameStore = useGameStore()
@@ -59,8 +60,8 @@ function animateFloatingBarIn(el: HTMLElement) {
     {
       y: 0,
       opacity: 1,
-      duration: 0.4,
-      ease: 'cubic-bezier(0.16, 1, 0.3, 1)',
+      duration: ANIM_TIMING.enterDuration,
+      ease: ANIM_TIMING.enterEase,
       clearProps: 'transform',
     }
   )

@@ -44,7 +44,7 @@ const TRANSITION_PROPS: Record<string, {
     enterDuration: '400ms',
     enterEase: 'cubic-bezier(0.33, 1, 0.68, 1)',
     leaveTransform: (dir = 1) => `translateX(${dir * -30}px) scale(0.96)`,
-    leaveDuration: '220ms',
+    leaveDuration: '250ms',
     leaveEase: 'ease-in',
   },
   fade: {
@@ -239,9 +239,10 @@ onMounted(() => {
  * ════════════════════════════════════════════════════════════ */
 
 /* ─── Leave: current page exits ─── */
+/* Fallback chain: --page-leave-duration → --anim-leave-duration → 250ms */
 .page-leave-active {
-  transition: opacity var(--page-leave-duration, 220ms) var(--page-leave-ease, ease-in),
-              transform var(--page-leave-duration, 220ms) var(--page-leave-ease, ease-in);
+  transition: opacity var(--page-leave-duration, var(--anim-leave-duration, 250ms)) var(--page-leave-ease, var(--anim-leave-ease, ease-in)),
+              transform var(--page-leave-duration, var(--anim-leave-duration, 250ms)) var(--page-leave-ease, var(--anim-leave-ease, ease-in));
 }
 
 .page-leave-to {
@@ -250,9 +251,10 @@ onMounted(() => {
 }
 
 /* ─── Enter: new page arrives ─── */
+/* Fallback chain: --page-enter-duration → --anim-enter-duration → 400ms */
 .page-enter-active {
-  transition: opacity var(--page-enter-duration, 400ms) var(--page-enter-ease, cubic-bezier(0.33, 1, 0.68, 1)),
-              transform var(--page-enter-duration, 400ms) var(--page-enter-ease, cubic-bezier(0.33, 1, 0.68, 1));
+  transition: opacity var(--page-enter-duration, var(--anim-enter-duration, 0.4s)) var(--page-enter-ease, cubic-bezier(0.33, 1, 0.68, 1)),
+              transform var(--page-enter-duration, var(--anim-enter-duration, 0.4s)) var(--page-enter-ease, cubic-bezier(0.33, 1, 0.68, 1));
 }
 
 .page-enter-from {
@@ -324,11 +326,13 @@ onMounted(() => {
 }
 
 /* ─── Loading overlay fade transition ─── */
+/* Enter is intentionally fast (0.15s) so the spinner appears immediately */
 .loading-fade-enter-active {
   transition: opacity 0.15s ease-out;
 }
+/* Leave uses centralized leave duration/easing for consistency */
 .loading-fade-leave-active {
-  transition: opacity 0.25s ease-in;
+  transition: opacity var(--anim-leave-duration) var(--anim-leave-ease);
 }
 .loading-fade-enter-from,
 .loading-fade-leave-to {

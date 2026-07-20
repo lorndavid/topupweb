@@ -3,6 +3,7 @@ import { ref, computed, nextTick, onMounted, onUnmounted } from 'vue'
 import gsap from 'gsap'
 import html2canvas from 'html2canvas'
 import { useToastStore } from '@/stores/toast'
+import { ANIM_TIMING } from '@/composables/useAnimationTiming'
 
 const props = defineProps<{
   merchantName: string
@@ -60,7 +61,7 @@ function handleCheckout() {
         gsap.fromTo(
           cardRef.value,
           { opacity: 0, y: 30, scale: 0.97 },
-          { opacity: 1, y: 0, scale: 1, duration: 0.4, ease: 'back.out(1.7)' }
+          { opacity: 1, y: 0, scale: 1, duration: ANIM_TIMING.enterDuration, ease: 'back.out(1.7)' }
         )
       }
       if (qrContainerRef.value) {
@@ -358,10 +359,10 @@ async function handleDownloadQR() {
 @media (max-width: 639px) {
   /* Backdrop fade */
   .khqr-bg-enter-active {
-    transition: opacity 0.3s ease-out;
+    transition: opacity var(--anim-backdrop-duration) ease-out;
   }
   .khqr-bg-leave-active {
-    transition: opacity 0.25s ease-in;
+    transition: opacity var(--anim-leave-duration) var(--anim-leave-ease);
   }
   .khqr-bg-enter-from,
   .khqr-bg-leave-to {
@@ -373,12 +374,12 @@ async function handleDownloadQR() {
 
   /* Bottom sheet slide (0.4s, spring easing, includes opacity) */
   .khqr-bs-enter-active {
-    transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1),
-                opacity 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+    transition: transform var(--anim-enter-duration) var(--anim-enter-ease),
+                opacity var(--anim-enter-duration) var(--anim-enter-ease);
   }
   .khqr-bs-leave-active {
-    transition: transform 0.25s ease-in,
-                opacity 0.25s ease-in;
+    transition: transform var(--anim-leave-duration) var(--anim-leave-ease),
+                opacity var(--anim-leave-duration) var(--anim-leave-ease);
   }
   .khqr-bs-enter-from {
     transform: translateY(100%);

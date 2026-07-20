@@ -3,12 +3,28 @@ import type { GameProduct } from '@/types'
 import { useFormattedPrice } from '@/composables/useCurrency'
 import { getGameCurrency, extractAmount } from '@/utils/gameCurrency'
 
+type ProductBadge = 'best-value' | 'most-popular' | null
+
 const props = defineProps<{
   product: GameProduct
   selected?: boolean
   gameCode?: string
   gameImageUrl?: string
+  badge?: ProductBadge
 }>()
+
+const badgeConfig: Record<NonNullable<ProductBadge>, { label: string; bg: string; icon: string }> = {
+  'best-value': {
+    label: 'Best Value',
+    bg: 'from-emerald-500 to-emerald-600 shadow-emerald-500/30',
+    icon: 'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z',
+  },
+  'most-popular': {
+    label: 'Most Popular',
+    bg: 'from-amber-500 to-orange-500 shadow-amber-500/30',
+    icon: 'M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z',
+  },
+}
 
 const emit = defineEmits<{
   select: []
@@ -29,6 +45,24 @@ const amount = extractAmount(props.product.name)
         : 'border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-900 hover:border-primary-300 dark:hover:border-primary-700 hover:shadow-lg hover:shadow-primary-500/5 hover:-translate-y-0.5'
     ]"
   >
+    <!-- Badge ribbon (top-left corner) -->
+    <div
+      v-if="badge"
+      class="absolute -top-0.5 -left-0.5 z-10"
+    >
+      <div
+        :class="[
+          'inline-flex items-center gap-1 px-1.5 py-0.5 rounded-br-lg text-[9px] font-bold text-white bg-gradient-to-r shadow-lg',
+          badgeConfig[badge].bg
+        ]"
+      >
+        <svg class="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 24 24">
+          <path :d="badgeConfig[badge].icon" />
+        </svg>
+        {{ badgeConfig[badge].label }}
+      </div>
+    </div>
+
     <!-- Selected glow ring -->
     <div
       v-if="selected"

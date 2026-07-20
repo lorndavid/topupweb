@@ -1,13 +1,16 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18nStore } from '@/stores/i18n'
-import { getOrdersByPlayer } from '@/services/api'
+import { useGameStore } from '@/stores/game'
+import { getOrdersByPlayer, getCategories } from '@/services/api'
+import { getGameCurrency } from '@/utils/gameCurrency'
 import type { OrderResponse } from '@/types'
 import gsap from 'gsap'
 
 const router = useRouter()
 const i18n = useI18nStore()
+const gameStore = useGameStore()
 
 const playerIdInput = ref('')
 const orders = ref<OrderResponse[]>([])
@@ -20,18 +23,45 @@ const totalSpent = computed(() =>
   orders.value.reduce((sum, o) => sum + o.amount, 0)
 )
 
+function gameImageUrl(gameCode: string): string {
+  const cat = gameStore.categories.find((c) => c.game_code === gameCode)
+  return cat?.image_url || ''
+}
+
 function statusColor(status: string): string {
   switch (status) {
-    case 'completed': return 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800'
+    case 'completed': return 'bg-emerald-500/15 text-emerald-300 border-emerald-500/25'
     case 'paid':
-    case 'processing': return 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800'
+    case 'processing': return 'bg-blue-500/15 text-blue-300 border-blue-500/25'
     case 'pending':
-    case 'awaiting_payment': return 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800'
-    case 'awaiting_stock': return 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800'
+    case 'awaiting_payment': return 'bg-amber-500/15 text-amber-300 border-amber-500/25'
+    case 'awaiting_stock': return 'bg-purple-500/15 text-purple-300 border-purple-500/25'
     case 'failed':
-    case 'cancelled': return 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 border-red-200 dark:border-red-800'
-    default: return 'bg-surface-100 dark:bg-surface-800 text-surface-600 dark:text-surface-400'
+    case 'cancelled': return 'bg-red-500/15 text-red-300 border-red-500/25'
+    default: return 'bg-white/5 text-white/40 border-white/10'
   }
+}
+
+function statusIcon(status: string): string {
+  switch (status) {
+    case 'completed': return 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z'
+    case 'paid':
+    case 'processing': return 'M13 10V3L4 14h7v7l9-11h-7z'
+    case 'pending':
+    case 'awaiting_payment': return 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z'
+    case 'awaiting_stock': return 'M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4'
+    case 'failed':
+    case 'cancelled': return 'M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z'
+    default: return 'M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z'
+  }
+}
+
+function statusLabel(status: string): string {
+  const key = `order.status.${status}` as const
+  const translated = (i18n.t as (k: string) => string)(key)
+  // If translation returns the key itself, fall back to formatted status
+  if (translated === key) return status.replace(/_/g, ' ')
+  return translated
 }
 
 async function handleSearch() {
@@ -50,8 +80,8 @@ async function handleSearch() {
       if (cards.length > 0) {
         gsap.fromTo(
           cards,
-          { opacity: 0, y: 20 },
-          { opacity: 1, y: 0, duration: 0.4, stagger: 0.06, ease: 'power2.out' }
+          { opacity: 0, y: 20, scale: 0.97 },
+          { opacity: 1, y: 0, scale: 1, duration: 0.4, stagger: 0.07, ease: 'power2.out' }
         )
       }
     }, 50)
@@ -76,6 +106,22 @@ function formatDate(dateStr: string): string {
     return dateStr
   }
 }
+
+function navigateToGame(gameCode: string) {
+  router.push(`/game/${gameCode}`)
+}
+
+// Pre-load categories for game image lookups
+onMounted(async () => {
+  if (gameStore.categories.length === 0) {
+    try {
+      const cats = await getCategories()
+      gameStore.categories = cats
+    } catch {
+      // Silent — images will be empty but the page still works
+    }
+  }
+})
 </script>
 
 <template>
@@ -195,23 +241,46 @@ function formatDate(dateStr: string): string {
         <div
           v-for="order in orders"
           :key="order.reference"
-          class="order-card rounded-2xl bg-white/[0.04] border border-white/10 hover:border-white/20 transition-all duration-300 overflow-hidden cursor-pointer hover:bg-white/[0.06]"
-          @click="router.push(`/order/${order.reference}`)"
+          class="order-card group relative rounded-2xl bg-white/[0.04] border border-white/10 hover:border-white/20 transition-all duration-300 overflow-hidden"
         >
-          <div class="p-5">
-            <!-- Top row: Game + Status -->
+          <!-- Clickable area (entire card except action buttons) -->
+          <div
+            class="p-5 pb-3 cursor-pointer"
+            @click="router.push(`/order/${order.reference}`)"
+          >
+            <!-- Top row: Game icon + Name + Status -->
             <div class="flex items-start justify-between mb-3">
-              <div class="min-w-0 flex-1 mr-3">
-                <p class="font-semibold text-white/90 truncate">{{ order.game_name }}</p>
-                <p class="text-xs text-white/40 mt-0.5 truncate">{{ order.product_name }}</p>
+              <div class="flex items-center gap-3 min-w-0 flex-1 mr-3">
+                <!-- Game icon -->
+                <div
+                  v-if="gameImageUrl(order.game_code)"
+                  class="shrink-0 w-9 h-9 sm:w-10 sm:h-10 rounded-xl overflow-hidden ring-1 ring-white/10"
+                >
+                  <img
+                    :src="gameImageUrl(order.game_code)"
+                    :alt="order.game_name"
+                    class="w-full h-full object-cover"
+                    loading="lazy"
+                  />
+                </div>
+                <div class="min-w-0">
+                  <p class="font-semibold text-white/90 truncate flex items-center gap-2">
+                    {{ order.game_name }}
+                    <span class="text-[9px] font-mono text-white/20 uppercase">{{ order.game_code }}</span>
+                  </p>
+                  <p class="text-xs text-white/40 mt-0.5 truncate">{{ order.product_name }}</p>
+                </div>
               </div>
               <span
                 :class="[
-                  'shrink-0 px-2.5 py-1 rounded-full text-[10px] font-semibold border capitalize',
+                  'shrink-0 inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-semibold border capitalize',
                   statusColor(order.order_status)
                 ]"
               >
-                {{ order.order_status.replace('_', ' ') }}
+                <svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" :d="statusIcon(order.order_status)" />
+                </svg>
+                {{ statusLabel(order.order_status) }}
               </span>
             </div>
 
@@ -219,11 +288,14 @@ function formatDate(dateStr: string): string {
             <div class="grid grid-cols-2 gap-y-2 gap-x-4 text-xs">
               <div>
                 <span class="text-white/30">Reference</span>
-                <p class="font-mono text-white/60 mt-0.5 truncate">{{ order.reference }}</p>
+                <p class="font-mono text-white/60 mt-0.5 truncate text-[10px]">{{ order.reference }}</p>
               </div>
               <div class="text-right">
                 <span class="text-white/30">Amount</span>
-                <p class="font-bold text-amber-300 mt-0.5">${{ order.amount.toFixed(2) }}</p>
+                <p class="font-bold text-amber-300 mt-0.5">
+                  ${{ order.amount.toFixed(2) }}
+                  <span class="text-[9px] font-normal text-amber-300/60 ml-0.5">{{ getGameCurrency(order.game_code) }}</span>
+                </p>
               </div>
               <div>
                 <span class="text-white/30">Player ID</span>
@@ -231,7 +303,7 @@ function formatDate(dateStr: string): string {
               </div>
               <div class="text-right">
                 <span class="text-white/30">Date</span>
-                <p class="text-white/60 mt-0.5">{{ formatDate(order.created_at) }}</p>
+                <p class="text-white/60 mt-0.5 text-[10px]">{{ formatDate(order.created_at) }}</p>
               </div>
             </div>
 
@@ -242,14 +314,28 @@ function formatDate(dateStr: string): string {
             </div>
           </div>
 
-          <!-- Bottom arrow hint -->
-          <div class="px-5 pb-3 flex justify-end">
-            <span class="text-[10px] text-white/20 flex items-center gap-1 hover:text-amber-300/50 transition-colors">
+          <!-- Bottom action row -->
+          <div class="px-5 pb-3 flex items-center justify-between">
+            <span
+              class="text-[10px] text-white/20 flex items-center gap-1 cursor-pointer hover:text-amber-300/50 transition-colors"
+              @click="router.push(`/order/${order.reference}`)"
+            >
               View details
               <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
               </svg>
             </span>
+
+            <!-- Top Up Again button -->
+            <button
+              @click.stop="navigateToGame(order.game_code)"
+              class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-semibold bg-gradient-to-r from-amber-500/20 to-amber-600/10 border border-amber-500/20 text-amber-300 hover:from-amber-500/30 hover:to-amber-600/20 hover:border-amber-500/30 active:scale-95 transition-all duration-200"
+            >
+              <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+              </svg>
+              Top Up Again
+            </button>
           </div>
         </div>
       </div>

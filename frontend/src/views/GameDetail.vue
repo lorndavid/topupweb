@@ -10,7 +10,7 @@ import { verifyPlayer, createPayment, getPaymentStatus, cancelOrder, getOrder } 
 import type { GameProduct } from '@/types'
 import { useSavedPlayers } from '@/composables/useSavedPlayers'
 import { formatPrice } from '@/composables/useCurrency'
-import { getGameCurrency } from '@/utils/gameCurrency'
+import { getGameCurrency, extractAmount } from '@/utils/gameCurrency'
 import { usePaymentWebSocket } from '@/composables/usePaymentWebSocket'
 import ReceiptCard from '@/components/ReceiptCard.vue'
 import gsap from 'gsap'
@@ -78,6 +78,69 @@ const gameCurrency = computed(() => getGameCurrency(gameCode.value))
 const gameImageUrl = computed(() => gameStore.selectedGame?.image_url || '')
 
 // ─── Product stagger reveal (one-shot guard prevents re-trigger flash) ───
+type ProductBadge = 'best-value' | 'most-popular' | null
+type SortMode = 'default' | 'most-popular' | 'best-value' | 'cheapest'
+
+const activeSort = ref<SortMode>('default')
+
+/** Compute price-per-unit for every product (shared by badges + sort) */
+const productsWithPPU = computed(() => {
+  return gameStore.products.map((p) => ({
+    product: p,
+    amount: parseFloat(extractAmount(p.name)),
+    ppu: (() => {
+      const amt = parseFloat(extractAmount(p.name))
+      return amt > 0 ? p.sell_price / amt : Infinity
+    })(),
+  }))
+})
+
+/** Sorted products based on active sort mode */
+const sortedProducts = computed(() => {
+  const items = [...productsWithPPU.value]
+  if (activeSort.value === 'cheapest') {
+    items.sort((a, b) => a.product.sell_price - b.product.sell_price)
+  } else if (activeSort.value === 'best-value') {
+    items.sort((a, b) => a.ppu - b.ppu)
+  } else if (activeSort.value === 'most-popular') {
+    // Push the most-popular-badged product to the very top, then PPU ascending
+    const badges = productBadges.value
+    items.sort((a, b) => {
+      const aPopular = badges.get(a.product.product_code) === 'most-popular' ? -1 : 0
+      const bPopular = badges.get(b.product.product_code) === 'most-popular' ? -1 : 0
+      if (aPopular !== bPopular) return aPopular - bPopular
+      return a.ppu - b.ppu
+    })
+  }
+  // 'default' keeps original API order
+  return items.map((i) => i.product)
+})
+
+const productBadges = computed<Map<string, ProductBadge>>(() => {
+  const map = new Map<string, ProductBadge>()
+  const items = productsWithPPU.value
+  const valid = items.filter((i) => i.amount > 0)
+  if (valid.length < 3) return map
+
+  // Sort by price per unit ascending
+  const sorted = [...valid].sort((a, b) => a.ppu - b.ppu)
+
+  // Best Value = lowest price per unit
+  map.set(sorted[0].product.product_code, 'best-value')
+
+  // Most Popular = middle of the sorted list
+  const midIdx = Math.floor((sorted.length - 1) / 2)
+  const midCode = sorted[midIdx].product.product_code
+  const bestCode = sorted[0].product.product_code
+  if (midCode !== bestCode) {
+    map.set(midCode, 'most-popular')
+  } else if (sorted.length > 1) {
+    map.set(sorted[1].product.product_code, 'most-popular')
+  }
+
+  return map
+})
+
 const staggerDone = ref(false)
 
 watch(
@@ -720,6 +783,47 @@ onUnmounted(() => {
               </span>
             </div>
 
+            <!-- Sort / Filter chips -->
+            <div class="flex items-center gap-2 overflow-x-auto pb-1 hide-scrollbar">
+              <button
+                v-for="opt in ([{ mode: 'default' as SortMode, label: 'Default' }, { mode: 'most-popular' as SortMode, label: 'Most Popular' }, { mode: 'best-value' as SortMode, label: 'Best Value' }, { mode: 'cheapest' as SortMode, label: 'Cheapest' }])"
+                :key="opt.mode"
+                @click="activeSort = opt.mode"
+                :class="[
+                  'shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-semibold border transition-all duration-200',
+                  activeSort === opt.mode
+                    ? 'bg-primary-500 text-white border-primary-500 shadow-sm shadow-primary-500/20'
+                    : 'bg-white dark:bg-surface-900 text-surface-500 dark:text-surface-400 border-surface-200 dark:border-surface-700 hover:border-primary-300 dark:hover:border-primary-600 hover:text-primary-600 dark:hover:text-primary-400'
+                ]"
+              >
+                <svg
+                  v-if="opt.mode === 'most-popular'"
+                  class="w-3 h-3" fill="currentColor" viewBox="0 0 24 24"
+                >
+                  <path d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+                </svg>
+                <svg
+                  v-if="opt.mode === 'best-value'"
+                  class="w-3 h-3" fill="currentColor" viewBox="0 0 24 24"
+                >
+                  <path d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                </svg>
+                <svg
+                  v-if="opt.mode === 'cheapest'"
+                  class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                >
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                </svg>
+                <svg
+                  v-if="opt.mode === 'default'"
+                  class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                >
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h7" />
+                </svg>
+                {{ opt.label }}
+              </button>
+            </div>
+
             <div v-if="gameStore.products.length === 0" class="text-center py-12 bg-white dark:bg-surface-900 rounded-2xl border border-surface-200 dark:border-surface-700">
               <div class="inline-flex items-center justify-center w-12 h-12 rounded-full bg-surface-100 dark:bg-surface-800 mb-3">
                 <svg class="w-6 h-6 text-surface-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -731,12 +835,13 @@ onUnmounted(() => {
 
             <div ref="productsListRef" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-3">
               <ProductCard
-                v-for="product in gameStore.products"
+                v-for="product in sortedProducts"
                 :key="product.product_code"
                 :product="product"
                 :selected="selectedProduct?.product_code === product.product_code"
                 :game-code="gameCode"
                 :game-image-url="gameImageUrl"
+                :badge="productBadges.get(product.product_code) || null"
                 @select="selectProduct(product)"
                 class="product-card"
               />

@@ -1031,21 +1031,23 @@ onUnmounted(() => {
 
     <!-- ═══ Mobile KHQR Bottom Sheet ═══ -->
     <Teleport to="body">
-      <div
-        v-if="mobileCheckoutActive"
-        class="fixed inset-0 z-50"
-      >
-        <!-- Backdrop -->
+      <!-- Backdrop with fade transition -->
+      <Transition name="khqr-backdrop">
         <div
-          class="absolute inset-0 bg-black/50 backdrop-blur-sm"
+          v-if="mobileCheckoutActive"
+          key="backdrop"
+          class="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm"
           @click="closeMobileCheckout"
         ></div>
+      </Transition>
 
-      <!-- Bottom Sheet -->
-      <div
-        class="absolute bottom-0 left-0 right-0 bg-white dark:bg-surface-900 rounded-t-2xl shadow-2xl max-h-[90vh] overflow-y-auto"
-        :class="{ 'animate-slide-up': true }"
-      >
+      <!-- Bottom Sheet with spring slide-up transition -->
+      <Transition name="khqr-sheet">
+        <div
+          v-if="mobileCheckoutActive"
+          key="sheet"
+          class="fixed bottom-0 left-0 right-0 z-50 bg-white dark:bg-surface-900 rounded-t-2xl shadow-2xl max-h-[90vh] overflow-y-auto"
+        >
         <!-- Handle bar -->
         <div class="flex justify-center pt-3 pb-1">
           <div class="w-10 h-1 rounded-full bg-surface-300 dark:bg-surface-600"></div>
@@ -1147,9 +1149,9 @@ onUnmounted(() => {
             </div>
           </div>
         </div>
-      </div>
     </div>
-  </Teleport>
+  </Transition>
+    </Teleport>
 
     <!-- Success overlay (mobile) -->
     <Teleport to="body">
@@ -1243,15 +1245,14 @@ onUnmounted(() => {
   opacity: 1;
 }
 
-/* ─── Desktop proceed button slide-up ─── */
-.proceed-btn-enter-active {
-  transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1),
-              opacity 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+/* ─── Desktop proceed button slide-up ─── */.proceed-btn-enter-active {
+  transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1),
+               opacity 0.4s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .proceed-btn-leave-active {
-  transition: transform 0.2s ease-in,
-              opacity 0.2s ease-in;
+  transition: transform 0.25s ease-in,
+               opacity 0.25s ease-in;
 }
 
 .proceed-btn-enter-from {
@@ -1292,11 +1293,9 @@ onUnmounted(() => {
     transform: translateY(0) scale(1);
     opacity: 1;
   }
-}
-
-.result-card-leave-active {
-  transition: transform 0.2s ease-in,
-              opacity 0.2s ease-in;
+}.result-card-leave-active {
+  transition: transform 0.25s ease-in,
+               opacity 0.25s ease-in;
 }
 
 .result-card-leave-to {
@@ -1423,5 +1422,42 @@ onUnmounted(() => {
 .input-field.input-verified:focus {
   box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2), 0 0 10px 0 rgba(16, 185, 129, 0.08);
   border-color: rgba(16, 185, 129, 0.6);
+}
+
+/* ─── KHQR backdrop fade transition (unified 0.3s) ─── */
+.khqr-backdrop-enter-active {
+  transition: opacity 0.3s ease-out;
+}
+.khqr-backdrop-leave-active {
+  transition: opacity 0.25s ease-in;
+}
+.khqr-backdrop-enter-from,
+.khqr-backdrop-leave-to {
+  opacity: 0;
+}
+.khqr-backdrop-enter-to {
+  opacity: 1;
+}
+
+/* ─── KHQR bottom sheet slide-up (unified 0.4s with spring easing) ─── */
+.khqr-sheet-enter-active {
+  transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1),
+              opacity 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.khqr-sheet-leave-active {
+  transition: transform 0.25s ease-in,
+              opacity 0.25s ease-in;
+}
+.khqr-sheet-enter-from {
+  transform: translateY(100%);
+  opacity: 0;
+}
+.khqr-sheet-leave-to {
+  transform: translateY(100%);
+  opacity: 0;
+}
+.khqr-sheet-enter-to {
+  transform: translateY(0);
+  opacity: 1;
 }
 </style>

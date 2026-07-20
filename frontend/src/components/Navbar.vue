@@ -28,7 +28,7 @@ function animateLogoEntrance() {
   gsap.fromTo(
     logoRef.value,
     { opacity: 0, y: -10, scale: 0.85, rotate: -5 },
-    { opacity: 1, y: 0, scale: 1, rotate: 0, duration: 0.5, ease: 'back.out(1.7)', delay: 0.15 }
+    { opacity: 1, y: 0, scale: 1, rotate: 0, duration: 0.4, ease: 'back.out(1.7)', delay: 0.15 }
   )
 }
 

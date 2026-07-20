@@ -52,15 +52,15 @@ const balanceLoading = ref(false)
 const floatingBarRef = ref<HTMLElement | null>(null)
 
 function animateFloatingBarIn(el: HTMLElement) {
-  // iOS-style slide-up entrance: starts below viewport, springs into place
+  // Unified slide-up entrance: starts below viewport, springs into place
   gsap.fromTo(
     el,
     { y: '100%', opacity: 0 },
     {
       y: 0,
       opacity: 1,
-      duration: 0.5,
-      ease: 'power4.out',
+      duration: 0.4,
+      ease: 'cubic-bezier(0.16, 1, 0.3, 1)',
       clearProps: 'transform',
     }
   )

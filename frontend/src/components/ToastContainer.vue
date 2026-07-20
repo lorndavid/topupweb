@@ -70,10 +70,10 @@ function getColors(type: string) {
 
 <style scoped>
 .toast-enter-active {
-  transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
 }
 .toast-leave-active {
-  transition: all 0.2s ease-in;
+  transition: all 0.25s ease-in;
 }
 .toast-enter-from {
   opacity: 0;

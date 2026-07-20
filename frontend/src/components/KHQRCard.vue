@@ -60,7 +60,7 @@ function handleCheckout() {
         gsap.fromTo(
           cardRef.value,
           { opacity: 0, y: 30, scale: 0.97 },
-          { opacity: 1, y: 0, scale: 1, duration: 0.5, ease: 'back.out(1.7)' }
+          { opacity: 1, y: 0, scale: 1, duration: 0.4, ease: 'back.out(1.7)' }
         )
       }
       if (qrContainerRef.value) {
@@ -168,23 +168,28 @@ async function handleDownloadQR() {
     </div>
 
     <!-- ─── KHQR CARD (when shown) ─── -->
-    <template v-if="showCard">
-      <!-- Mobile: backdrop overlay -->
-      <div
-        v-if="isMobile"
-        class="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm"
-        @click="emit('cancel')"
-      ></div>
+      <!-- Mobile: backdrop overlay with fade transition -->
+      <Transition name="khqr-bg">
+        <div
+          v-if="showCard && isMobile"
+          key="backdrop"
+          class="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm"
+          @click="emit('cancel')"
+        ></div>
+      </Transition>
 
-      <!-- Card (shared between mobile + desktop) -->
-      <div
-        ref="cardRef"
-        :class="[
-          isMobile
-            ? 'fixed inset-x-0 bottom-0 z-50 bottom-sheet-up'
-            : 'mx-auto max-w-sm'
-        ]"
-      >
+      <!-- Card (shared between mobile + desktop) with slide-up transition -->
+      <Transition name="khqr-bs">
+        <div
+          v-if="showCard"
+          key="card"
+          ref="cardRef"
+          :class="[
+            isMobile
+              ? 'fixed inset-x-0 bottom-0 z-50'
+              : 'mx-auto max-w-sm'
+          ]"
+        >
         <div
           class="bg-white overflow-hidden border border-gray-100"
           :class="isMobile ? 'rounded-t-2xl shadow-2xl' : 'rounded-2xl shadow-2xl'"
@@ -330,12 +335,12 @@ async function handleDownloadQR() {
         </div>
 
       </div>
+    </Transition>
 
       <!-- Mobile: drag handle (outside capture ref) -->
-      <div v-if="isMobile" class="flex justify-center py-3 bg-white">
+      <div v-if="showCard && isMobile" class="flex justify-center py-3 bg-white">
         <div class="w-10 h-1 rounded-full bg-gray-300"></div>
       </div>
-    </template>
   </div>
 </template>
 
@@ -349,21 +354,45 @@ async function handleDownloadQR() {
   to { opacity: 1; }
 }
 
-/* ─── Mobile bottom-sheet animation ─── */
+/* ─── Unified mobile bottom-sheet enter/leave transitions ─── */
 @media (max-width: 639px) {
-  .bottom-sheet-up {
-    animation: slide-up 0.45s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  /* Backdrop fade */
+  .khqr-bg-enter-active {
+    transition: opacity 0.3s ease-out;
+  }
+  .khqr-bg-leave-active {
+    transition: opacity 0.25s ease-in;
+  }
+  .khqr-bg-enter-from,
+  .khqr-bg-leave-to {
+    opacity: 0;
+  }
+  .khqr-bg-enter-to {
+    opacity: 1;
   }
 
-  @keyframes slide-up {
-    from {
-      transform: translateY(100%);
-    }
-    to {
-      transform: translateY(0);
-    }
+  /* Bottom sheet slide (0.4s, spring easing, includes opacity) */
+  .khqr-bs-enter-active {
+    transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1),
+                opacity 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .khqr-bs-leave-active {
+    transition: transform 0.25s ease-in,
+                opacity 0.25s ease-in;
+  }
+  .khqr-bs-enter-from {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+  .khqr-bs-leave-to {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+  .khqr-bs-enter-to {
+    transform: translateY(0);
+    opacity: 1;
   }
 }
 
-
+/* Desktop: no specific transition needed (GSAP handles it) */
 </style>

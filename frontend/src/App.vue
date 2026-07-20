@@ -5,6 +5,7 @@ import Navbar from '@/components/Navbar.vue'
 import Footer from '@/components/Footer.vue'
 import ToastContainer from '@/components/ToastContainer.vue'
 import gsap from 'gsap'
+import { ANIM_TIMING } from '@/composables/useAnimationTiming'
 
 const router = useRouter()
 const isDark = ref(false)
@@ -110,11 +111,12 @@ router.beforeEach((to, from) => {
 })
 
 router.afterEach(() => {
-  // Hide the loading overlay after the enter animation is mostly complete
-  // 600ms covers the longest enter transition (400ms slide) + leave (250ms loading fade)
+  // Hide loading overlay after the longest enter transition finishes
+  // Combined: max page enter + loading-fade leave
+  // 650ms = 400ms (ANIM_TIMING.enterDuration slide enter) + 250ms (ANIM_TIMING.leaveDuration loading-fade leave)
   setTimeout(() => {
     pageLoading.value = false
-  }, 600)
+  }, (ANIM_TIMING.enterDuration * 1000) + (ANIM_TIMING.leaveDuration * 1000))
 })
 
 function toggleDark() {

@@ -139,16 +139,28 @@ watch([playerId, serverId], () => {
 
 // Simple slide-in for verify success card (handled by Transition CSS)
 
-// Smooth error slide-in
+// Smooth error slide-in + shake (staggered after success animations)
 watch(verifyError, (err) => {
   if (err && errorRef.value) {
+    gsap.killTweensOf(errorRef.value)
     nextTick(() => {
-      gsap.set(errorRef.value, { opacity: 0, y: -8, maxHeight: 0 })
-      gsap.to(errorRef.value, {
+      const tl = gsap.timeline({ delay: 0.1 })
+      tl.set(errorRef.value, { opacity: 0, y: -8, maxHeight: 0, x: 0 })
+      tl.to(errorRef.value, {
         opacity: 1, y: 0, maxHeight: 200,
-        duration: 0.35,
+        duration: 0.25,
         ease: 'power3.out',
       })
+      // Horizontal shake with dramatic damping curve ±8px → ±2px
+      tl.to(errorRef.value, { x: -8, duration: 0.05 })
+      tl.to(errorRef.value, { x: 8, duration: 0.05 })
+      tl.to(errorRef.value, { x: -6, duration: 0.05 })
+      tl.to(errorRef.value, { x: 6, duration: 0.05 })
+      tl.to(errorRef.value, { x: -4, duration: 0.05 })
+      tl.to(errorRef.value, { x: 4, duration: 0.05 })
+      tl.to(errorRef.value, { x: -2, duration: 0.05 })
+      tl.to(errorRef.value, { x: 2, duration: 0.05 })
+      tl.to(errorRef.value, { x: 0, duration: 0.05 })
     })
   }
 })
@@ -761,19 +773,35 @@ onUnmounted(() => {
                           type="text"
                           :placeholder="i18n.t('detail.playerIdPlaceholder')"
                           class="input-field pl-9 pr-10 h-10 text-xs sm:text-sm"
+                          :class="verified ? 'input-verified' : ''"
                           :disabled="verifying"
                         />
-                        <!-- Auto-verify status indicator -->
-                        <div v-if="verifying" class="absolute right-3 top-1/2 -translate-y-1/2">
-                          <svg class="w-4 h-4 animate-spin text-primary-500" fill="none" viewBox="0 0 24 24">
-                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                          </svg>
+                        <!-- Auto-verify status indicator → spinner fades out, checkmark pops in -->
+                        <div class="absolute right-3 top-1/2 -translate-y-1/2">
+                          <Transition name="status-swap" mode="out-in">
+                            <div v-if="verifying" key="spinner" role="status" aria-label="Auto-verifying player name">
+                              <svg class="w-4 h-4 animate-spin text-primary-500" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                              </svg>
+                            </div>
+                            <div v-else-if="verified" key="check">
+                              <div class="verified-pulse">
+                                <svg class="w-4 h-4 text-emerald-500" fill="currentColor" viewBox="0 0 20 20" role="img" aria-label="Verified">
+                                  <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
+                                </svg>
+                              </div>
+                            </div>
+                          </Transition>
                         </div>
-                        <div v-else-if="verified" class="absolute right-3 top-1/2 -translate-y-1/2">
-                          <svg class="w-4 h-4 text-emerald-500" fill="currentColor" viewBox="0 0 20 20">
-                            <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
-                          </svg>
+                        <!-- Brief 'Verified!' toast that fades in after checkmark settles -->
+                        <div v-if="verified" class="flex justify-end">
+                          <span class="verified-toast">
+                            <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                              <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
+                            </svg>
+                            Verified!
+                          </span>
                         </div>
                       </div>
                     </div>
@@ -795,6 +823,7 @@ onUnmounted(() => {
                           inputmode="numeric"
                           :placeholder="i18n.t('detail.serverIdPlaceholder')"
                           class="input-field pl-9 h-10 text-xs sm:text-sm"
+                          :class="verified ? 'input-verified' : ''"
                           :disabled="verifying"
                         />
                       </div>
@@ -1240,10 +1269,29 @@ onUnmounted(() => {
   opacity: 1;
 }
 
-/* ─── Verify result card slide-in ─── */
+/* ─── Verify result card pop-in animation (similar to checkmark pulse) ─── */
 .result-card-enter-active {
-  transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1),
-              opacity 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+  /* Delay 0.3s so checkmark pop settles first, then card enters */
+  animation: card-pop 0.35s 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+  opacity: 0;
+}
+
+@keyframes card-pop {
+  0% {
+    transform: translateY(-6px) scale(0.92);
+    opacity: 0;
+  }
+  45% {
+    transform: translateY(2px) scale(1.04);
+    opacity: 1;
+  }
+  70% {
+    transform: translateY(-1px) scale(0.97);
+  }
+  100% {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
 }
 
 .result-card-leave-active {
@@ -1251,18 +1299,129 @@ onUnmounted(() => {
               opacity 0.2s ease-in;
 }
 
-.result-card-enter-from {
-  transform: translateY(-12px) scale(0.97);
-  opacity: 0;
-}
-
 .result-card-leave-to {
   transform: translateY(-8px) scale(0.97);
   opacity: 0;
 }
 
-.result-card-enter-to {
-  transform: translateY(0) scale(1);
-  opacity: 1;
+/* ─── Verified checkmark pulse animation ─── */
+@keyframes verified-pulse {
+  0% {
+    transform: scale(0) rotate(-15deg);
+    opacity: 0;
+  }
+  40% {
+    transform: scale(1.3) rotate(0deg);
+    opacity: 1;
+  }
+  65% {
+    transform: scale(0.88) rotate(0deg);
+  }
+  100% {
+    transform: scale(1) rotate(0deg);
+    opacity: 1;
+  }
+}
+
+.verified-pulse {
+  animation: verified-pulse 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+  transform-origin: center;
+  will-change: transform, opacity;
+}
+
+/* ─── Brief 'Verified!' toast that appears after checkmark settles ─── */
+@keyframes toast-in {
+  0% {
+    opacity: 0;
+    transform: translateY(4px) scale(0.9);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes toast-out {
+  0% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-3px) scale(0.9);
+  }
+}
+
+.verified-toast {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.125rem 0.5rem;
+  margin-top: 2px;
+  font-size: 0.65rem;
+  font-weight: 600;
+  line-height: 1.2;
+  color: rgb(16, 185, 129);
+  background: rgba(16, 185, 129, 0.1);
+  border-radius: 9999px;
+  /* Delay 0.7s so checkmark & result card settle first, stay ~2s, then fade out */
+  animation: toast-in 0.3s 0.7s cubic-bezier(0.16, 1, 0.3, 1) forwards,
+             toast-out 0.25s 3.0s ease-in forwards;
+  pointer-events: none;
+}
+
+/* Dark mode: slightly brighter background so the pill is visible on surface-900 */
+:is(.dark) .verified-toast {
+  background: rgba(16, 185, 129, 0.2);
+}
+
+/* ─── Spinner → checkmark smooth swap transition ─── */
+.status-swap-leave-active {
+  transition: opacity 0.15s ease-in, transform 0.15s ease-in;
+}
+
+.status-swap-enter-active {
+  transition: opacity 0.2s ease-out, transform 0.2s ease-out;
+}
+
+.status-swap-leave-to {
+  opacity: 0;
+  transform: translateY(-3px) scale(0.85);
+}
+
+.status-swap-enter-from {
+  opacity: 0;
+  transform: translateY(4px) scale(0.85);
+}
+
+/* ─── Verified green glow on input fields ─── */
+@keyframes verified-glow {
+  0% {
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0), 0 0 0 0 rgba(16, 185, 129, 0);
+    border-color: rgba(16, 185, 129, 0.3);
+  }
+  40% {
+    box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.25), 0 0 12px 0 rgba(16, 185, 129, 0.12);
+    border-color: rgba(16, 185, 129, 0.6);
+  }
+  100% {
+    box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.12), 0 0 8px 0 rgba(16, 185, 129, 0.06);
+    border-color: rgba(16, 185, 129, 0.5);
+  }
+}
+
+/* Smooth border/glow transitions on all input fields (in/out) */
+.input-field {
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.input-field.input-verified {
+  animation: verified-glow 0.7s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  border-color: rgba(16, 185, 129, 0.5);
+}
+
+.input-field.input-verified:focus {
+  box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2), 0 0 10px 0 rgba(16, 185, 129, 0.08);
+  border-color: rgba(16, 185, 129, 0.6);
 }
 </style>

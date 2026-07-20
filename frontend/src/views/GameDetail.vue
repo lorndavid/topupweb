@@ -10,6 +10,7 @@ import { verifyPlayer, createPayment, getPaymentStatus, cancelOrder, getOrder } 
 import type { GameProduct } from '@/types'
 import { useSavedPlayers } from '@/composables/useSavedPlayers'
 import { formatPrice } from '@/composables/useCurrency'
+import { getGameCurrency } from '@/utils/gameCurrency'
 import { usePaymentWebSocket } from '@/composables/usePaymentWebSocket'
 import ReceiptCard from '@/components/ReceiptCard.vue'
 import gsap from 'gsap'
@@ -71,6 +72,10 @@ const canProceed = computed(() => {
 const gameDisplayName = computed(() => {
   return gameStore.selectedGame?.name || gameCode.value
 })
+
+const gameCurrency = computed(() => getGameCurrency(gameCode.value))
+
+const gameImageUrl = computed(() => gameStore.selectedGame?.image_url || '')
 
 // ─── Product stagger reveal (one-shot guard prevents re-trigger flash) ───
 const staggerDone = ref(false)
@@ -730,6 +735,8 @@ onUnmounted(() => {
                 :key="product.product_code"
                 :product="product"
                 :selected="selectedProduct?.product_code === product.product_code"
+                :game-code="gameCode"
+                :game-image-url="gameImageUrl"
                 @select="selectProduct(product)"
                 class="product-card"
               />
@@ -739,31 +746,40 @@ onUnmounted(() => {
           <!-- Order Form Column (right on desktop) -->
           <div ref="formRef" class="lg:col-span-5 order-1 lg:order-2">
             <div class="sticky top-24 space-y-5">
-              <!-- Player ID Card -->
-              <div class="bg-white dark:bg-surface-900 rounded-2xl border border-surface-200 dark:border-surface-700 shadow-sm overflow-hidden">
-                <div class="p-4 sm:p-5 space-y-4 sm:space-y-5">
-                  <div class="flex items-center gap-3">
-                    <div class="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-primary-100 dark:bg-primary-900/30 flex items-center justify-center">
-                      <svg class="w-4 h-4 sm:w-5 sm:h-5 text-primary-600 dark:text-primary-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+              <!-- Player ID Card (compact) -->
+              <div class="bg-white dark:bg-surface-900 rounded-xl border border-surface-200 dark:border-surface-700 shadow-sm overflow-hidden">
+                <div class="p-2.5 sm:p-4 space-y-2.5 sm:space-y-4">
+                  <!-- Header row: icon + title + currency badge -->
+                  <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-2">
+                      <div class="w-6 h-6 sm:w-8 sm:h-8 rounded-lg bg-primary-100 dark:bg-primary-900/30 flex items-center justify-center shrink-0">
+                        <svg class="w-3 h-3 sm:w-4 sm:h-4 text-primary-600 dark:text-primary-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                        </svg>
+                      </div>
+                      <div>
+                        <h3 class="text-xs sm:text-sm font-semibold text-surface-900 dark:text-surface-100">{{ i18n.t('verify.title') }}</h3>
+                      </div>
+                    </div>
+                    <!-- Currency badge -->
+                    <span class="inline-flex items-center gap-1 px-2 py-0.5 bg-surface-100 dark:bg-surface-800 rounded-full text-[10px] font-semibold text-primary-600 dark:text-primary-400">
+                      <svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                       </svg>
-                    </div>
-                    <div>
-                      <h3 class="font-semibold text-surface-900 dark:text-surface-100">{{ i18n.t('verify.title') }}</h3>
-                      <p class="text-xs text-surface-400 dark:text-surface-500">{{ gameStore.selectedGame.game_code }}</p>
-                    </div>
+                      {{ gameCurrency }}
+                    </span>
                   </div>
 
                   <!-- Player ID + Server ID in one row -->
-                  <div class="grid grid-cols-2 gap-3">
+                  <div class="grid grid-cols-2 gap-2 sm:gap-3">
                     <!-- Player ID (spans full width when no server ID needed) -->
                     <div :class="needsServerId ? 'col-span-1' : 'col-span-2'">
-                      <label for="player-id" class="block text-xs sm:text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">
-                        {{ i18n.t('detail.playerId') }} <span class="text-red-400">*</span>
+                      <label for="player-id" class="block text-[10px] sm:text-xs font-medium text-surface-500 dark:text-surface-400 mb-0.5">
+                        {{ i18n.t('detail.playerId') }}
                       </label>
                       <div class="relative">
-                        <div class="absolute left-3 top-1/2 -translate-y-1/2 text-surface-400">
-                          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <div class="absolute left-2.5 top-1/2 -translate-y-1/2 text-surface-300 dark:text-surface-500">
+                          <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 114 0v1m-4 0a2 2 0 104 0" />
                           </svg>
                         </div>
@@ -772,47 +788,47 @@ onUnmounted(() => {
                           v-model="playerId"
                           type="text"
                           :placeholder="i18n.t('detail.playerIdPlaceholder')"
-                          class="input-field pl-9 pr-10 h-10 text-xs sm:text-sm"
+                          class="input-field pl-8 pr-8 h-8 sm:h-9 text-xs"
                           :class="verified ? 'input-verified' : ''"
                           :disabled="verifying"
                         />
                         <!-- Auto-verify status indicator → spinner fades out, checkmark pops in -->
-                        <div class="absolute right-3 top-1/2 -translate-y-1/2">
+                        <div class="absolute right-2.5 top-1/2 -translate-y-1/2">
                           <Transition name="status-swap" mode="out-in">
                             <div v-if="verifying" key="spinner" role="status" aria-label="Auto-verifying player name">
-                              <svg class="w-4 h-4 animate-spin text-primary-500" fill="none" viewBox="0 0 24 24">
+                              <svg class="w-3.5 h-3.5 animate-spin text-primary-500" fill="none" viewBox="0 0 24 24">
                                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
                                 <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                               </svg>
                             </div>
                             <div v-else-if="verified" key="check">
                               <div class="verified-pulse">
-                                <svg class="w-4 h-4 text-emerald-500" fill="currentColor" viewBox="0 0 20 20" role="img" aria-label="Verified">
+                                <svg class="w-3.5 h-3.5 text-emerald-500" fill="currentColor" viewBox="0 0 20 20" role="img" aria-label="Verified">
                                   <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
                                 </svg>
                               </div>
                             </div>
                           </Transition>
                         </div>
-                        <!-- Brief 'Verified!' toast that fades in after checkmark settles -->
-                        <div v-if="verified" class="flex justify-end">
-                          <span class="verified-toast">
-                            <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                              <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
-                            </svg>
-                            Verified!
-                          </span>
-                        </div>
+                      </div>
+                      <!-- Brief 'Verified!' toast that fades in after checkmark settles -->
+                      <div v-if="verified" class="flex justify-end mt-0.5">
+                        <span class="verified-toast">
+                          <svg class="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
+                          </svg>
+                          Verified!
+                        </span>
                       </div>
                     </div>
                     <!-- Server / Zone ID -->
                     <div v-show="needsServerId" ref="serverIdRef" class="overflow-hidden">
-                      <label for="server-id" class="block text-xs sm:text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">
-                        {{ i18n.t('detail.serverId') }} <span class="text-red-400">*</span>
+                      <label for="server-id" class="block text-[10px] sm:text-xs font-medium text-surface-500 dark:text-surface-400 mb-0.5">
+                        {{ i18n.t('detail.serverId') }}
                       </label>
                       <div class="relative">
-                        <div class="absolute left-3 top-1/2 -translate-y-1/2 text-surface-400">
-                          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <div class="absolute left-2.5 top-1/2 -translate-y-1/2 text-surface-300 dark:text-surface-500">
+                          <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4" />
                           </svg>
                         </div>
@@ -822,7 +838,7 @@ onUnmounted(() => {
                           type="text"
                           inputmode="numeric"
                           :placeholder="i18n.t('detail.serverIdPlaceholder')"
-                          class="input-field pl-9 h-10 text-xs sm:text-sm"
+                          class="input-field pl-8 h-8 sm:h-9 text-xs"
                           :class="verified ? 'input-verified' : ''"
                           :disabled="verifying"
                         />
@@ -989,7 +1005,7 @@ onUnmounted(() => {
               <p class="text-[10px] text-surface-400 dark:text-surface-500 uppercase tracking-wider font-medium">Total</p>
               <p class="text-xl font-bold text-surface-900 dark:text-white">
                 {{ formatPrice(selectedProduct.sell_price).formatted }}
-                <span class="text-xs text-surface-400 font-normal ml-0.5">{{ formatPrice(selectedProduct.sell_price).code }}</span>
+                <span class="text-xs text-surface-400 font-normal ml-0.5">{{ gameCurrency }}</span>
               </p>
               <p v-if="playerNickname" class="text-[11px] text-surface-400 dark:text-surface-500 mt-0.5 truncate">
                 {{ playerNickname }}
@@ -1080,7 +1096,7 @@ onUnmounted(() => {
               <p class="text-lg font-bold text-primary-600 dark:text-primary-400">
                 {{ formatPrice(selectedProduct?.sell_price || 0).formatted }}
               </p>
-              <p class="text-[10px] text-surface-400 uppercase">{{ formatPrice(selectedProduct?.sell_price || 0).code }}</p>
+              <p class="text-[10px] text-surface-400 uppercase">{{ gameCurrency }}</p>
             </div>
           </div>
 

@@ -79,7 +79,7 @@ const gameImageUrl = computed(() => gameStore.selectedGame?.image_url || '')
 
 // ─── Product stagger reveal (one-shot guard prevents re-trigger flash) ───
 type ProductBadge = 'best-value' | 'most-popular' | null
-type SortMode = 'default' | 'most-popular' | 'best-value' | 'cheapest'
+type SortMode = 'default' | 'most-popular' | 'best-value' | 'cheapest' | 'price-high'
 
 const activeSort = ref<SortMode>('default')
 
@@ -102,6 +102,8 @@ const sortedProducts = computed(() => {
     items.sort((a, b) => a.product.sell_price - b.product.sell_price)
   } else if (activeSort.value === 'best-value') {
     items.sort((a, b) => a.ppu - b.ppu)
+  } else if (activeSort.value === 'price-high') {
+    items.sort((a, b) => b.product.sell_price - a.product.sell_price)
   } else if (activeSort.value === 'most-popular') {
     // Push the most-popular-badged product to the very top, then PPU ascending
     const badges = productBadges.value
@@ -786,9 +788,10 @@ onUnmounted(() => {
             <!-- Sort / Filter chips -->
             <div class="flex items-center gap-2 overflow-x-auto pb-1 hide-scrollbar">
               <button
-                v-for="opt in ([{ mode: 'default' as SortMode, label: 'Default' }, { mode: 'most-popular' as SortMode, label: 'Most Popular' }, { mode: 'best-value' as SortMode, label: 'Best Value' }, { mode: 'cheapest' as SortMode, label: 'Cheapest' }])"
+                v-for="opt in ([{ mode: 'default' as SortMode, label: 'Default', tooltip: '' }, { mode: 'most-popular' as SortMode, label: 'Most Popular', tooltip: 'Mid-tier package — often the most purchased option' }, { mode: 'best-value' as SortMode, label: 'Best Value', tooltip: 'Lowest price per ' + gameCurrency + ' — best deal' }, { mode: 'cheapest' as SortMode, label: 'Cheapest', tooltip: 'Lowest total price' }, { mode: 'price-high' as SortMode, label: 'Price: High to Low', tooltip: 'Highest total price first' }])"
                 :key="opt.mode"
                 @click="activeSort = opt.mode"
+                :title="opt.tooltip"
                 :class="[
                   'shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-semibold border transition-all duration-200',
                   activeSort === opt.mode
@@ -820,8 +823,33 @@ onUnmounted(() => {
                 >
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h7" />
                 </svg>
+                <svg
+                  v-if="opt.mode === 'price-high'"
+                  class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                >
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                </svg>
                 {{ opt.label }}
               </button>
+              <!-- Reset sort button (only visible when not on Default) -->
+              <button
+                v-if="activeSort !== 'default'"
+                @click="activeSort = 'default'"
+                :title="'Reset to default order'"
+                class="shrink-0 inline-flex items-center gap-1 px-2 py-1.5 rounded-full text-[10px] font-semibold border border-red-200 dark:border-red-800/40 text-red-500 dark:text-red-400 bg-red-50 dark:bg-red-900/10 hover:bg-red-100 dark:hover:bg-red-900/20 hover:border-red-300 dark:hover:border-red-700 active:scale-95 transition-all duration-200"
+              >
+                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+                Reset
+              </button>
+              <!-- Package count badge -->
+              <span class="shrink-0 ml-auto inline-flex items-center gap-1 px-2 py-1 rounded-full bg-surface-100 dark:bg-surface-800 text-[10px] font-mono font-semibold text-surface-400 dark:text-surface-500 border border-surface-200 dark:border-surface-700" :title="gameStore.products.length + ' packages available'">
+                <svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                </svg>
+                {{ gameStore.products.length }}
+              </span>
             </div>
 
             <div v-if="gameStore.products.length === 0" class="text-center py-12 bg-white dark:bg-surface-900 rounded-2xl border border-surface-200 dark:border-surface-700">

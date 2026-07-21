@@ -13,9 +13,27 @@ validateConfig();
 
 // Security middleware
 app.use(helmet());
+// Allow both local dev URL and production frontend URL(s)
+const allowedOrigins = [
+  config.frontendUrl,
+  'https://topup.lorndavid.online',
+  'https://www.topup.lorndavid.online',
+  // Allow Vercel preview deployments (for testing before going live)
+  ...(process.env.EXTRA_CORS_ORIGINS ? process.env.EXTRA_CORS_ORIGINS.split(',') : []),
+].filter(Boolean);
+
 app.use(
   cors({
-    origin: config.frontendUrl,
+    origin: (origin, callback) => {
+      // Allow requests with no origin (e.g., mobile apps, curl, server-to-server)
+      if (!origin) return callback(null, true);
+      // Allow any of the configured origins (exact match or subdomain match)
+      if (allowedOrigins.some((o) => origin.startsWith(o))) {
+        return callback(null, true);
+      }
+      // Deny unknown origins
+      return callback(new Error(`Origin ${origin} not allowed by CORS`));
+    },
     methods: ['GET', 'POST'],
     allowedHeaders: ['Content-Type', 'Accept'],
   })

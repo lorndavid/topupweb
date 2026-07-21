@@ -62,10 +62,22 @@ export function usePaymentWebSocket(reference: Ref<string | null>) {
     // Don't reconnect if close was requested
     if (closeRequested) return
 
-    // Determine the WebSocket URL based on the current environment
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-    const host = window.location.host
-    const wsUrl = `${protocol}//${host}/ws`
+    // Determine the WebSocket URL
+    // In production (VITE_API_BASE_URL set), derive WS URL from the API base URL
+    // In development, use the current host (Vite proxy handles /ws → localhost:3001)
+    const apiBase = import.meta.env.VITE_API_BASE_URL || ''
+    let wsUrl: string
+
+    if (apiBase) {
+      // Production: convert https://api.domain.com → wss://api.domain.com/ws
+      const protocol = apiBase.startsWith('https') ? 'wss:' : 'ws:'
+      wsUrl = apiBase.replace(/^https?:\/\//, `${protocol}//`) + '/ws'
+    } else {
+      // Development: proxy via Vite
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+      const host = window.location.host
+      wsUrl = `${protocol}//${host}/ws`
+    }
 
     try {
       ws = new WebSocket(wsUrl)

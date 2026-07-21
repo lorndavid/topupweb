@@ -14,8 +14,8 @@ self.addEventListener('push', (event) => {
 
   const options = {
     body: data.body || '',
-    icon: data.icon || '/pwa-icon-192x192.png',
-    badge: data.badge || '/pwa-icon-192x192.png',
+    icon: data.icon || '/pwa-192x192.png',
+    badge: data.badge || '/pwa-192x192.png',
     tag: data.tag || 'default',
     renotify: true,
     requireInteraction: true,

@@ -193,7 +193,7 @@ async function handleDownloadQR() {
         >
         <div
           class="bg-white overflow-hidden border border-gray-100"
-          :class="isMobile ? 'rounded-t-2xl shadow-2xl' : 'rounded-2xl shadow-2xl'"
+          :class="isMobile ? 'rounded-t-2xl shadow-2xl pb-[max(0.75rem,env(safe-area-inset-bottom,0.75rem))]' : 'rounded-2xl shadow-2xl'"
         >
           <!-- ═══ CAPTURE CONTENT (header + merchant/amount + QR) ═══ -->
           <!--     This section is captured by html2canvas for download.

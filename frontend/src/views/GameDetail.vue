@@ -1341,11 +1341,10 @@ onUnmounted(() => {
       </Transition>
 
       <!-- Bottom Sheet with spring slide-up transition -->
-      <Transition name="khqr-sheet">
-        <div
-          v-if="mobileCheckoutActive"
-          key="sheet"
-          class="fixed bottom-0 left-0 right-0 z-50 bg-white dark:bg-surface-900 rounded-t-2xl shadow-2xl max-h-[90vh] overflow-y-auto"
+      <Transition name="khqr-sheet">          <div
+            v-if="mobileCheckoutActive"
+            key="sheet"
+            class="fixed bottom-0 left-0 right-0 z-50 bg-white dark:bg-surface-900 rounded-t-2xl shadow-2xl max-h-[90vh] overflow-y-auto pb-[max(0.5rem,env(safe-area-inset-bottom,0.5rem))]"
         >
         <!-- Handle bar -->
         <div class="flex justify-center pt-3 pb-1">

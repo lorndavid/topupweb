@@ -70,8 +70,8 @@ export class PushNotificationService {
       url: payload.url || config.frontendUrl,
       reference: payload.reference || '',
       tag: payload.tag || 'default',
-      icon: '/pwa-icon-192x192.png',
-      badge: '/pwa-icon-192x192.png',
+      icon: '/pwa-192x192.png',
+      badge: '/pwa-192x192.png',
       vibrate: [200, 100, 200],
     });
 

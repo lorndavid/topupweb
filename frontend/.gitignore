@@ -2,3 +2,10 @@ node_modules/
 dist/
 .env
 *.log
+
+# ─── Generated PWA assets (regenerate via: npx pwa-assets-generator) ───
+public/apple-splash-*.png
+public/apple-touch-icon-*.png
+public/pwa-*.png
+public/maskable-icon-*.png
+public/favicon.ico

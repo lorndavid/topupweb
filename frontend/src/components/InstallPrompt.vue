@@ -48,7 +48,7 @@ function handleDismiss() {
       <div class="bg-white dark:bg-surface-900 rounded-2xl shadow-2xl border border-surface-200 dark:border-surface-700 p-4 flex items-start gap-3">
         <!-- App icon -->
         <div class="w-12 h-12 rounded-xl overflow-hidden ring-2 ring-primary-500/20 shrink-0 shadow-lg">
-          <img src="/pwa-icon-192x192.png" alt="VidTopUp" class="w-full h-full object-cover" />
+          <img src="/pwa-192x192.png" alt="VidTopUp" class="w-full h-full object-cover" />
         </div>
         <div class="flex-1 min-w-0">
           <p class="text-sm font-bold text-surface-900 dark:text-surface-100">Install VidTopUp</p>

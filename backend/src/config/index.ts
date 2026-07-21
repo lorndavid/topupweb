@@ -46,6 +46,12 @@ export const config = {
     webhookUrl: process.env.NOTIFICATION_WEBHOOK_URL || '',
   },
 
+  push: {
+    publicKey: process.env.VAPID_PUBLIC_KEY || '',
+    privateKey: process.env.VAPID_PRIVATE_KEY || '',
+    subject: process.env.VAPID_SUBJECT || 'mailto:admin@vidtopup.com',
+  },
+
   isDev: process.env.NODE_ENV === 'development',
   isProd: process.env.NODE_ENV === 'production',
 } as const;

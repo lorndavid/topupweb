@@ -14,12 +14,16 @@ import { getGameCurrency, extractAmount } from '@/utils/gameCurrency'
 import { usePaymentWebSocket } from '@/composables/usePaymentWebSocket'
 import ReceiptCard from '@/components/ReceiptCard.vue'
 import { useScrollToTop } from '@/composables/useScrollToTop'
+import { usePushNotifications } from '@/composables/usePushNotifications'
 import gsap from 'gsap'
 import { ScrollTrigger } from 'gsap/ScrollTrigger'
 
 gsap.registerPlugin(ScrollTrigger)
 
 const route = useRoute()
+
+// ─── Push notifications (subscribe after payment success) ───
+const { subscribe: subscribePush } = usePushNotifications()
 const router = useRouter()
 const gameStore = useGameStore()
 const i18n = useI18nStore()
@@ -470,6 +474,8 @@ mobileWs.setOnStatusChange((data) => {
     playSuccessSound()
     fetchMobileOrderData()
     toast.success('Payment received! Redirecting...')
+    // Subscribe to push notifications after successful payment
+    subscribePush().catch(() => {})
     setTimeout(() => {
       router.push('/order/' + mobilePaymentRef.value)
     }, 3000)
@@ -612,6 +618,8 @@ function startMobilePolling() {
         playSuccessSound()
         fetchMobileOrderData()
         toast.success('Payment received! Redirecting...')
+        // Subscribe to push notifications after successful payment
+        subscribePush().catch(() => {})
         setTimeout(() => router.push('/order/' + mobilePaymentRef.value), 1500)
       } else if (status.payment_status === 'failed') {
         stopMobilePolling()

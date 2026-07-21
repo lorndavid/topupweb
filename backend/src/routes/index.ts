@@ -6,6 +6,8 @@ import { verifyPlayer, checkGameId } from '../controllers/player.controller';
 import { getAdminDashboard } from '../controllers/admin.controller';
 import { getBalance } from '../controllers/balance.controller';
 import { receiveStockAlert, getRecentAlerts, triggerDailySummary, testNotification } from '../controllers/webhook.controller';
+import { config } from '../config';
+import { pushNotificationService } from '../services/pushNotification.service';
 
 const router = Router();
 
@@ -39,6 +41,37 @@ router.post('/webhook/stock-alert', receiveStockAlert);
 router.get('/webhook/recent-alerts', getRecentAlerts);
 router.post('/webhook/test', testNotification);
 router.post('/webhook/daily-summary', triggerDailySummary);
+
+// Push notifications
+router.post('/push/subscribe', (req, res) => {
+  const { endpoint, keys, userAgent } = req.body;
+  if (!endpoint || !keys?.auth || !keys?.p256dh) {
+    return res.status(400).json({ success: false, message: 'Invalid subscription object' });
+  }
+  const result = pushNotificationService.subscribe({ endpoint, keys, userAgent, createdAt: new Date() });
+  res.json({ success: true, message: result.message });
+});
+
+router.post('/push/unsubscribe', (req, res) => {
+  const { endpoint } = req.body;
+  if (!endpoint) {
+    return res.status(400).json({ success: false, message: 'Endpoint required' });
+  }
+  const result = pushNotificationService.unsubscribe(endpoint);
+  res.json({ success: true, message: result.message });
+});
+
+router.get('/push/stats', (_req, res) => {
+  const stats = pushNotificationService.getStats();
+  res.json({ success: true, data: stats });
+});
+
+router.get('/push/vapid-key', (_req, res) => {
+  res.json({
+    success: true,
+    data: { publicKey: config.push.publicKey },
+  });
+});
 
 // Price drops
 router.get('/price-drops/:gameCode', getPriceDropsByGame);

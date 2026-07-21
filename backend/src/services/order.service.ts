@@ -7,6 +7,7 @@ import { bakongService } from './bakong.service';
 import { orderRepository } from '../repositories/OrderRepository';
 import { notificationService } from './notification.service';
 import { webSocketService } from './websocket.service';
+import { pushNotificationService } from './pushNotification.service';
 
 export class OrderService {
   /**
@@ -271,6 +272,13 @@ export class OrderService {
           completed_at: completedAt.toISOString(),
         });
       }
+
+      // ─── Send push notification to customer's device ──────────
+      pushNotificationService.notifyOrderCompleted(
+        order.reference,
+        order.game_name,
+        order.player_id
+      ).catch(() => {});
 
       return {
         success: true,

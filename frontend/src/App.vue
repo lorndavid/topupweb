@@ -4,6 +4,8 @@ import { useRouter } from 'vue-router'
 import Navbar from '@/components/Navbar.vue'
 import Footer from '@/components/Footer.vue'
 import ToastContainer from '@/components/ToastContainer.vue'
+import InstallPrompt from '@/components/InstallPrompt.vue'
+import { usePushNotifications } from '@/composables/usePushNotifications'
 import gsap from 'gsap'
 import { ANIM_TIMING } from '@/composables/useAnimationTiming'
 
@@ -175,7 +177,12 @@ function toggleDark() {
     })
 }
 
+const { checkSubscription } = usePushNotifications()
+
 onMounted(() => {
+  // Check existing push subscription
+  checkSubscription()
+
   const saved = localStorage.getItem('theme')
   if (saved === 'dark' || (!saved && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
     isDark.value = true
@@ -220,6 +227,7 @@ onMounted(() => {
     </main>
     <Footer />
     <ToastContainer />
+    <InstallPrompt />
   </div>
 </template>
 

@@ -13,6 +13,7 @@ import { formatPrice } from '@/composables/useCurrency'
 import { getGameCurrency, extractAmount } from '@/utils/gameCurrency'
 import { usePaymentWebSocket } from '@/composables/usePaymentWebSocket'
 import ReceiptCard from '@/components/ReceiptCard.vue'
+import { useScrollToTop } from '@/composables/useScrollToTop'
 import gsap from 'gsap'
 import { ScrollTrigger } from 'gsap/ScrollTrigger'
 
@@ -37,6 +38,9 @@ const errorRef = ref<HTMLElement | null>(null)
 const serverIdRef = ref<HTMLElement | null>(null)
 const proceedBtnRef = ref<HTMLElement | null>(null)
 const savedChipsRef = ref<HTMLElement | null>(null)
+
+// ─── Scroll-to-top button (appears when scrolling past products) ───
+const { showScrollTop, scrollToTop } = useScrollToTop(productsContainerRef, 100)
 
 const selectedProduct = ref<GameProduct | null>(null)
 const playerId = ref('')
@@ -832,17 +836,19 @@ onUnmounted(() => {
                 {{ opt.label }}
               </button>
               <!-- Reset sort button (only visible when not on Default) -->
-              <button
-                v-if="activeSort !== 'default'"
-                @click="activeSort = 'default'"
-                :title="'Reset to default order'"
-                class="shrink-0 inline-flex items-center gap-1 px-2 py-1.5 rounded-full text-[10px] font-semibold border border-red-200 dark:border-red-800/40 text-red-500 dark:text-red-400 bg-red-50 dark:bg-red-900/10 hover:bg-red-100 dark:hover:bg-red-900/20 hover:border-red-300 dark:hover:border-red-700 active:scale-95 transition-all duration-200"
-              >
-                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-                Reset
-              </button>
+              <Transition name="reset-fade">
+                <button
+                  v-if="activeSort !== 'default'"
+                  @click="activeSort = 'default'"
+                  :title="'Reset to default order'"
+                  class="shrink-0 inline-flex items-center gap-1 px-2 py-1.5 rounded-full text-[10px] font-semibold border border-red-200 dark:border-red-800/40 text-red-500 dark:text-red-400 bg-red-50 dark:bg-red-900/10 hover:bg-red-100 dark:hover:bg-red-900/20 hover:border-red-300 dark:hover:border-red-700 active:scale-95 transition-all duration-200"
+                >
+                  <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                  Reset
+                </button>
+              </Transition>
               <!-- Package count badge -->
               <span class="shrink-0 ml-auto inline-flex items-center gap-1 px-2 py-1 rounded-full bg-surface-100 dark:bg-surface-800 text-[10px] font-mono font-semibold text-surface-400 dark:text-surface-500 border border-surface-200 dark:border-surface-700" :title="gameStore.products.length + ' packages available'">
                 <svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1102,6 +1108,20 @@ onUnmounted(() => {
       </template>
     </div>
     </div>
+
+    <!-- ═══ Scroll-to-top button ═══ -->
+    <Transition name="scroll-top">
+      <button
+        v-if="showScrollTop"
+        @click="scrollToTop"
+        :title="'Scroll to top'"
+        class="fixed bottom-24 right-5 lg:bottom-8 lg:right-8 z-30 w-10 h-10 rounded-xl bg-white dark:bg-surface-800 border border-surface-200 dark:border-surface-700 shadow-lg hover:shadow-xl text-surface-500 dark:text-surface-400 hover:text-primary-600 dark:hover:text-primary-400 hover:border-primary-300 dark:hover:border-primary-600 active:scale-90 transition-all duration-200 flex items-center justify-center"
+      >
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 10l7-7m0 0l7 7m-7-7v18" />
+        </svg>
+      </button>
+    </Transition>
 
     <!-- ═══ Mobile Floating Checkout Bar (phone only — state-aware) ═══ -->
     <Transition name="float-bar">
@@ -1606,5 +1626,41 @@ onUnmounted(() => {
 .khqr-sheet-enter-to {
   transform: translateY(0);
   opacity: 1;
+}
+
+/* ─── Scroll-to-top button entrance/exit ─── */
+.scroll-top-enter-active {
+  transition: opacity var(--anim-enter-duration, 0.4s) var(--anim-enter-ease, cubic-bezier(0.16, 1, 0.3, 1)),
+              transform var(--anim-enter-duration, 0.4s) var(--anim-enter-ease, cubic-bezier(0.16, 1, 0.3, 1));
+}
+.scroll-top-leave-active {
+  transition: opacity var(--anim-leave-duration, 0.25s) var(--anim-leave-ease, ease-in),
+              transform var(--anim-leave-duration, 0.25s) var(--anim-leave-ease, ease-in);
+}
+.scroll-top-enter-from {
+  opacity: 0;
+  transform: translateY(16px) scale(0.85);
+}
+.scroll-top-leave-to {
+  opacity: 0;
+  transform: translateY(16px) scale(0.85);
+}
+
+/* ─── Reset button entrance/exit ─── */
+.reset-fade-enter-active {
+  transition: opacity var(--anim-enter-duration, 0.4s) var(--anim-enter-ease, cubic-bezier(0.16, 1, 0.3, 1)),
+              transform var(--anim-enter-duration, 0.4s) var(--anim-enter-ease, cubic-bezier(0.16, 1, 0.3, 1));
+}
+.reset-fade-leave-active {
+  transition: opacity var(--anim-leave-duration, 0.25s) var(--anim-leave-ease, ease-in),
+              transform var(--anim-leave-duration, 0.25s) var(--anim-leave-ease, ease-in);
+}
+.reset-fade-enter-from {
+  opacity: 0;
+  transform: scale(0.85) translateX(-8px);
+}
+.reset-fade-leave-to {
+  opacity: 0;
+  transform: scale(0.85) translateX(-8px);
 }
 </style>

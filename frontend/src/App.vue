@@ -7,14 +7,11 @@ import ToastContainer from '@/components/ToastContainer.vue'
 import InstallPrompt from '@/components/InstallPrompt.vue'
 import { usePushNotifications } from '@/composables/usePushNotifications'
 import gsap from 'gsap'
-import { ANIM_TIMING } from '@/composables/useAnimationTiming'
 
 const router = useRouter()
 const isDark = ref(false)
 const transitioning = ref(false)
 const overlayRef = ref<HTMLElement | null>(null)
-const pageLoading = ref(false)
-
 // ─── Route order for directional slide hints ───────────────
 // Controls which direction pages slide (forward = left, back = right).
 // Must stay in sync with the router's named routes.
@@ -108,17 +105,6 @@ router.beforeEach((to, from) => {
   document.documentElement.style.setProperty('--page-enter-duration', enterProps.enterDuration)
   document.documentElement.style.setProperty('--page-enter-ease', enterProps.enterEase)
 
-  // Show logo loading overlay during navigation
-  pageLoading.value = true
-})
-
-router.afterEach(() => {
-  // Hide loading overlay after the longest enter transition finishes
-  // Combined: max page enter + loading-fade leave
-  // 650ms = 400ms (ANIM_TIMING.enterDuration slide enter) + 250ms (ANIM_TIMING.leaveDuration loading-fade leave)
-  setTimeout(() => {
-    pageLoading.value = false
-  }, (ANIM_TIMING.enterDuration * 1000) + (ANIM_TIMING.leaveDuration * 1000))
 })
 
 function toggleDark() {
@@ -197,18 +183,6 @@ onMounted(() => {
   <!-- Theme crossfade overlay — sits above everything during transitions -->
   <div ref="overlayRef" class="theme-overlay" style="opacity: 0;"></div>
 
-  <!-- ─── Logo Loading Overlay (fades in on navigation) ─── -->
-  <transition name="loading-fade">
-    <div v-if="pageLoading" class="page-loading-overlay">
-      <div class="loading-logo">
-        <div class="loading-ring"></div>
-        <div class="loading-inner">
-          <img src="/logo.png" alt="VidTopUp" />
-        </div>
-      </div>
-    </div>
-  </transition>
-
   <div class="min-h-screen flex flex-col">
     <Navbar
       :is-dark="isDark"
@@ -272,80 +246,4 @@ onMounted(() => {
   transform: var(--page-enter-transform, translateX(calc(var(--page-dir, 1) * 60px)) scale(0.97));
 }
 
-/* ════════════════════════════════════════════════════════════
- *  Logo Loading Overlay — shown briefly during page navigation
- *  Uses the same ring+logo design as the splash screen.
- * ════════════════════════════════════════════════════════════ */
-.page-loading-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 99999;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(248, 250, 252, 0.85);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-}
-@media (prefers-color-scheme: dark) {
-  .page-loading-overlay { background: rgba(2, 6, 23, 0.85); }
-}
-
-.loading-logo {
-  width: 56px;
-  height: 56px;
-  border-radius: 14px;
-  position: relative;
-  overflow: hidden;
-  box-shadow: 0 4px 20px rgba(37, 99, 235, 0.12);
-}
-.loading-ring {
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-}
-.loading-ring::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  background: conic-gradient(from 0deg, #4d96ff, #2563eb, #8b5cf6, #c084fc, #2563eb, #4d96ff);
-  animation: loading-spin 1.2s linear infinite;
-}
-.loading-inner {
-  position: absolute;
-  inset: 2px;
-  border-radius: 12px;
-  background: #fff;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
-}
-@media (prefers-color-scheme: dark) {
-  .loading-inner { background: #0f172a; }
-}
-.loading-inner img {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-}
-
-@keyframes loading-spin {
-  to { transform: rotate(360deg); }
-}
-
-/* ─── Loading overlay fade transition ─── */
-/* Enter is intentionally fast (0.15s) so the spinner appears immediately */
-.loading-fade-enter-active {
-  transition: opacity 0.15s ease-out;
-}
-/* Leave uses centralized leave duration/easing for consistency */
-.loading-fade-leave-active {
-  transition: opacity var(--anim-leave-duration) var(--anim-leave-ease);
-}
-.loading-fade-enter-from,
-.loading-fade-leave-to {
-  opacity: 0;
-}
 </style>

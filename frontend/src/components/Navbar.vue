@@ -103,6 +103,7 @@ function navigateAndClose(path: string) {
         ? 'backdrop-blur-xl bg-white/85 dark:bg-surface-950/85 border-b border-surface-200/60 dark:border-surface-800/60 shadow-lg shadow-black/5'
         : 'backdrop-blur-md bg-white/70 dark:bg-surface-950/70 border-b border-transparent'
     ]"
+    style="padding-top: env(safe-area-inset-top, 0px);"
   >
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <div class="flex items-center justify-between h-16">

@@ -22,7 +22,7 @@ export default defineConfig({
         display_override: ['window-controls-overlay', 'standalone'],
         orientation: 'portrait',
         scope: '/',
-        start_url: '/pwa-splash.html',
+        start_url: '/',
         id: '/',
         icons: [
           {

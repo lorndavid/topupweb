@@ -1,10 +1,12 @@
 {
+  "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "vite",
-  "buildCommand": "npm run build",
+  "buildCommand": "npx pwa-assets-generator && npm run build",
   "outputDirectory": "dist",
+  "installCommand": "npm install",
   "rewrites": [
     {
-      "source": "/(.*)",
+      "source": "/((?!api).*)",
       "destination": "/index.html"
     }
   ],
@@ -19,7 +21,7 @@
       ]
     },
     {
-      "source": "/workbox-*.js",
+      "source": "/workbox-(.*)",
       "headers": [
         {
           "key": "Cache-Control",
@@ -28,7 +30,7 @@
       ]
     },
     {
-      "source": "/apple-splash-*.png",
+      "source": "/apple-splash-(.*)",
       "headers": [
         {
           "key": "Cache-Control",
@@ -37,7 +39,7 @@
       ]
     },
     {
-      "source": "/pwa-*.png",
+      "source": "/pwa-(.*)",
       "headers": [
         {
           "key": "Cache-Control",

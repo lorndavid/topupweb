@@ -12,6 +12,7 @@ import type {
   CheckGameIdResponse,
   AdminDashboardData,
   BalanceInfo,
+  NewProductsConfig,
 } from '@/types'
 
 const api = axios.create({
@@ -193,6 +194,22 @@ export async function getOrdersByPlayer(playerId: string): Promise<OrderResponse
     throw new Error(data.message || 'Failed to fetch orders')
   }
   return data.data || []
+}
+
+export async function getNewProductsConfig(): Promise<NewProductsConfig> {
+  const { data } = await api.get<ApiResponse<NewProductsConfig>>('/config/new-products')
+  if (!data.success || !data.data) {
+    throw new Error(data.message || 'Failed to fetch new products config')
+  }
+  return data.data
+}
+
+export async function getPriceDropsByGame(gameCode: string): Promise<Record<string, number>> {
+  const { data } = await api.get<ApiResponse<Record<string, number>>>(`/price-drops/${gameCode}`)
+  if (!data.success || !data.data) {
+    return {}
+  }
+  return data.data
 }
 
 export async function getResellerBalance(): Promise<BalanceInfo> {

@@ -157,6 +157,10 @@ export interface AwaitingStockOrder {
   updated_at: string
 }
 
+export interface NewProductsConfig {
+  [gameCode: string]: number[]
+}
+
 export interface AdminDashboardData {
   profile: AdminDashboardProfile | null
   stats: AdminDashboardStats

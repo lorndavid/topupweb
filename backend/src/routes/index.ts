@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { getCategories, getCambodiaGames, getProductsByGame } from '../controllers/category.controller';
+import { getCategories, getCambodiaGames, getProductsByGame, getPriceDropsByGame } from '../controllers/category.controller';
 import { createPayment, getPaymentStatus, handleCallback, manualConfirmPayment } from '../controllers/payment.controller';
 import { createOrder, getOrder, getOrdersByPlayer, cancelOrder, retryOrder } from '../controllers/order.controller';
 import { verifyPlayer, checkGameId } from '../controllers/player.controller';
@@ -39,6 +39,23 @@ router.post('/webhook/stock-alert', receiveStockAlert);
 router.get('/webhook/recent-alerts', getRecentAlerts);
 router.post('/webhook/test', testNotification);
 router.post('/webhook/daily-summary', triggerDailySummary);
+
+// Price drops
+router.get('/price-drops/:gameCode', getPriceDropsByGame);
+
+// Config
+router.get('/config/new-products', (_req, res) => {
+  res.json({
+    success: true,
+    message: 'New products config fetched',
+    data: {
+      mlbb: [11, 22, 55, 112],          // Newly added MLBB diamond packages
+      freefire_sgmy: [],
+      freefire_global: [],
+      pubgm: [],
+    },
+  });
+});
 
 // Admin
 router.get('/admin/dashboard', getAdminDashboard);

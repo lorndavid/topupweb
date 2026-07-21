@@ -3,7 +3,7 @@ import type { GameProduct } from '@/types'
 import { useFormattedPrice } from '@/composables/useCurrency'
 import { getGameCurrency, extractAmount } from '@/utils/gameCurrency'
 
-type ProductBadge = 'best-value' | 'most-popular' | null
+type ProductBadge = 'best-value' | 'most-popular' | 'new' | 'price-drop' | 'balance-check' | null
 
 const props = defineProps<{
   product: GameProduct
@@ -23,6 +23,21 @@ const badgeConfig: Record<NonNullable<ProductBadge>, { label: string; bg: string
     label: 'Most Popular',
     bg: 'from-amber-500 to-orange-500 shadow-amber-500/30',
     icon: 'M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z',
+  },
+  'new': {
+    label: 'New',
+    bg: 'from-blue-500 to-cyan-500 shadow-blue-500/30',
+    icon: 'M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z',
+  },
+  'price-drop': {
+    label: '🔥 Price Dropped',
+    bg: 'from-green-500 to-emerald-500 shadow-green-500/30',
+    icon: 'M13 7h8m0 0v8m0-8l-8 8-4-4-6 6',
+  },
+  'balance-check': {
+    label: 'Check Balance',
+    bg: 'from-amber-500 to-rose-500 shadow-amber-500/30',
+    icon: 'M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z',
   },
 }
 

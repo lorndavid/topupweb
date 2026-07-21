@@ -6,7 +6,7 @@ import { useI18nStore } from '@/stores/i18n'
 import { useToastStore } from '@/stores/toast'
 import ProductCard from '@/components/ProductCard.vue'
 import LoadingSkeleton from '@/components/LoadingSkeleton.vue'
-import { verifyPlayer, createPayment, getPaymentStatus, cancelOrder, getOrder } from '@/services/api'
+import { verifyPlayer, createPayment, getPaymentStatus, cancelOrder, getOrder, getNewProductsConfig, getPriceDropsByGame } from '@/services/api'
 import type { GameProduct } from '@/types'
 import { useSavedPlayers } from '@/composables/useSavedPlayers'
 import { formatPrice } from '@/composables/useCurrency'
@@ -81,8 +81,52 @@ const gameCurrency = computed(() => getGameCurrency(gameCode.value))
 
 const gameImageUrl = computed(() => gameStore.selectedGame?.image_url || '')
 
+// ─── New products config (fetched from backend) ───
+const newProductAmounts = ref<Record<string, Set<number>>>({})
+const priceDrops = ref<Record<string, number>>({})
+
+onMounted(async () => {
+  try {
+    const [config, drops] = await Promise.all([
+      getNewProductsConfig(),
+      getPriceDropsByGame(gameCode.value),
+    ])
+    // Convert number[] to Set<number> for fast lookup
+    const mapped: Record<string, Set<number>> = {}
+    for (const [code, amounts] of Object.entries(config)) {
+      if (amounts.length > 0) {
+        mapped[code] = new Set(amounts)
+      }
+    }
+    newProductAmounts.value = mapped
+    priceDrops.value = drops
+  } catch {
+    // Silently fail — badges just won't show
+  }
+})
+
+const productsNeedingNewBadge = computed<Set<string>>(() => {
+  const amounts = newProductAmounts.value[gameCode.value]
+  if (!amounts) return new Set()
+  const codes = new Set<string>()
+  for (const p of gameStore.products) {
+    const amt = parseFloat(extractAmount(p.name))
+    if (amounts.has(amt)) codes.add(p.product_code)
+  }
+  return codes
+})
+
+const productsWithPriceDrop = computed<Set<string>>(() => {
+  const codes = new Set<string>()
+  const drops = priceDrops.value
+  for (const code of Object.keys(drops)) {
+    if (drops[code] > 0) codes.add(code)
+  }
+  return codes
+})
+
 // ─── Product stagger reveal (one-shot guard prevents re-trigger flash) ───
-type ProductBadge = 'best-value' | 'most-popular' | null
+type ProductBadge = 'best-value' | 'most-popular' | 'new' | 'price-drop' | null
 type SortMode = 'default' | 'most-popular' | 'best-value' | 'cheapest' | 'price-high'
 
 const activeSort = ref<SortMode>('default')
@@ -286,6 +330,58 @@ watch(savedForGame, (chips) => {
   }
 })
 
+// ─── Balance eligibility check (Free Fire SG "Less is More" 520-diamond package) ───
+/** Config: game codes → set of diamond amounts that require balance confirmation */
+const BALANCE_CHECK_REQUIRED: Record<string, Set<number>> = {
+  freefire_sgmy: new Set([520]),
+  'freefire_sg': new Set([520]),
+}
+
+const showBalanceDialog = ref(false)
+const balanceConfirmed = ref(false)
+
+const selectedNeedsBalanceCheck = computed(() => {
+  if (!selectedProduct.value) return false
+  const amounts = BALANCE_CHECK_REQUIRED[gameCode.value]
+  if (!amounts) return false
+  const amt = parseFloat(extractAmount(selectedProduct.value.name))
+  return amounts.has(amt)
+})
+
+const productsNeedingBalanceCheck = computed<Set<string>>(() => {
+  const amounts = BALANCE_CHECK_REQUIRED[gameCode.value]
+  if (!amounts) return new Set()
+  const codes = new Set<string>()
+  for (const p of gameStore.products) {
+    const amt = parseFloat(extractAmount(p.name))
+    if (amounts.has(amt)) codes.add(p.product_code)
+  }
+  return codes
+})
+
+function openBalanceDialog() {
+  balanceConfirmed.value = false
+  showBalanceDialog.value = true
+}
+
+function closeBalanceDialog() {
+  showBalanceDialog.value = false
+  balanceConfirmed.value = false
+}
+
+/** Called after user confirms eligibility in the dialog */
+function proceedWithBalanceCheck() {
+  showBalanceDialog.value = false
+  // Resume whichever flow was interrupted
+  if (isMobileFlow.value) {
+    executeMobileCheckout()
+  } else {
+    executeProceedToCheckout()
+  }
+}
+
+const isMobileFlow = ref(false)
+
 // ─── Methods ─────────────────────────────────────────────────
 function selectProduct(product: GameProduct) {
   selectedProduct.value = product
@@ -446,6 +542,19 @@ function playSuccessSound() {
 async function handleMobileCheckout() {
   if (!selectedProduct.value || !playerId.value.trim() || !verified.value) return
 
+  // If this package requires balance confirmation, show the dialog first
+  if (selectedNeedsBalanceCheck.value) {
+    isMobileFlow.value = true
+    openBalanceDialog()
+    return
+  }
+
+  await executeMobileCheckout()
+}
+
+async function executeMobileCheckout() {
+  if (!selectedProduct.value || !playerId.value.trim() || !verified.value) return
+
   // Set the order in store first
   gameStore.setOrder({
     gameName: gameDisplayName.value,
@@ -580,6 +689,19 @@ function proceedToCheckout() {
     toast.warning(i18n.t('detail.toast.enterServerId'))
     return
   }
+
+  // If this package requires balance confirmation, show the dialog first
+  if (selectedNeedsBalanceCheck.value) {
+    isMobileFlow.value = false
+    openBalanceDialog()
+    return
+  }
+
+  executeProceedToCheckout()
+}
+
+function executeProceedToCheckout() {
+  if (!selectedProduct.value) return
 
   gameStore.setOrder({
     gameName: gameDisplayName.value,
@@ -875,7 +997,7 @@ onUnmounted(() => {
                 :selected="selectedProduct?.product_code === product.product_code"
                 :game-code="gameCode"
                 :game-image-url="gameImageUrl"
-                :badge="productBadges.get(product.product_code) || null"
+                :badge="productsNeedingBalanceCheck.has(product.product_code) ? 'balance-check' : productsWithPriceDrop.has(product.product_code) ? 'price-drop' : productsNeedingNewBadge.has(product.product_code) ? 'new' : (productBadges.get(product.product_code) || null)"
                 @select="selectProduct(product)"
                 class="product-card"
               />
@@ -1379,6 +1501,107 @@ onUnmounted(() => {
       </div>
     </div>
     </Teleport>
+
+    <!-- ═══ Balance Eligibility Confirmation Dialog ═══ -->
+    <Teleport to="body">
+      <Transition name="balance-dialog">
+        <div
+          v-if="showBalanceDialog"
+          class="fixed inset-0 z-[70] flex items-center justify-center p-4 overflow-y-auto"
+          @keydown.escape="closeBalanceDialog"
+        >
+          <!-- Backdrop -->
+          <div
+            class="absolute inset-0 bg-black/50 backdrop-blur-sm"
+            @click="closeBalanceDialog"
+          ></div>
+          <!-- Dialog card -->
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Balance eligibility confirmation"
+            class="relative w-full max-w-md bg-white dark:bg-surface-900 rounded-2xl shadow-2xl border border-surface-200 dark:border-surface-700 overflow-hidden"
+            @click.stop
+          >
+            <!-- Header accent bar -->
+            <div class="h-1.5 bg-gradient-to-r from-amber-500 to-rose-500"></div>
+            <div class="p-6 space-y-5">
+              <!-- Warning icon + title -->
+              <div class="flex items-start gap-4">
+                <div class="w-12 h-12 rounded-full bg-amber-50 dark:bg-amber-900/20 flex items-center justify-center shrink-0">
+                  <svg class="w-6 h-6 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 class="text-lg font-bold text-surface-900 dark:text-surface-100">
+                    Balance Check Required
+                  </h3>
+                  <p class="text-sm text-surface-500 dark:text-surface-400 mt-1">
+                    This "Less is More" package is only available for accounts with
+                    <strong class="text-amber-600 dark:text-amber-400">49 💎 or fewer</strong> remaining diamonds.
+                  </p>
+                </div>
+              </div>
+
+              <!-- Details -->
+              <div class="bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800/30 rounded-xl p-4 space-y-2">
+                <div class="flex items-start gap-3">
+                  <svg class="w-4 h-4 shrink-0 mt-0.5 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <p class="text-xs text-amber-700 dark:text-amber-300">
+                    Bay2Game requires that the player's account has <strong>49 diamonds or fewer</strong> in their balance to be eligible for this package. If the balance is 50+ diamonds, the order may fail or the diamonds may not be delivered.
+                  </p>
+                </div>
+                <div class="flex items-start gap-3">
+                  <svg class="w-4 h-4 shrink-0 mt-0.5 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <p class="text-xs text-amber-700 dark:text-amber-300">
+                    <strong>Please ask your customer</strong> to check their in-game diamond balance before proceeding. We cannot automatically verify the balance.
+                  </p>
+                </div>
+              </div>
+
+              <!-- Confirmation checkbox -->
+              <label class="flex items-start gap-3 cursor-pointer group">
+                <input
+                  type="checkbox"
+                  v-model="balanceConfirmed"
+                  class="mt-0.5 w-4 h-4 rounded border-surface-300 dark:border-surface-600 text-primary-500 focus:ring-primary-400 cursor-pointer"
+                />
+                <span class="text-sm text-surface-700 dark:text-surface-300 group-hover:text-surface-900 dark:group-hover:text-surface-100 transition-colors">
+                  I have confirmed with the customer that their account has <strong>49 💎 or fewer</strong> remaining diamonds.
+                </span>
+              </label>
+
+              <!-- Action buttons -->
+              <div class="flex items-center gap-3 pt-1">
+                <button
+                  @click="closeBalanceDialog"
+                  class="flex-1 px-4 py-2.5 rounded-xl border border-surface-200 dark:border-surface-700 text-sm font-semibold text-surface-600 dark:text-surface-400 hover:bg-surface-50 dark:hover:bg-surface-800 transition-all duration-200"
+                >
+                  Cancel
+                </button>
+                <button
+                  @click="proceedWithBalanceCheck"
+                  :disabled="!balanceConfirmed"
+                  class="flex-1 px-4 py-2.5 rounded-xl text-sm font-semibold text-white transition-all duration-200"
+                  :class="balanceConfirmed
+                    ? 'bg-gradient-to-r from-primary-500 to-primary-600 hover:from-primary-600 hover:to-primary-700 shadow-lg shadow-primary-500/20 active:scale-[0.98]'
+                    : 'bg-surface-200 dark:bg-surface-700 text-surface-400 dark:text-surface-500 cursor-not-allowed'
+                  "
+                >
+                  Continue
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
+
   </div>
 </template>
 
@@ -1626,6 +1849,44 @@ onUnmounted(() => {
 .khqr-sheet-enter-to {
   transform: translateY(0);
   opacity: 1;
+}
+
+/* ─── Balance confirmation dialog entrance/exit ─── */
+.balance-dialog-enter-active {
+  transition: opacity var(--anim-enter-duration, 0.4s) var(--anim-enter-ease, cubic-bezier(0.16, 1, 0.3, 1));
+}
+.balance-dialog-leave-active {
+  transition: opacity var(--anim-leave-duration, 0.25s) var(--anim-leave-ease, ease-in);
+}
+.balance-dialog-enter-from,
+.balance-dialog-leave-to {
+  opacity: 0;
+}
+.balance-dialog-enter-active > div:last-child {
+  animation: balance-card-enter var(--anim-enter-duration, 0.4s) var(--anim-enter-ease, cubic-bezier(0.16, 1, 0.3, 1)) both;
+}
+.balance-dialog-leave-active > div:last-child {
+  animation: balance-card-leave var(--anim-leave-duration, 0.25s) var(--anim-leave-ease, ease-in) both;
+}
+@keyframes balance-card-enter {
+  from {
+    opacity: 0;
+    transform: scale(0.92) translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+@keyframes balance-card-leave {
+  from {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.92) translateY(20px);
+  }
 }
 
 /* ─── Scroll-to-top button entrance/exit ─── */

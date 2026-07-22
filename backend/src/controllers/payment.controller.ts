@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { orderService } from '../services/order.service';
-import { paymentCreateSchema, paymentCallbackSchema } from '../validators';
+import { cutluyService } from '../services/cutluy.service';
+import { paymentCreateSchema } from '../validators';
 import { HTTP_STATUS } from '../constants';
 import { AppError } from '../middleware/errorHandler';
 
@@ -87,21 +88,60 @@ export async function manualConfirmPayment(
   }
 }
 
-export async function handleCallback(
+/**
+ * Handle CutLuy webhook for payment status updates.
+ *
+ * IMPORTANT: This endpoint must receive the RAW request body (not parsed JSON)
+ * for webhook signature verification. The raw body parser is configured
+ * in server.ts via app.use('/api/webhooks/cutluy', express.raw({ type: 'application/json' })).
+ *
+ * CutLuy sends:
+ *   - payment.completed  → order is paid → trigger top-up
+ *   - payment.expired    → QR expired unpaid
+ *   - payment.failed     → payment failed
+ */
+export async function handleCutLuyWebhook(
   req: Request,
   res: Response,
   next: NextFunction
 ): Promise<void> {
   try {
-    const validation = paymentCallbackSchema.safeParse(req.body);
-    if (!validation.success) {
-      throw new AppError('Invalid callback payload', HTTP_STATUS.BAD_REQUEST);
+    // Get the raw body for signature verification
+    const rawBody = (req as any).rawBody || JSON.stringify(req.body);
+    const signature = req.headers['x-cutluy-signature'] as string;
+    const eventType = req.headers['x-cutluy-event'] as string;
+
+    // Verify webhook signature
+    if (signature) {
+      const isValid = cutluyService.verifyWebhookSignature(rawBody, signature);
+      if (!isValid) {
+        console.warn('⚠️  CutLuy webhook signature verification failed — rejecting');
+        res.status(400).json({ error: 'invalid signature' });
+        return;
+      }
     }
 
-    const result = await orderService.handleCallback(validation.data);
+    const event = req.body;
 
-    res.status(HTTP_STATUS.OK).json(result);
+    if (!event || !event.type) {
+      console.warn('⚠️  CutLuy webhook: invalid payload');
+      res.status(400).json({ error: 'invalid payload' });
+      return;
+    }
+
+    console.log(`📨 CutLuy webhook: ${event.type}`, {
+      payment_id: event.data?.payment?.id,
+      reference_id: event.data?.payment?.reference_id,
+      status: event.data?.payment?.status,
+    });
+
+    await orderService.handleCutLuyWebhook(event);
+
+    // Always respond 200 to acknowledge receipt
+    res.status(HTTP_STATUS.OK).json({ received: true });
   } catch (error) {
-    next(error);
+    // Log but don't fail — CutLuy will retry if we send non-2xx
+    console.error('❌ CutLuy webhook error:', error);
+    res.status(HTTP_STATUS.OK).json({ received: true });
   }
 }

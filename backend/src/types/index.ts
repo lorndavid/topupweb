@@ -74,7 +74,7 @@ export interface Order {
   amount: number;
   player_id: string;
   server_id?: string;
-  payment_method: 'bakong';
+  payment_method: 'cutluy';
   payment_status: 'pending' | 'paid' | 'failed';
   order_status: OrderStatus;
   khqr_image?: string;

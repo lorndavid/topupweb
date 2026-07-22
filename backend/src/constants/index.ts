@@ -53,7 +53,6 @@ export const ERROR_MESSAGES = {
   API_TIMEOUT: 'Bay2Game API timeout',
   API_FAILURE: 'Bay2Game API failure',
   DUPLICATE_REFERENCE: 'Duplicate order reference',
-  BAKONG_ERROR: 'Bakong payment error',
 } as const;
 
 export const REFERENCE_PREFIX = 'TUP';

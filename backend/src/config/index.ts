@@ -24,20 +24,17 @@ export const config = {
   },
 
   merchant: {
-    bakongId: process.env.MERCHANT_BAKONG_ID || '',
     name: process.env.MERCHANT_NAME || 'MY SHOP',
     city: process.env.MERCHANT_CITY || 'Phnom Penh',
     defaultCurrency: process.env.DEFAULT_CURRENCY || 'USD',
   },
 
-  bakong: {
-    apiUrl: process.env.BAKONG_API_URL || 'https://api-bakong.nbc.gov.kh',
-    apiToken: process.env.BAKONG_API_TOKEN || '',
-    callbackUrl:
-      process.env.BAKONG_CALLBACK_URL ||
-      'http://localhost:3001/api/payment/callback',
+  cutluy: {
+    apiKey: process.env.CUTLUY_API_KEY || '',
+    apiUrl: process.env.CUTLUY_API_URL || 'https://cutluy.com/v1',
+    webhookSecret: process.env.CUTLUY_WEBHOOK_SECRET || '',
     returnUrl:
-      process.env.BAKONG_RETURN_URL || 'http://localhost:5173/payment/success',
+      process.env.CUTLUY_RETURN_URL || 'http://localhost:5173/payment/success',
   },
 
   notifications: {
@@ -65,8 +62,7 @@ export const config = {
 export function validateConfig(): void {
   const required = [
     ['BAY2GAME_API_KEY', config.bay2game.apiKey],
-    ['BAKONG_API_TOKEN', config.bakong.apiToken],
-    ['MERCHANT_BAKONG_ID', config.merchant.bakongId],
+    ['CUTLUY_API_KEY', config.cutluy.apiKey],
     ['MONGODB_URI', config.mongodb.uri],
   ];
 

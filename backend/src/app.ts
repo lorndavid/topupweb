@@ -43,6 +43,22 @@ app.use(
 );
 
 // Body parsing
+// IMPORTANT: Capture raw body for CutLuy webhook signature verification BEFORE JSON parsing.
+// We use express.raw() for just the CutLuy route, which preserves the raw Buffer.
+// Then we manually parse it as JSON so the route handler gets both req.body and req.rawBody.
+app.use('/api/webhooks/cutluy', express.raw({ type: '*/*', limit: '1mb' }));
+app.use('/api/webhooks/cutluy', (req, _res, next) => {
+  try {
+    // Save the raw body as string for signature verification
+    (req as any).rawBody = (req.body as Buffer).toString('utf8');
+    // Parse JSON for the route handler
+    req.body = JSON.parse((req as any).rawBody);
+  } catch {
+    // If it's not valid JSON, leave body as-is
+  }
+  next();
+});
+
 app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: true, limit: '1mb' }));
 

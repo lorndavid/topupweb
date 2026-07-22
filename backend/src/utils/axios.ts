@@ -10,20 +10,27 @@ export const bay2gameApi = axios.create({
   },
 });
 
-export const bakongApi = axios.create({
+/**
+ * CutLuy API client for KHQR payment processing.
+ *
+ * CutLuy uses Bearer token authentication with the store's API key.
+ * The API key identifies which store (and which ABA PayWay payment link)
+ * the request acts on.
+ */
+export const cutluyApi = axios.create({
   timeout: API_TIMEOUT,
-  baseURL: config.bakong.apiUrl,
+  baseURL: config.cutluy.apiUrl || 'https://cutluy.com/v1',
   headers: {
     Accept: 'application/json',
     'Content-Type': 'application/json',
-    ...(config.bakong.apiToken ? { Authorization: `Bearer ${config.bakong.apiToken}` } : {}),
+    ...(config.cutluy.apiKey ? { Authorization: `Bearer ${config.cutluy.apiKey}` } : {}),
   },
 });
 
-// Update Bakong auth header if token changes (at runtime)
-bakongApi.interceptors.request.use((reqConfig) => {
-  if (config.bakong.apiToken) {
-    reqConfig.headers.Authorization = `Bearer ${config.bakong.apiToken}`;
+// Keep the auth header in sync if config changes at runtime
+cutluyApi.interceptors.request.use((reqConfig) => {
+  if (config.cutluy.apiKey) {
+    reqConfig.headers.Authorization = `Bearer ${config.cutluy.apiKey}`;
   }
   return reqConfig;
 });

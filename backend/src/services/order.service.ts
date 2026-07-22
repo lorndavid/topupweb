@@ -3,7 +3,7 @@ import { config } from '../config';
 import { AppError } from '../middleware/errorHandler';
 import { generateReference } from '../utils/generateReference';
 import { bay2gameService } from './bay2game.service';
-import { bakongService } from './bakong.service';
+import { cutluyService } from './cutluy.service';
 import { orderRepository } from '../repositories/OrderRepository';
 import { notificationService } from './notification.service';
 import { webSocketService } from './websocket.service';
@@ -11,7 +11,17 @@ import { pushNotificationService } from './pushNotification.service';
 
 export class OrderService {
   /**
-   * Create a new order and generate KHQR payment
+   * Create a new order and generate CutLuy payment (KHQR via ABA PayWay).
+   *
+   * Flow:
+   *   1. Create order in DB with 'awaiting_payment' status
+   *   2. Call CutLuy API to create a payment and get QR string + checkout URL
+   *   3. Generate QR image from the raw KHQR string
+   *   4. Return payment details to the frontend
+   *
+   * The customer scans the QR (or opens the checkout URL) with any Cambodian
+   * banking app that supports KHQR (ABA, ACLEDA, Wing, Bakong, etc.).
+   * The underlying ABA PayWay payment link processes the transaction.
    */
   async createPaymentRequest(params: {
     gameCode: string;
@@ -24,11 +34,7 @@ export class OrderService {
   }) {
     const reference = generateReference();
 
-    const khqr = await bakongService.generateKHQR({
-      amount: params.amount,
-      description: `Top-up ${params.productName} - ${params.gameName} - ${params.playerId}`,
-    });
-
+    // 1. Create the order in our DB
     const order = await orderRepository.create({
       reference,
       game_code: params.gameCode,
@@ -40,33 +46,56 @@ export class OrderService {
       amount: params.amount,
       player_id: params.playerId,
       server_id: params.serverId,
-      payment_method: 'bakong',
+      payment_method: 'cutluy',
       payment_status: 'pending',
       order_status: 'awaiting_payment',
-      khqr_image: khqr.qrImage,
-      khqr_data: khqr.qr,
-      transaction_id: khqr.transactionId,
+    });
+
+    // 2. Create payment on CutLuy (uses the store's ABA PayWay payment link)
+    //    The payment link configured in CutLuy is:
+    //      https://link.payway.com.kh/ABAPAY7a479793u
+    //    This is an ABA PayWay link that accepts Bakong KHQR payments.
+    const cutluyPayment = await cutluyService.createPayment({
+      amount: params.amount,
+      reference_id: reference,
+      metadata: {
+        game_code: params.gameCode,
+        product_code: params.productCode,
+        product_name: params.productName,
+        game_name: params.gameName,
+        player_id: params.playerId,
+        server_id: params.serverId,
+      },
+    });
+
+    // 3. Store the CutLuy payment ID and checkout URL on the order
+    await orderRepository.updateStatus(reference, {
+      cutluy_payment_id: cutluyPayment.cutluyPaymentId,
+      khqr_image: cutluyPayment.qrImage,
+      khqr_data: cutluyPayment.qr_string,
+      checkout_url: cutluyPayment.checkout_url,
     });
 
     return {
       reference: order.reference,
-      amount: order.amount,
-      khqr_image: order.khqr_image,
-      khqr_data: order.khqr_data,
-      transaction_id: order.transaction_id,
-      expires_at: new Date(Date.now() + 5 * 60 * 1000).toISOString(),
+      amount: cutluyPayment.amount,
+      khqr_image: cutluyPayment.qrImage,
+      khqr_data: cutluyPayment.qr_string,
+      checkout_url: cutluyPayment.checkout_url,
+      cutluy_payment_id: cutluyPayment.cutluyPaymentId,
+      expires_at: cutluyPayment.expires_at,
     };
   }
 
   /**
    * Check payment status (called by frontend polling every 3 seconds).
    *
-   * Verification Strategy (Dual Approach):
-   * 1. PRIMARY: Real Bakong API check via v1/check_transaction with the transaction_id
-   * 2. FALLBACK (dev): Simulated check after reasonable elapsed time
+   * Verification:
+   *   1. PRIMARY: Check with CutLuy API via cutluy_payment_id
+   *   2. FALLBACK: Timeout after 5 minutes → mark as failed
    *
-   * In production with Bakong API configured, this polls the real Bakong API
-   * which covers ALL Cambodian banks (ABA, ACLEDA, Wing, etc.) through Bakong.
+   * CutLuy's API covers ALL Cambodian banks through the Bakong KHQR system.
+   * When the customer scans and pays, CutLuy reports the payment as 'paid'.
    */
   async checkPaymentStatus(reference: string) {
     const order = await orderRepository.findByReference(reference);
@@ -83,14 +112,12 @@ export class OrderService {
       };
     }
 
-    // ── 1. Try the real Bakong API check ─────────────────
-    let bakongCheckFailed = false;
-
-    if (order.transaction_id && config.bakong.apiToken) {
+    // ── 1. Try the CutLuy API check ─────────────────
+    if (order.cutluy_payment_id) {
       try {
-        const bakongResult = await bakongService.checkPaymentStatus(order.transaction_id);
+        const cutluyResult = await cutluyService.retrievePayment(order.cutluy_payment_id);
 
-        if (bakongResult.status === 'PAID' || bakongResult.status === 'SUCCESS') {
+        if (cutluyService.isPaid(cutluyResult.status)) {
           const updated = await orderRepository.markPaid(reference);
 
           // Notify connected clients in real-time
@@ -112,16 +139,31 @@ export class OrderService {
           };
         }
 
-        // Bakong says still pending — return current status
+        // CutLuy says expired/failed — mark as failed
+        if (cutluyResult.status === 'expired' || cutluyResult.status === 'failed') {
+          console.warn(`⏰ CutLuy payment ${cutluyResult.status} for ${reference}`);
+          await orderRepository.updateStatus(reference, {
+            payment_status: 'failed',
+            order_status: 'failed',
+          });
+
+          return {
+            reference,
+            payment_status: 'failed',
+            order_status: 'failed',
+          };
+        }
+
+        // Still pending/scanned — return current status
         return {
           reference: order.reference,
           payment_status: order.payment_status,
           order_status: order.order_status,
         };
       } catch (error) {
-        // Bakong API check failed — fall through to safety net below
-        console.warn('⚠️  Bakong API payment check failed:', error);
-        bakongCheckFailed = true;
+        // CutLuy API check failed (network error, etc.)
+        // Log it but don't fail the order — let it try again on next poll
+        console.warn('⚠️  CutLuy API payment check failed:', error);
       }
     }
 
@@ -138,53 +180,6 @@ export class OrderService {
         reference,
         payment_status: 'failed',
         order_status: 'failed',
-      };
-    }
-
-    // ── 3. Safety net: Time-based simulation ─────────────────
-    //
-    // Runs when either:
-    //   a) Bakong API is NOT configured at all (no apiToken) — dev mode
-    //   b) Bakong API IS configured but the check_transaction call failed
-    //      (e.g. locally-generated QR, invalid credentials, network error)
-    //
-    // Why this is needed:
-    //   When the KHQR is generated via the bakong-khqr SDK (not the Bakong API),
-    //   the transaction_id in the order is LOCAL (not registered with Bakong).
-    //   Calling Bakong's check_transaction with this ID will always fail.
-    //   Without this safety net, orders would hang forever and auto-fail after 5 min.
-    //
-    // Timing:
-    //   Production: 60 seconds — gives user time to scan + pay, but auto-advances
-    //   Dev:         30 seconds — faster for testing
-    //
-    // The manual confirm button (visible after 20-30s on the frontend) is the
-    // primary mechanism. This safety net is a fallback so orders don't hang.
-
-    const bakongUnavailable = !config.bakong.apiToken || bakongCheckFailed;
-    const simulationDelay = config.isProd ? 60000 : 30000;
-
-    if (bakongUnavailable && elapsed > simulationDelay) {
-      const mode = config.isProd ? 'PROD' : 'DEV';
-      console.log(`💡 [${mode}] Payment simulation for ${reference} after ${Math.round(elapsed / 1000)}s (Bakong ${!config.bakong.apiToken ? 'unconfigured' : 'check failed'})`);
-      const updated = await orderRepository.markPaid(reference);
-
-      // Notify connected clients in real-time
-      webSocketService.emitPaymentStatus({
-        reference,
-        payment_status: 'paid',
-        order_status: 'paid',
-      });
-
-      // Trigger top-up processing (non-blocking)
-      this.processTopUp(reference).catch((err) =>
-        console.error('Top-up processing error:', err)
-      );
-
-      return {
-        reference,
-        payment_status: updated?.payment_status || 'paid',
-        order_status: updated?.order_status || 'paid',
       };
     }
 
@@ -323,7 +318,6 @@ export class OrderService {
         });
 
         // ─── Fire notification alerts (fire-and-forget) ───────────
-        // alertAwaitingStock handles its own errors internally via Promise.allSettled
         notificationService.alertAwaitingStock({
           reference: order.reference,
           game_name: order.game_name,
@@ -334,9 +328,6 @@ export class OrderService {
           created_at: order.created_at.toISOString(),
         });
 
-        // ALWAYS re-throw so callers (retryAwaitingOrders, handleCallback, etc.)
-        // can properly differentiate success from "still waiting" and call
-        // incrementRetry for exponential backoff.
         throw error;
       }
 
@@ -375,11 +366,9 @@ export class OrderService {
     await Promise.allSettled(
       orders.map(async (order) => {
         try {
-          // Try processing again
           await this.processTopUp(order.reference);
           succeeded++;
         } catch {
-          // Failed again — increment retry count for next cycle
           await orderRepository.incrementRetry(order.reference);
           still_waiting++;
         }
@@ -416,7 +405,6 @@ export class OrderService {
       );
     }
 
-    // Reset retry count so it gets a fresh start
     await orderRepository.updateStatus(reference, {
       order_status: 'paid',
     });
@@ -462,7 +450,6 @@ export class OrderService {
       throw new AppError(ERROR_MESSAGES.ORDER_NOT_FOUND, HTTP_STATUS.NOT_FOUND);
     }
 
-    // Only allow cancellation if still awaiting payment
     if (order.order_status !== ORDER_STATUS.AWAITING_PAYMENT) {
       throw new AppError(
         ERROR_MESSAGES.ORDER_ALREADY_PROCESSED,
@@ -472,7 +459,6 @@ export class OrderService {
 
     await orderRepository.markCancelled(reference);
 
-    // Notify connected clients in real-time
     webSocketService.emitPaymentStatus({
       reference,
       payment_status: 'cancelled',
@@ -487,33 +473,70 @@ export class OrderService {
   }
 
   /**
-   * Handle Bakong payment callback
+   * Handle CutLuy payment webhook callback.
+   *
+   * CutLuy sends a POST to our webhook endpoint when:
+   *   - payment.completed → payment was successful
+   *   - payment.expired → QR expired unpaid
+   *   - payment.failed → payment failed
+   *
+   * The webhook body contains the payment object with reference_id matching
+   * our order reference.
    */
-  async handleCallback(payload: {
-    transactionId: string;
-    amount: number;
-    status: string;
-    reference?: string;
+  async handleCutLuyWebhook(event: {
+    type: string;
+    data: {
+      payment: {
+        id: string;
+        status: string;
+        amount: string;
+        currency: string;
+        reference_id: string | null;
+        approved_at: string | null;
+      };
+    };
   }) {
-    let order = payload.reference
-      ? await orderRepository.findByReference(payload.reference)
-      : await orderRepository.findByTransactionId(payload.transactionId);
-
-    if (!order) {
-      throw new AppError(ERROR_MESSAGES.ORDER_NOT_FOUND, HTTP_STATUS.NOT_FOUND);
+    const reference = event.data.payment.reference_id;
+    if (!reference) {
+      console.warn('⚠️  CutLuy webhook received without reference_id — skipping');
+      return { received: true };
     }
 
-    if (payload.status === 'PAID' || payload.status === 'SUCCESS') {
-      await orderRepository.markPaid(order.reference);
+    const order = await orderRepository.findByReference(reference);
+    if (!order) {
+      console.warn(`⚠️  CutLuy webhook: order ${reference} not found — skipping`);
+      return { received: true };
+    }
 
-      // Notify connected clients in real-time
+    const paymentStatus = cutluyService.mapStatus(event.data.payment.status);
+    const cutluyIsPaid = cutluyService.isPaid(event.data.payment.status);
+
+    if (cutluyIsPaid && order.payment_status !== 'paid') {
+      console.log(`✅ CutLuy webhook: payment completed for ${reference}`);
+      await orderRepository.markPaid(reference);
+
       webSocketService.emitPaymentStatus({
-        reference: order.reference,
+        reference,
         payment_status: 'paid',
         order_status: 'paid',
       });
 
-      await this.processTopUp(order.reference);
+      // Trigger top-up processing (non-blocking)
+      this.processTopUp(reference).catch((err) =>
+        console.error('Top-up processing error:', err)
+      );
+    } else if (paymentStatus === 'failed' && order.payment_status === 'pending') {
+      console.log(`❌ CutLuy webhook: payment failed for ${reference}`);
+      await orderRepository.updateStatus(reference, {
+        payment_status: 'failed',
+        order_status: 'failed',
+      });
+
+      webSocketService.emitPaymentStatus({
+        reference,
+        payment_status: 'failed',
+        order_status: 'failed',
+      });
     }
 
     return { received: true };
@@ -521,7 +544,7 @@ export class OrderService {
 
   /**
    * Manually confirm payment for an order.
-   * Used when Bakong API auto-verification is unavailable or fails.
+   * Used when webhook auto-verification is unavailable.
    * The admin can mark an order as paid after verifying payment in their bank app.
    */
   async manualConfirmPayment(reference: string) {
@@ -546,17 +569,14 @@ export class OrderService {
 
     console.log(`💡 Manual payment confirmation for ${reference}`);
 
-    // Mark as paid and trigger top-up
     const updated = await orderRepository.markPaid(reference);
 
-    // Notify connected clients in real-time
     webSocketService.emitPaymentStatus({
       reference,
       payment_status: 'paid',
       order_status: 'paid',
     });
 
-    // Trigger top-up processing (non-blocking)
     this.processTopUp(reference).catch((err) =>
       console.error('Top-up processing error:', err)
     );
@@ -571,7 +591,8 @@ export class OrderService {
   }
 
   /**
-   * Create order directly (after payment)
+   * Create order directly (after payment).
+   * This is called after payment is confirmed to trigger the Bay2Game top-up.
    */
   async createOrder(params: {
     reference: string;

@@ -41,7 +41,8 @@ export interface PaymentResponse {
   amount: number
   khqr_image?: string
   khqr_data?: string
-  transaction_id?: string
+  checkout_url?: string
+  cutluy_payment_id?: string
   expires_at: string
 }
 

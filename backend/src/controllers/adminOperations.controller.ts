@@ -145,16 +145,14 @@ export async function getBalanceAlert(req: Request, res: Response) {
  */
 export async function getWebhookConfig(_req: Request, res: Response) {
   try {
-    const callbackUrl = config.bakong.callbackUrl || '';
-    const returnUrl = config.bakong.returnUrl || '';
+    const callbackUrl = config.cutluy.returnUrl || '';
 
     return res.json({
       success: true,
       message: 'Webhook configuration retrieved',
       data: {
-        bakongCallbackUrl: callbackUrl,
-        bakongReturnUrl: returnUrl,
-        // Bay2Game webhook would be set on their partner dashboard
+        cutluyReturnUrl: callbackUrl,
+        cutluyWebhookUrl: '/api/webhooks/cutluy',
         bay2gameNote: 'Bay2Game webhooks are configured on their partner dashboard at https://bay2game.xyz/partners/login.php',
       },
     });
@@ -173,15 +171,15 @@ export async function getWebhookConfig(_req: Request, res: Response) {
  */
 export async function testWebhook(req: Request, res: Response) {
   try {
-    const callbackUrl = config.bakong.callbackUrl;
-    if (!callbackUrl) {
-      return res.status(HTTP_STATUS.BAD_REQUEST).json({
-        success: false,
-        message: 'No webhook callback URL configured',
+    const returnUrl = config.cutluy.returnUrl;
+    if (!returnUrl) {
+      return res.json({
+        success: true,
+        message: 'CutLuy webhooks are configured server-side at /api/webhooks/cutluy',
       });
     }
 
-    // Send a test payload
+    // Send a test payload to the return URL
     const payload = {
       type: 'TEST',
       message: 'This is a test webhook from VidTopUp Admin',
@@ -189,18 +187,18 @@ export async function testWebhook(req: Request, res: Response) {
     };
 
     // We don't await this — it's a fire-and-forget test
-    axios.post(callbackUrl, payload, {
+    axios.post(returnUrl, payload, {
       headers: { 'Content-Type': 'application/json' },
       timeout: 5000,
     }).then((response) => {
-      console.log(`Test webhook sent to ${callbackUrl} — response: ${response.status}`);
+      console.log(`Test webhook sent to ${returnUrl} — response: ${response.status}`);
     }).catch((err) => {
-      console.warn(`Test webhook to ${callbackUrl} failed:`, err?.message);
+      console.warn(`Test webhook to ${returnUrl} failed:`, err?.message);
     });
 
     return res.json({
       success: true,
-      message: `Test webhook sent to ${callbackUrl}`,
+      message: `Test webhook sent to ${returnUrl}`,
     });
   } catch (error: any) {
     console.error('Error testing webhook:', error?.message);

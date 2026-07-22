@@ -12,12 +12,13 @@ export interface IOrder extends Document {
   amount: number;
   player_id: string;
   server_id?: string;
-  payment_method: 'bakong';
+  payment_method: 'cutluy';
   payment_status: 'pending' | 'paid' | 'failed';
   order_status: OrderStatus;
   khqr_image?: string;
   khqr_data?: string;
-  transaction_id?: string;
+  cutluy_payment_id?: string;
+  checkout_url?: string;
   retry_count?: number;
   next_retry_at?: Date;
   completed_at?: Date;
@@ -44,8 +45,8 @@ const OrderSchema = new Schema<IOrder>(
     server_id: { type: String },
     payment_method: {
       type: String,
-      enum: ['bakong'],
-      default: 'bakong',
+      enum: ['cutluy'],
+      default: 'cutluy',
     },
     payment_status: {
       type: String,
@@ -68,11 +69,12 @@ const OrderSchema = new Schema<IOrder>(
     },
     khqr_image: { type: String },
     khqr_data: { type: String },
-    transaction_id: {
+    cutluy_payment_id: {
       type: String,
       index: true,
       sparse: true,
     },
+    checkout_url: { type: String },
     retry_count: { type: Number, default: 0 },
     next_retry_at: { type: Date },
     completed_at: { type: Date },
@@ -84,7 +86,7 @@ const OrderSchema = new Schema<IOrder>(
 );
 
 // Compound index for common queries
-OrderSchema.index({ reference: 1, transaction_id: 1 });
+OrderSchema.index({ reference: 1, cutluy_payment_id: 1 });
 
 // Index for stock retry queries (findAwaitingStock)
 OrderSchema.index({ order_status: 1, next_retry_at: 1 });

@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { getCategories, getCambodiaGames, getProductsByGame, getPriceDropsByGame } from '../controllers/category.controller';
-import { createPayment, getPaymentStatus, handleCallback, manualConfirmPayment } from '../controllers/payment.controller';
+import { createPayment, getPaymentStatus, handleCutLuyWebhook, manualConfirmPayment } from '../controllers/payment.controller';
 import { createOrder, getOrder, getOrdersByPlayer, cancelOrder, retryOrder } from '../controllers/order.controller';
 import { verifyPlayer, checkGameId } from '../controllers/player.controller';
 import { getBalance } from '../controllers/balance.controller';
@@ -54,11 +54,15 @@ router.get('/products/:gameCode', getProductsByGame);
 router.post('/verify-player', verifyPlayer);
 router.get('/check-id', checkGameId);
 
-// Payment
+// Payment (CutLuy / ABA PayWay KHQR)
 router.post('/payment/create', createPayment);
 router.get('/payment/status/:reference', getPaymentStatus);
-router.post('/payment/callback', handleCallback);
 router.post('/payment/manual-confirm/:reference', manualConfirmPayment);
+
+// CutLuy Webhook (receives payment status updates from CutLuy)
+// IMPORTANT: Must use express.raw() middleware to verify signature
+// This is set up in server.ts with a dedicated route
+router.post('/webhooks/cutluy', handleCutLuyWebhook);
 
 // Balance check (for customers to see if shop has stock before paying)
 router.get('/balance', getBalance);

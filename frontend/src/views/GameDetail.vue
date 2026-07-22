@@ -445,6 +445,7 @@ async function handleVerify() {
 // ─── Mobile One-Step Checkout ───────────────────────
 const mobileCheckoutActive = ref(false)
 const mobileQrImage = ref('')
+const mobileCheckoutUrl = ref('')
 const mobilePaymentRef = ref('')
 const mobileQrLoading = ref(false)
 const mobileQrError = ref<string | null>(null)
@@ -596,6 +597,7 @@ async function executeMobileCheckout() {
     mobilePaymentRef.value = result.reference
     mobileWsRef.value = result.reference
     mobileQrImage.value = result.khqr_image || ''
+    mobileCheckoutUrl.value = result.checkout_url || ''
     mobilePaymentStatus.value = 'pending'
     mobileTimeLeft.value = 5 * 60
 
@@ -654,6 +656,7 @@ function closeMobileCheckout() {
   cancelOrder(mobilePaymentRef.value).catch(() => {})
   mobileCheckoutActive.value = false
   mobileQrImage.value = ''
+  mobileCheckoutUrl.value = ''
   mobilePaymentRef.value = ''
   mobilePaymentStatus.value = 'pending'
   mobileTimeLeft.value = 5 * 60

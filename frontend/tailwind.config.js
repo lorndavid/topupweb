@@ -1,4 +1,5 @@
 /** @type {import('tailwindcss').Config} */
+// ═══ KEEP IN SYNC with the inline tailwind.config in frontend/index.html ═══
 export default {
   content: [
     "./index.html",
@@ -36,6 +37,8 @@ export default {
       },
       fontFamily: {
         sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+        heading: ['Space Grotesk', 'Inter', 'system-ui', 'sans-serif'],
+        mono: ['JetBrains Mono', 'monospace'],
         khmer: ['Khmer OS', 'Moul', 'sans-serif'],
       },
       animation: {

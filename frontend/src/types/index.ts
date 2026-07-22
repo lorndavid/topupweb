@@ -166,3 +166,17 @@ export interface AdminDashboardData {
   stats: AdminDashboardStats
   awaiting_stock_orders: AwaitingStockOrder[]
 }
+
+export interface SiteAnnouncement {
+  _id: string
+  title: string
+  message: string
+  type: 'info' | 'warning' | 'success' | 'promo'
+  is_active: boolean
+  link_url?: string
+  link_label?: string
+  dismissible: boolean
+  starts_at?: string
+  expires_at?: string
+  created_at: string
+}

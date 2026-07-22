@@ -13,6 +13,7 @@ import type {
   AdminDashboardData,
   BalanceInfo,
   NewProductsConfig,
+  SiteAnnouncement,
 } from '@/types'
 
 const api = axios.create({
@@ -218,6 +219,12 @@ export async function getResellerBalance(): Promise<BalanceInfo> {
     return { balance: 0, username: '', available: false }
   }
   return data.data
+}
+
+export async function getAnnouncements(): Promise<SiteAnnouncement[]> {
+  const { data } = await api.get<ApiResponse<SiteAnnouncement[]>>('/announcements')
+  if (!data.success) return []
+  return data.data || []
 }
 
 export default api

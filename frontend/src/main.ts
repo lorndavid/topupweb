@@ -4,6 +4,11 @@ import App from './App.vue'
 import router from './router'
 import './style.css'
 
+// ─── GSAP: Explicitly register CSSPlugin to prevent tree-shaking issues ──
+import gsap from 'gsap'
+import { CSSPlugin } from 'gsap/CSSPlugin'
+gsap.registerPlugin(CSSPlugin)
+
 const app = createApp(App)
 const pinia = createPinia()
 

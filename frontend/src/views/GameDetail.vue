@@ -253,7 +253,10 @@ watch([playerId, serverId], () => {
   }
   const id = playerId.value.trim()
   if (!id) return
+  // Minimum length check: MLBB UIDs are 6+ digits, most games need 5+ chars
+  if (id.length < 5) return
   if (needsServerId.value && !serverId.value.trim()) return
+  if (needsServerId.value && serverId.value.trim().length < 3) return
   verifyDebounce = setTimeout(() => {
     handleVerify()
   }, 600)

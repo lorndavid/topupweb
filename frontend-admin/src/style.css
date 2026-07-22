@@ -1,0 +1,212 @@
+/**
+ * VidTopUp Admin Dashboard — Design System
+ *
+ * A polished, professional admin UI with glassmorphism accents,
+ * responsive light/dark mode, and smooth micro-interactions.
+ */
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ══════════════════════════════════════════════════════
+   CSS Custom Properties (shared by all components)
+   ══════════════════════════════════════════════════════ */
+:root {
+  --sidebar-width: 260px;
+  --sidebar-collapsed-width: 72px;
+  --topbar-height: 64px;
+  --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-base: 200ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-slow: 300ms cubic-bezier(0.4, 0, 0.2, 1);
+  --shadow-card: 0 1px 3px 0 rgb(0 0 0 / 0.06), 0 1px 2px -1px rgb(0 0 0 / 0.06);
+  --shadow-card-hover: 0 4px 6px -1px rgb(0 0 0 / 0.08), 0 2px 4px -2px rgb(0 0 0 / 0.06);
+  --shadow-modal: 0 20px 25px -5px rgb(0 0 0 / 0.12), 0 8px 10px -6px rgb(0 0 0 / 0.08);
+  --shadow-slideover: -8px 0 25px -5px rgb(0 0 0 / 0.1);
+}
+
+.dark {
+  --shadow-card: 0 1px 3px 0 rgb(0 0 0 / 0.3), 0 1px 2px -1px rgb(0 0 0 / 0.3);
+  --shadow-card-hover: 0 4px 6px -1px rgb(0 0 0 / 0.4), 0 2px 4px -2px rgb(0 0 0 / 0.3);
+  --shadow-modal: 0 20px 25px -5px rgb(0 0 0 / 0.5), 0 8px 10px -6px rgb(0 0 0 / 0.4);
+  --shadow-slideover: -8px 0 25px -5px rgb(0 0 0 / 0.4);
+}
+
+/* ══════════════════════════════════════════════════════
+   Base styles
+   ══════════════════════════════════════════════════════ */
+@layer base {
+  body {
+    @apply font-sans text-sm antialiased;
+    font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-heading font-semibold tracking-tight;
+  }
+
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    @apply bg-transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply bg-slate-300 dark:bg-slate-600 rounded-full;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-slate-400 dark:bg-slate-500;
+  }
+}
+
+/* ══════════════════════════════════════════════════════
+   Utility component classes
+   ══════════════════════════════════════════════════════ */
+@layer components {
+  /* Card component — used everywhere in the dashboard */
+  .card {
+    @apply bg-white dark:bg-slate-800/80 rounded-xl border border-slate-200 dark:border-slate-700/50;
+    box-shadow: var(--shadow-card);
+    transition: box-shadow var(--transition-base), border-color var(--transition-base);
+  }
+  .card:hover {
+    box-shadow: var(--shadow-card-hover);
+  }
+  .card-header {
+    @apply px-5 py-4 border-b border-slate-100 dark:border-slate-700/50 flex items-center justify-between;
+  }
+  .card-body {
+    @apply p-5;
+  }
+
+  /* Glassmorphism overlay for modals/slideovers */
+  .glass-overlay {
+    @apply fixed inset-0 z-40 bg-black/40 backdrop-blur-sm;
+    animation: fadeIn 0.2s ease-out;
+  }
+
+  /* Table styles */
+  .table-container {
+    @apply overflow-x-auto;
+  }
+  .data-table {
+    @apply w-full text-left;
+  }
+  .data-table th {
+    @apply px-4 py-3 text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-700 sticky top-0 z-10;
+  }
+  .data-table td {
+    @apply px-4 py-3 text-sm text-slate-700 dark:text-slate-300 border-b border-slate-100 dark:border-slate-700/30;
+  }
+  .data-table tr {
+    @apply transition-colors duration-150;
+  }
+  .data-table tbody tr:hover {
+    @apply bg-slate-50/80 dark:bg-slate-700/30;
+  }
+
+  /* Form inputs */
+  .form-input {
+    @apply w-full px-3 py-2.5 text-sm bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500;
+    @apply focus:outline-none focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 dark:focus:border-primary-400;
+    @apply transition-all duration-150;
+  }
+  .form-input-error {
+    @apply border-danger-400 dark:border-danger-500 focus:ring-danger-500/30 focus:border-danger-500;
+  }
+  .form-label {
+    @apply block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1.5 uppercase tracking-wider;
+  }
+  .form-help {
+    @apply mt-1 text-xs text-slate-400 dark:text-slate-500;
+  }
+  .form-error {
+    @apply mt-1 text-xs text-danger-500;
+  }
+
+  /* Badges */
+  .badge {
+    @apply inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full;
+  }
+  .badge-success {
+    @apply badge bg-success-50 text-success-700 dark:bg-success-500/10 dark:text-success-400;
+  }
+  .badge-warning {
+    @apply badge bg-warning-50 text-warning-700 dark:bg-warning-500/10 dark:text-warning-400;
+  }
+  .badge-danger {
+    @apply badge bg-danger-50 text-danger-700 dark:bg-danger-500/10 dark:text-danger-400;
+  }
+  .badge-info {
+    @apply badge bg-info-50 text-info-700 dark:bg-info-500/10 dark:text-info-400;
+  }
+  .badge-neutral {
+    @apply badge bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-400;
+  }
+
+  /* Staggered fade-in animation for cards */
+  .stagger-enter {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  .stagger-enter-active {
+    transition: opacity 0.4s ease-out, transform 0.4s ease-out;
+  }
+}
+
+/* ══════════════════════════════════════════════════════
+   Transition classes for Vue
+   ══════════════════════════════════════════════════════ */
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity var(--transition-base);
+}
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
+
+.slide-up-enter-active {
+  transition: all 0.3s ease-out;
+}
+.slide-up-leave-active {
+  transition: all 0.2s ease-in;
+}
+.slide-up-enter-from {
+  opacity: 0;
+  transform: translateY(16px);
+}
+.slide-up-leave-to {
+  opacity: 0;
+  transform: translateY(-8px);
+}
+
+.slide-right-enter-active {
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.slide-right-leave-active {
+  transition: all 0.2s ease-in;
+}
+.slide-right-enter-from {
+  transform: translateX(100%);
+}
+.slide-right-leave-to {
+  transform: translateX(100%);
+}
+
+/* Notification animations */
+.toast-enter-active {
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.toast-leave-active {
+  transition: all 0.2s ease-in;
+}
+.toast-enter-from {
+  opacity: 0;
+  transform: translateX(24px) scale(0.95);
+}
+.toast-leave-to {
+  opacity: 0;
+  transform: translateX(24px) scale(0.95);
+}

@@ -3,9 +3,43 @@ import { getCategories, getCambodiaGames, getProductsByGame, getPriceDropsByGame
 import { createPayment, getPaymentStatus, handleCallback, manualConfirmPayment } from '../controllers/payment.controller';
 import { createOrder, getOrder, getOrdersByPlayer, cancelOrder, retryOrder } from '../controllers/order.controller';
 import { verifyPlayer, checkGameId } from '../controllers/player.controller';
-import { getAdminDashboard } from '../controllers/admin.controller';
 import { getBalance } from '../controllers/balance.controller';
 import { receiveStockAlert, getRecentAlerts, triggerDailySummary, testNotification } from '../controllers/webhook.controller';
+import { login, loginWithApiKey, verifyToken } from '../controllers/adminAuth.controller';
+import {
+  getOrders,
+  getOrderDetail,
+  updateOrderStatus,
+  getDashboardStats,
+} from '../controllers/adminOrders.controller';
+import {
+  getProducts,
+  updateProductProfit,
+  deleteProductOverride,
+  getProfitMargins,
+  saveProfitMargin,
+  saveProfitMarginsBatch,
+  getGames,
+} from '../controllers/adminProducts.controller';
+import {
+  getFundingHistory,
+  getBalanceAlert,
+  getWebhookConfig,
+  testWebhook,
+  checkPlayerId,
+  getDirectOrderGames,
+  getDirectOrderProducts,
+  createDirectOrder,
+} from '../controllers/adminOperations.controller';
+import { getAnalytics } from '../controllers/adminAnalytics.controller';
+import {
+  getActiveAnnouncements,
+  getAllAnnouncements,
+  createAnnouncement,
+  updateAnnouncement,
+  deleteAnnouncement,
+  toggleAnnouncement,
+} from '../controllers/announcement.controller';
 import { config } from '../config';
 import { pushNotificationService } from '../services/pushNotification.service';
 
@@ -74,6 +108,10 @@ router.get('/push/vapid-key', (_req, res) => {
 });
 
 // Price drops
+// Announcements (public)
+router.get('/announcements', getActiveAnnouncements);
+
+// Price drops
 router.get('/price-drops/:gameCode', getPriceDropsByGame);
 
 // Config
@@ -90,7 +128,42 @@ router.get('/config/new-products', (_req, res) => {
   });
 });
 
-// Admin
-router.get('/admin/dashboard', getAdminDashboard);
+// ─── Admin Dashboard ──────────────────────────────
+// Public: login
+router.post('/admin/login', login);
+router.post('/admin/login/apikey', loginWithApiKey);
+
+// Protected: all admin routes below require JWT
+router.get('/admin/dashboard', verifyToken, getDashboardStats);
+router.get('/admin/orders', verifyToken, getOrders);
+router.get('/admin/orders/:reference', verifyToken, getOrderDetail);
+router.post('/admin/orders/:reference/status', verifyToken, updateOrderStatus);
+router.get('/admin/products', verifyToken, getProducts);
+router.put('/admin/products/profit', verifyToken, updateProductProfit);
+router.delete('/admin/products/override/:productCode', verifyToken, deleteProductOverride);
+router.get('/admin/profit-margins', verifyToken, getProfitMargins);
+router.post('/admin/profit-margins', verifyToken, saveProfitMargin);
+router.post('/admin/profit-margins/batch', verifyToken, saveProfitMarginsBatch);
+router.get('/admin/games', verifyToken, getGames);
+
+// Admin analytics
+router.get('/admin/analytics', verifyToken, getAnalytics);
+
+// Admin operations (funding, balance alert, webhooks, player lookup, direct order)
+router.get('/admin/funding-history', verifyToken, getFundingHistory);
+router.get('/admin/balance-alert', verifyToken, getBalanceAlert);
+router.get('/admin/webhooks', verifyToken, getWebhookConfig);
+router.post('/admin/webhooks/test', verifyToken, testWebhook);
+router.post('/admin/check-player-id', verifyToken, checkPlayerId);
+router.get('/admin/direct-order/games', verifyToken, getDirectOrderGames);
+router.get('/admin/direct-order/products/:gameCode', verifyToken, getDirectOrderProducts);
+router.post('/admin/direct-order/create', verifyToken, createDirectOrder);
+
+// Admin: Announcements
+router.get('/admin/announcements', verifyToken, getAllAnnouncements);
+router.post('/admin/announcements', verifyToken, createAnnouncement);
+router.put('/admin/announcements/:id', verifyToken, updateAnnouncement);
+router.delete('/admin/announcements/:id', verifyToken, deleteAnnouncement);
+router.patch('/admin/announcements/:id/toggle', verifyToken, toggleAnnouncement);
 
 export default router;

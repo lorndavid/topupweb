@@ -16,6 +16,9 @@ app.use(helmet());
 // Allow both local dev URL and production frontend URL(s)
 const allowedOrigins = [
   config.frontendUrl,
+  'http://localhost:5173',   // Main frontend (dev)
+  'http://localhost:5174',   // Admin dashboard (dev)
+  'http://localhost:4199',   // Admin dashboard (preview)
   'https://topup.lorndavid.online',
   'https://www.topup.lorndavid.online',
   // Allow Vercel preview deployments (for testing before going live)
@@ -34,14 +37,14 @@ app.use(
       // Deny unknown origins
       return callback(new Error(`Origin ${origin} not allowed by CORS`));
     },
-    methods: ['GET', 'POST'],
-    allowedHeaders: ['Content-Type', 'Accept'],
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
+    allowedHeaders: ['Content-Type', 'Accept', 'Authorization'],
   })
 );
 
 // Body parsing
-app.use(express.json({ limit: '10kb' }));
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: '1mb' }));
+app.use(express.urlencoded({ extended: true, limit: '1mb' }));
 
 // Logging
 if (config.isDev) {

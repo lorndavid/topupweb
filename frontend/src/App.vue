@@ -5,6 +5,7 @@ import Navbar from '@/components/Navbar.vue'
 import Footer from '@/components/Footer.vue'
 import ToastContainer from '@/components/ToastContainer.vue'
 import InstallPrompt from '@/components/InstallPrompt.vue'
+import AnnouncementBanner from '@/components/AnnouncementBanner.vue'
 import { usePushNotifications } from '@/composables/usePushNotifications'
 import gsap from 'gsap'
 
@@ -189,6 +190,7 @@ onMounted(() => {
       :transitioning="transitioning"
       @toggle-dark="toggleDark"
     />
+    <AnnouncementBanner />
     <main class="flex-1">
       <router-view v-slot="{ Component, route }">
         <transition

@@ -35,7 +35,7 @@ export class GameCacheRepository {
           expires_at: new Date(Date.now() + CACHE_TTL_MS),
         },
       },
-      { upsert: true, new: true }
+      { upsert: true, returnDocument: 'after' }
     );
   }
 
@@ -66,7 +66,7 @@ export class GameCacheRepository {
           expires_at: new Date(Date.now() + CACHE_TTL_MS),
         },
       },
-      { upsert: true, new: true }
+      { upsert: true, returnDocument: 'after' }
     );
   }
 

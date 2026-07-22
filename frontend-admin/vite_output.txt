@@ -1,0 +1,23 @@
+Port 5174 is in use, trying another one...
+Port 5175 is in use, trying another one...
+Port 5176 is in use, trying another one...
+Port 5177 is in use, trying another one...
+Port 5178 is in use, trying another one...
+Port 5179 is in use, trying another one...
+Port 5180 is in use, trying another one...
+
+  [32m[1mVITE[22m v5.4.21[39m  [2mready in [0m[1m822[22m[2m[0m ms[22m
+
+  [32m➜[39m  [1mLocal[22m:   [36mhttp://localhost:[1m5181[22m/[39m
+  [32m➜[39m  [1mNetwork[22m: [36mhttp://100.100.1.33:[1m5181[22m/[39m
+  [32m➜[39m  [1mNetwork[22m: [36mhttp://192.168.216.1:[1m5181[22m/[39m
+  [32m➜[39m  [1mNetwork[22m: [36mhttp://192.168.168.1:[1m5181[22m/[39m
+  [32m➜[39m  [1mNetwork[22m: [36mhttp://172.31.192.1:[1m5181[22m/[39m
+[2m12:12:20 PM[22m [36m[1m[vite][22m[39m [32mvite.config.ts changed, restarting server...[39m
+[2m12:12:20 PM[22m [36m[1m[vite][22m[39m server restarted.
+
+  [32m➜[39m  [1mLocal[22m:   [36mhttp://localhost:[1m5181[22m/admin/[39m
+  [32m➜[39m  [1mNetwork[22m: [36mhttp://100.100.1.33:[1m5181[22m/admin/[39m
+  [32m➜[39m  [1mNetwork[22m: [36mhttp://192.168.216.1:[1m5181[22m/admin/[39m
+  [32m➜[39m  [1mNetwork[22m: [36mhttp://192.168.168.1:[1m5181[22m/admin/[39m
+  [32m➜[39m  [1mNetwork[22m: [36mhttp://172.31.192.1:[1m5181[22m/admin/[39m

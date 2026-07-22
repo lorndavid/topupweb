@@ -52,6 +52,12 @@ export const config = {
     subject: process.env.VAPID_SUBJECT || 'mailto:admin@vidtopup.com',
   },
 
+  admin: {
+    jwtSecret: process.env.ADMIN_JWT_SECRET || process.env.JWT_SECRET || 'admin-secret-change-in-production',
+    username: process.env.ADMIN_USERNAME || 'admin',
+    password: process.env.ADMIN_PASSWORD || 'admin123',
+  },
+
   isDev: process.env.NODE_ENV === 'development',
   isProd: process.env.NODE_ENV === 'production',
 } as const;
@@ -63,8 +69,6 @@ export function validateConfig(): void {
     ['MERCHANT_BAKONG_ID', config.merchant.bakongId],
     ['MONGODB_URI', config.mongodb.uri],
   ];
-
-
 
   const missing = required.filter(([, value]) => !value).map(([key]) => key);
 

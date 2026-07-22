@@ -40,7 +40,16 @@ export async function verifyPlayer(
       data: result,
     });
   } catch (error) {
-    next(error);
+    // Graceful fallback: never return 500 for verification failures
+    console.error('Unexpected verify-player error:', error);
+    res.status(HTTP_STATUS.OK).json({
+      success: false,
+      message: 'Verification service temporarily unavailable',
+      data: {
+        verified: false,
+        playerId: req.body?.player_id || '',
+      },
+    });
   }
 }
 

@@ -4,6 +4,7 @@ import helmet from 'helmet';
 import morgan from 'morgan';
 import { config, validateConfig } from './config';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler';
+import { generateSitemap } from './controllers/sitemap.controller';
 import routes from './routes';
 
 const app = express();
@@ -67,6 +68,9 @@ app.use(express.urlencoded({ extended: true, limit: '1mb' }));
 if (config.isDev) {
   app.use(morgan('dev'));
 }
+
+// Sitemap (served at root level for crawlers)
+app.get('/sitemap.xml', generateSitemap);
 
 // Health check
 app.get('/api/health', (_req, res) => {

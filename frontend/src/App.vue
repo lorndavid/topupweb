@@ -2,6 +2,7 @@
 import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useMeta } from '@/composables/useMeta'
+import { useJsonLd } from '@/composables/useJsonLd'
 import Navbar from '@/components/Navbar.vue'
 import Footer from '@/components/Footer.vue'
 import ToastContainer from '@/components/ToastContainer.vue'
@@ -169,8 +170,10 @@ const { checkSubscription } = usePushNotifications()
 
 // ─── Dynamic SEO meta tags ──────────────────────────────────
 const { setMeta } = useMeta()
+const { setJsonLd } = useJsonLd()
 router.afterEach((to) => {
   setMeta(to)
+  setJsonLd(to)
 })
 
 onMounted(() => {

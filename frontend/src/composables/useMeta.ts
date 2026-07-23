@@ -12,9 +12,10 @@ const SITE_URL = 'https://topup.lorndavid.online'
 const DEFAULT_IMAGE = `${SITE_URL}/apple-touch-icon-180x180.png`
 
 /**
- * Maps game codes to human-readable names for dynamic SEO titles/descriptions.
+ * Shared game-name mapping used by both useMeta (SEO tags) and useJsonLd (structured data).
+ * Import this in any composable that needs game-code → human-name resolution.
  */
-const GAME_NAMES: Record<string, { name: string; description: string }> = {
+export const GAME_NAMES: Record<string, { name: string; description: string }> = {
   mlbb: {
     name: 'Mobile Legends Bang Bang',
     description: 'Fast MLBB diamond top-up in Cambodia — KHQR Payment, Instant Delivery.',

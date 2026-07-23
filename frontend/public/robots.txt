@@ -1,0 +1,9 @@
+# robots.txt for VidTopUp
+# https://topup.lorndavid.online
+
+# Allow all well-behaved crawlers full access
+User-agent: *
+Allow: /
+
+# Direct crawlers to the dynamic XML sitemap
+Sitemap: https://topup.lorndavid.online/sitemap.xml

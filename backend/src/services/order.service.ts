@@ -1,3 +1,4 @@
+import mongoose from 'mongoose';
 import { HTTP_STATUS, ERROR_MESSAGES, ORDER_STATUS, PAYMENT_POLL_TIMEOUT, STOCK_RETRY_MAX } from '../constants';
 import { config } from '../config';
 import { AppError } from '../middleware/errorHandler';
@@ -32,6 +33,14 @@ export class OrderService {
     serverId?: string;
     amount: number;
   }) {
+    // Check database connection before proceeding
+    if (mongoose.connection.readyState !== 1) {
+      throw new AppError(
+        'Database is not connected. Please try again in a moment.',
+        HTTP_STATUS.SERVICE_UNAVAILABLE
+      );
+    }
+
     const reference = generateReference();
 
     // 1. Create the order in our DB

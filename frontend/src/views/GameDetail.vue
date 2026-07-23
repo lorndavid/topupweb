@@ -15,12 +15,54 @@ import { usePaymentWebSocket } from '@/composables/usePaymentWebSocket'
 import ReceiptCard from '@/components/ReceiptCard.vue'
 import { useScrollToTop } from '@/composables/useScrollToTop'
 import { usePushNotifications } from '@/composables/usePushNotifications'
+import { useBalanceBadge } from '@/composables/useBalanceBadge'
 import gsap from 'gsap'
 import { ScrollTrigger } from 'gsap/ScrollTrigger'
 
 gsap.registerPlugin(ScrollTrigger)
 
 const route = useRoute()
+
+// ─── Wallet balance badge (real-time) ───
+const { balance: walletBalance, loading: balanceLoading } = useBalanceBadge()
+
+const balanceStatus = computed<'in-stock' | 'low-stock' | 'out-of-stock'>(() => {
+  if (walletBalance.value > 5) return 'in-stock'
+  if (walletBalance.value > 0) return 'low-stock'
+  return 'out-of-stock'
+})
+
+const balanceLabel = computed(() => {
+  const map = { 'in-stock': 'In Stock', 'low-stock': 'Low Stock', 'out-of-stock': 'Out of Stock' }
+  return map[balanceStatus.value]
+})
+
+const balanceIcon = computed(() => {
+  const map = {
+    'in-stock': 'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z',
+    'low-stock': 'M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z',
+    'out-of-stock': 'M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636',
+  }
+  return map[balanceStatus.value]
+})
+
+const balanceBadgeColors = computed(() => {
+  const map = {
+    'in-stock': 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30',
+    'low-stock': 'bg-amber-500/20 text-amber-300 border-amber-500/30',
+    'out-of-stock': 'bg-red-500/20 text-red-300 border-red-500/30',
+  }
+  return map[balanceStatus.value]
+})
+
+const balanceDotColors = computed(() => {
+  const map = {
+    'in-stock': 'bg-emerald-400',
+    'low-stock': 'bg-amber-400',
+    'out-of-stock': 'bg-red-400',
+  }
+  return map[balanceStatus.value]
+})
 
 // ─── Push notifications (subscribe after payment success) ───
 const { subscribe: subscribePush } = usePushNotifications()
@@ -662,6 +704,17 @@ function closeMobileCheckout() {
   mobileTimeLeft.value = 5 * 60
 }
 
+function downloadQrImage() {
+  if (mobileQrImage.value) {
+    const link = document.createElement('a')
+    link.href = mobileQrImage.value
+    link.download = 'KHQR-payment.png'
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+  }
+}
+
 // ─── Saved Players ─────────────────────────────────
 /** Load previously verified player IDs for this game from localStorage. */
 function loadSavedPlayers() {
@@ -884,6 +937,29 @@ onUnmounted(() => {
               :alt="gameStore.selectedGame.name"
               class="w-full h-full object-cover"
             />
+          </div>
+
+          <!-- Balance badge (top-right corner) -->
+          <div
+            v-if="!balanceLoading"
+            :title="`Wallet balance: $${walletBalance.toFixed(2)}`"
+            :class="['absolute top-2 right-2 sm:top-3 sm:right-3 inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border text-[10px] font-semibold backdrop-blur-sm transition-all duration-300', balanceBadgeColors]"
+          >
+            <span :class="['w-1.5 h-1.5 rounded-full', balanceDotColors]"></span>
+            <svg
+              class="w-2.5 h-2.5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                :d="balanceIcon"
+              />
+            </svg>
+            {{ balanceLabel }}
           </div>
 
           <div              class="relative flex items-center gap-3 sm:gap-5"
@@ -1367,15 +1443,34 @@ onUnmounted(() => {
           </svg>
         </button>
 
-        <div class="px-6 pb-8">
-          <!-- Order Summary -->
-          <div class="text-center mb-4 pt-2">
-            <h3 class="text-lg font-bold text-surface-900 dark:text-surface-100">Scan to Pay</h3>
-            <p class="text-sm text-surface-400 dark:text-surface-500 mt-1">Scan with any Cambodian banking app</p>
+        <!-- Red KHQR Header with download icon -->
+        <div class="bg-red-600 px-6 py-3 flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <svg class="w-5 h-5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="3" y="3" width="18" height="18" rx="2" />
+              <circle cx="9" cy="9" r="1.5" fill="currentColor" />
+              <circle cx="15" cy="9" r="1.5" fill="currentColor" />
+              <circle cx="9" cy="15" r="1.5" fill="currentColor" />
+              <circle cx="15" cy="15" r="1.5" fill="currentColor" />
+            </svg>
+            <span class="text-white font-bold text-base tracking-wide">KHQR</span>
           </div>
+          <div
+            class="flex items-center gap-2 bg-white/20 hover:bg-white/30 transition-colors rounded-full px-3 py-1.5 cursor-pointer"
+            @click.stop="downloadQrImage"
+          >
+            <img
+              src="https://checkout.payway.com.kh/images/download-icon-khqr.svg"
+              alt="Download QR"
+              class="w-4 h-4"
+            />
+            <span class="text-[11px] font-semibold text-white">Download</span>
+          </div>
+        </div>
 
+        <div class="px-6 pb-8">
           <!-- Game + Amount info -->
-          <div class="flex items-center justify-between px-4 py-3 bg-surface-50 dark:bg-surface-800/50 rounded-xl mb-4">
+          <div class="flex items-center justify-between px-4 py-3 bg-surface-50 dark:bg-surface-800/50 rounded-xl mt-4 mb-4">
             <div class="min-w-0 flex-1">
               <p class="text-xs text-surface-400 dark:text-surface-500 truncate">{{ gameDisplayName }}</p>
               <p v-if="playerNickname" class="text-sm font-semibold text-surface-900 dark:text-surface-100 mt-0.5 truncate">{{ playerNickname }}</p>
@@ -1406,7 +1501,7 @@ onUnmounted(() => {
                 <template v-else-if="mobileQrImage">
                   <img :src="mobileQrImage" alt="KHQR Code" class="w-full h-full object-contain" />
                 </template>
-                <!-- Placeholder -->
+                <!-- Error -->
                 <template v-else-if="mobileQrError">
                   <div class="text-center">
                     <p class="text-xs text-red-500 mb-2">{{ mobileQrError }}</p>
@@ -1423,6 +1518,25 @@ onUnmounted(() => {
             </div>
           </div>
 
+          <!-- Pay with ABA PayWay CTA button (opens CutLuy hosted checkout) -->
+          <div v-if="mobileCheckoutUrl" class="mb-3">
+            <a
+              :href="mobileCheckoutUrl"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="flex items-center justify-center gap-2 w-full py-3 px-4 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white font-bold rounded-xl shadow-lg shadow-red-500/20 hover:shadow-red-500/30 transition-all duration-300 active:scale-[0.98] group"
+            >
+              <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10" />
+                <path d="M12 6v6l4 2" />
+              </svg>
+              <span>Pay with ABA PayWay</span>
+              <svg class="w-4 h-4 group-hover:translate-x-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+              </svg>
+            </a>
+          </div>
+
           <!-- Timer ring -->
           <div v-if="mobilePaymentStatus === 'pending' && mobileTimeLeft > 0" class="flex justify-center mb-4">
             <div class="flex items-center gap-2 text-xs text-surface-400 dark:text-surface-500">
@@ -1434,23 +1548,11 @@ onUnmounted(() => {
             </div>
           </div>
 
-          <!-- Payment instructions -->
+          <!-- Footer hint -->
           <div class="text-center">
-            <div class="flex items-center justify-center gap-6 text-xs text-surface-500 dark:text-surface-400">
-              <span class="flex items-center gap-1.5">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-                </svg>
-                Pay with any bank
-              </span>
-              <span class="text-surface-300">or</span>
-              <span class="flex items-center gap-1.5">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-                Download QR
-              </span>
-            </div>
+            <p class="text-[10px] text-surface-400 dark:text-surface-500">
+              Scan QR with any banking app or click to pay with ABA PayWay
+            </p>
           </div>
         </div>
     </div>

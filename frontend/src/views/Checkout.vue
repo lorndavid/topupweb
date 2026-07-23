@@ -190,7 +190,9 @@ function startTimer() {
       stopPolling()
       toast.error(i18n.t('payment.toast.timeExpired'))
       cancelOrder(paymentRef.value).catch(() => {})
-      paymentStatus.value = 'failed'
+      // Don't set paymentStatus to 'failed' — let KHQRCard's isExpired state
+      // show the "Expired" card with retry button instead. The user can
+      // tap retry to regenerate the payment.
     }
   }, 1000)
 }

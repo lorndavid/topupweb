@@ -155,6 +155,47 @@ export class OrderRepository {
   // ─── Analytics ────────────────────────────────────────
 
   /**
+   * Get today's stats for the daily summary notification.
+   * Returns total orders, revenue, profit (estimated as 20% markup),
+   * per-game breakdown, and the most recent order for the summary.
+   */
+  async getDailyStats() {
+    const now = new Date();
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+    const orders = await Order.find({
+      order_status: ORDER_STATUS.COMPLETED,
+      created_at: { $gte: todayStart },
+    })
+      .sort({ completed_at: -1 })
+      .lean();
+
+    const total_orders = orders.length;
+    const total_revenue = orders.reduce((sum, o) => sum + (o.amount || 0), 0);
+    // Estimate profit as ~20% of revenue (configurable margin approximation)
+    const total_profit = Math.round(total_revenue * 0.2 * 100) / 100;
+
+    // Build per-game breakdown
+    const by_game: Record<string, { revenue: number; count: number }> = {};
+    for (const order of orders) {
+      const code = order.game_code || 'unknown';
+      if (!by_game[code]) by_game[code] = { revenue: 0, count: 0 };
+      by_game[code].revenue += order.amount || 0;
+      by_game[code].count += 1;
+    }
+
+    return {
+      total_orders,
+      total_revenue,
+      total_profit,
+      by_game,
+      orders: orders.map((o) => ({
+        completed_at: o.completed_at || o.created_at,
+      })),
+    };
+  }
+
+  /**
    * Get revenue analytics aggregated by day for a date range.
    * Returns daily revenue, order count, and per-game breakdown.
    */

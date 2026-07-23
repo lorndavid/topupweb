@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { useMeta } from '@/composables/useMeta'
 import Navbar from '@/components/Navbar.vue'
 import Footer from '@/components/Footer.vue'
 import ToastContainer from '@/components/ToastContainer.vue'
@@ -165,6 +166,12 @@ function toggleDark() {
 }
 
 const { checkSubscription } = usePushNotifications()
+
+// ─── Dynamic SEO meta tags ──────────────────────────────────
+const { setMeta } = useMeta()
+router.afterEach((to) => {
+  setMeta(to)
+})
 
 onMounted(() => {
   // Check existing push subscription

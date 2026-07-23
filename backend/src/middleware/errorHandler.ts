@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
+import mongoose from 'mongoose';
 import { HTTP_STATUS } from '../constants';
 
 export class AppError extends Error {
@@ -37,6 +38,25 @@ export function errorHandler(
       success: false,
       message: 'External API service unavailable',
       error: 'External API Error',
+      statusCode: HTTP_STATUS.SERVICE_UNAVAILABLE,
+    });
+    return;
+  }
+
+  // Handle Mongoose/Database errors — show friendly message instead of generic 500
+  if (err.name?.startsWith('Mongo') || err.name === 'MongooseError' || err.message?.includes('Mongoose')) {
+    const isConnectionError = err.message?.toLowerCase().includes('connect') ||
+      err.message?.toLowerCase().includes('timedout') ||
+      err.message?.toLowerCase().includes('timeout') ||
+      err.name === 'MongooseServerSelectionError' ||
+      mongoose.connection.readyState === 0;
+
+    res.status(HTTP_STATUS.SERVICE_UNAVAILABLE).json({
+      success: false,
+      message: isConnectionError
+        ? 'Database is not connected. Please try again in a moment.'
+        : 'A database error occurred. Please try again.',
+      error: process.env.NODE_ENV === 'development' ? err.message : 'Database Error',
       statusCode: HTTP_STATUS.SERVICE_UNAVAILABLE,
     });
     return;

@@ -5,6 +5,12 @@ import html2canvas from 'html2canvas'
 import { useToastStore } from '@/stores/toast'
 import { ANIM_TIMING } from '@/composables/useAnimationTiming'
 
+function formatCountdown(seconds: number): string {
+  const m = Math.floor(seconds / 60)
+  const s = seconds % 60
+  return `${m}:${String(s).padStart(2, '0')}`
+}
+
 const props = defineProps<{
   merchantName: string
   amount: number
@@ -43,6 +49,15 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
 const progressPercent = computed(() => {
   if (!props.timeLeft || props.timeLeft <= 0) return 0
   return Math.round((props.timeLeft / 300) * 100)
+})
+
+const countdownDisplay = computed(() => {
+  if (props.timeLeft === undefined || props.timeLeft === null) return null
+  return formatCountdown(props.timeLeft)
+})
+
+const isExpired = computed(() => {
+  return props.timeLeft !== undefined && props.timeLeft !== null && props.timeLeft <= 0
 })
 
 // ─── Checkout ───────────────────────────────────────────────
@@ -205,24 +220,47 @@ async function handleDownloadQR() {
             <div class="bg-gradient-to-r from-red-600 to-red-500 px-6 pt-6 pb-5 text-center relative overflow-hidden">
               <div class="absolute -top-6 -right-6 w-24 h-24 rounded-full bg-white/5"></div>
               <div class="absolute -bottom-4 -left-4 w-16 h-16 rounded-full bg-white/5"></div>
-              <div class="flex justify-center">
+              <div class="flex justify-center relative">
                 <img
                   src="https://checkout.payway.com.kh/images/khqr-icon.svg"
                   alt="KHQR"
                   class="w-14 h-14 brightness-0 invert"
                 />
               </div>
-              <div v-if="timeLeft !== undefined && timeLeft !== null" class="absolute top-3 right-3">
-                <svg class="w-8 h-8 -rotate-90" viewBox="0 0 36 36">
-                  <path class="text-white/20" fill="none" stroke="currentColor" stroke-width="3" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-                  <path
-                    :class="isUrgent ? 'text-red-300 animate-pulse' : 'text-white/90'"
-                    fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"
-                    :stroke-dasharray="`${progressPercent}, 100`"
-                    class="transition-all duration-1000 ease-linear"
-                    d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                  />
-                </svg>
+
+              <!-- Countdown timer display (text + ring) -->
+              <div
+                v-if="countdownDisplay !== null"
+                class="mt-2 flex items-center justify-center gap-2"
+              >
+                <!-- Circular progress ring (small) -->
+                <div class="relative w-7 h-7 shrink-0">
+                  <svg class="w-7 h-7 -rotate-90" viewBox="0 0 36 36">
+                    <path class="text-white/20" fill="none" stroke="currentColor" stroke-width="3" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                    <path
+                      :class="isExpired ? 'text-red-300' : isUrgent ? 'text-red-300 animate-pulse' : 'text-white/90'"
+                      fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"
+                      :stroke-dasharray="`${progressPercent}, 100`"
+                      class="transition-all duration-1000 ease-linear"
+                      d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                    />
+                  </svg>
+                </div>
+
+                <!-- Countdown text -->
+                <span
+                  :class="[
+                    'font-mono font-bold text-sm tracking-wider transition-all duration-500',
+                    isExpired
+                      ? 'text-red-200'
+                      : isUrgent
+                        ? 'text-red-200 animate-pulse'
+                        : 'text-white/90',
+                  ]"
+                >
+                  <template v-if="isExpired">Expired</template>
+                  <template v-else>Expires in {{ countdownDisplay }}</template>
+                </span>
               </div>
             </div>
 
@@ -300,22 +338,46 @@ async function handleDownloadQR() {
               </div>
             </div>
 
-            <!-- Three-row Actions Section (only show when pending) -->
+            <!-- Three-row Actions Section (only show when pending, or expired) -->
             <div v-if="paymentStatus === 'pending' || !paymentStatus" class="text-center space-y-3">
-              <p class="text-xs text-gray-500 font-medium">Pay with any Cambodian banking app</p>
-              <div class="flex items-center justify-center">
-                <button
-                  @click="handleDownloadQR"
-                  class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl border-2 border-red-500/20 bg-red-50 hover:bg-red-100 hover:border-red-500/40 transition-all duration-200 group"
-                >
-                  <img
-                    src="https://checkout.payway.com.kh/images/download-icon-khqr.svg"
-                    alt="Download"
-                    class="w-5 h-5 opacity-60 group-hover:opacity-100 transition-opacity"
-                  />
-                  <span class="text-sm font-semibold text-red-600 group-hover:text-red-700 transition-colors">Download QR</span>
-                </button>
-              </div>
+              <!-- Expired state with retry button -->
+              <template v-if="isExpired">
+                <div class="p-3 bg-red-50 rounded-xl border border-red-200">
+                  <div class="flex items-center justify-center gap-2 mb-2">
+                    <svg class="w-4 h-4 text-red-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span class="text-xs font-semibold text-red-700">Payment time expired</span>
+                  </div>
+                  <button
+                    @click="handleRetry"
+                    class="w-full px-4 py-2 bg-red-500 hover:bg-red-600 text-white text-xs font-semibold rounded-lg transition-all duration-200 active:scale-95 inline-flex items-center justify-center gap-1.5"
+                  >
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                    Try Again
+                  </button>
+                </div>
+              </template>
+
+              <!-- Pending state: Download QR -->
+              <template v-else>
+                <p class="text-xs text-gray-500 font-medium">Pay with any Cambodian banking app</p>
+                <div class="flex items-center justify-center">
+                  <button
+                    @click="handleDownloadQR"
+                    class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl border-2 border-red-500/20 bg-red-50 hover:bg-red-100 hover:border-red-500/40 transition-all duration-200 group"
+                  >
+                    <img
+                      src="https://checkout.payway.com.kh/images/download-icon-khqr.svg"
+                      alt="Download"
+                      class="w-5 h-5 opacity-60 group-hover:opacity-100 transition-opacity"
+                    />
+                    <span class="text-sm font-semibold text-red-600 group-hover:text-red-700 transition-colors">Download QR</span>
+                  </button>
+                </div>
+              </template>
             </div>
 
             <!-- Error with Retry -->

@@ -16,6 +16,7 @@ app.use(helmet());
 // Allow both local dev URL and production frontend URL(s)
 const allowedOrigins = [
   config.frontendUrl,
+  'http://localhost:3001',   // Backend (serves frontend or admin)
   'http://localhost:5173',   // Main frontend (dev)
   'http://localhost:5174',   // Admin dashboard (dev)
   'http://localhost:4199',   // Admin dashboard (preview)

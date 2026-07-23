@@ -81,7 +81,7 @@ export async function loginWithApiKey(req: Request, res: Response) {
 
     const profileData = profileRes.data;
 
-    if (!profileData || profileData.status !== 'SUCCESS' || !profileData.user) {
+    if (!profileData || profileData.status?.toLowerCase() !== 'success' || !profileData.user) {
       return res.status(HTTP_STATUS.UNAUTHORIZED).json({
         success: false,
         message: 'Invalid API key — could not verify with Bay2Game',

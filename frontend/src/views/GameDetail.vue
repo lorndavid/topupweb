@@ -16,6 +16,7 @@ import ReceiptCard from '@/components/ReceiptCard.vue'
 import { useScrollToTop } from '@/composables/useScrollToTop'
 import { usePushNotifications } from '@/composables/usePushNotifications'
 import { useBalanceBadge } from '@/composables/useBalanceBadge'
+import { useAnalytics } from '@/composables/useAnalytics'
 import gsap from 'gsap'
 import { ScrollTrigger } from 'gsap/ScrollTrigger'
 
@@ -67,6 +68,7 @@ const balanceDotColors = computed(() => {
 // ─── Push notifications (subscribe after payment success) ───
 const { subscribe: subscribePush } = usePushNotifications()
 const router = useRouter()
+const analytics = useAnalytics()
 const gameStore = useGameStore()
 const i18n = useI18nStore()
 const toast = useToastStore()
@@ -434,6 +436,10 @@ const isMobileFlow = ref(false)
 // ─── Methods ─────────────────────────────────────────────────
 function selectProduct(product: GameProduct) {
   selectedProduct.value = product
+  analytics.track('product_select', {
+    game_code: gameCode.value,
+    product_code: product.product_code,
+  })
 }
 
 async function handleVerify() {
@@ -460,6 +466,11 @@ async function handleVerify() {
       playerRegion.value = result.region || null
       playerGameTitle.value = result.gameTitle || null
       verifyProvider.value = result.provider || null
+
+      analytics.track('verify_player', {
+        game_code: gameCode.value,
+        event_data: { nickname: result.nickname },
+      })
 
       toast.success(i18n.t('verify.successMessage'))
 
@@ -520,6 +531,12 @@ mobileWs.setOnStatusChange((data) => {
     playSuccessSound()
     fetchMobileOrderData()
     toast.success('Payment received! Redirecting...')
+    analytics.trackPayment('completed', {
+      game_code: gameCode.value,
+      product_code: selectedProduct.value?.product_code,
+      amount: selectedProduct.value?.sell_price,
+      reference: mobilePaymentRef.value,
+    })
     // Subscribe to push notifications after successful payment
     subscribePush().catch(() => {})
     setTimeout(() => {
@@ -528,6 +545,12 @@ mobileWs.setOnStatusChange((data) => {
   } else if (data.payment_status === 'failed') {
     mobilePaymentStatus.value = 'failed'
     stopMobilePolling()
+    analytics.trackPayment('failed', {
+      game_code: gameCode.value,
+      product_code: selectedProduct.value?.product_code,
+      amount: selectedProduct.value?.sell_price,
+      reference: mobilePaymentRef.value,
+    })
     toast.error('Payment failed')
   }
 })
@@ -621,6 +644,12 @@ async function executeMobileCheckout() {
 
   if (!gameStore.currentOrder) return
 
+  analytics.trackPayment('initiated', {
+    game_code: gameCode.value,
+    product_code: selectedProduct.value.product_code,
+    amount: selectedProduct.value.sell_price,
+  })
+
   mobileCheckoutActive.value = true
   mobileQrLoading.value = true
   mobileQrError.value = null
@@ -665,11 +694,23 @@ function startMobilePolling() {
         playSuccessSound()
         fetchMobileOrderData()
         toast.success('Payment received! Redirecting...')
+        analytics.trackPayment('completed', {
+          game_code: gameCode.value,
+          product_code: selectedProduct.value?.product_code,
+          amount: selectedProduct.value?.sell_price,
+          reference: mobilePaymentRef.value,
+        })
         // Subscribe to push notifications after successful payment
         subscribePush().catch(() => {})
         setTimeout(() => router.push('/order/' + mobilePaymentRef.value), 1500)
       } else if (status.payment_status === 'failed') {
         stopMobilePolling()
+        analytics.trackPayment('failed', {
+          game_code: gameCode.value,
+          product_code: selectedProduct.value?.product_code,
+          amount: selectedProduct.value?.sell_price,
+          reference: mobilePaymentRef.value,
+        })
         toast.error('Payment failed')
       }
     } catch { /* silent */ }
@@ -779,6 +820,12 @@ function executeProceedToCheckout() {
     playerId: playerId.value.trim(),
     serverId: serverId.value.trim() || undefined,
     verifyProvider: verifyProvider.value || undefined,
+  })
+
+  analytics.trackPayment('initiated', {
+    game_code: gameCode.value,
+    product_code: selectedProduct.value.product_code,
+    amount: selectedProduct.value.sell_price,
   })
 
   router.push('/checkout')

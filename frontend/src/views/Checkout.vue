@@ -6,12 +6,14 @@ import { useI18nStore } from '@/stores/i18n'
 import { useToastStore } from '@/stores/toast'
 import { createPayment, getPaymentStatus, cancelOrder, getResellerBalance, getOrder } from '@/services/api'
 import { formatPrice } from '@/composables/useCurrency'
+import { useAnalytics } from '@/composables/useAnalytics'
 import { usePaymentWebSocket } from '@/composables/usePaymentWebSocket'
 import KHQRCard from '@/components/KHQRCard.vue'
 import ReceiptCard from '@/components/ReceiptCard.vue'
 import gsap from 'gsap'
 import { ANIM_TIMING } from '@/composables/useAnimationTiming'
 
+const analytics = useAnalytics()
 const router = useRouter()
 const gameStore = useGameStore()
 const i18n = useI18nStore()
@@ -132,6 +134,12 @@ async function handleCheckout() {
     wsReference.value = result.reference
     qrImage.value = result.khqr_image || ''
     paymentStatus.value = 'pending'
+
+    analytics.trackPayment('initiated', {
+      game_code: order.value.gameCode,
+      product_code: order.value.productCode,
+      amount: order.value.amount,
+    })
 
     // Start polling + timer
     startPolling()
@@ -274,6 +282,12 @@ function onPaymentReceived() {
   if (showSuccessOverlay.value) return
   stopPolling()
   playSuccessSound()
+  analytics.trackPayment('completed', {
+    game_code: order.value?.gameCode,
+    product_code: order.value?.productCode,
+    amount: order.value?.amount,
+    reference: paymentRef.value,
+  })
   showSuccessOverlay.value = true
   redirectCountdown.value = 3
   fetchCheckoutOrderData()

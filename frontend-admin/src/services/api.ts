@@ -8,6 +8,7 @@ import type {
   AdminGame,
   Announcement,
   AnalyticsData,
+  PageAnalyticsData,
   LoginCredentials,
   ApiKeyCredentials,
   LoginResponse,
@@ -210,6 +211,12 @@ class AdminApiService {
       params: { days },
     })
     if (!data.success || !data.data) throw new Error(data.message || 'Failed to fetch analytics')
+    return data.data
+  }
+
+  async getPageAnalyticsStats(): Promise<PageAnalyticsData> {
+    const { data } = await this.api.get<ApiResponse<PageAnalyticsData>>('/admin/analytics/stats')
+    if (!data.success || !data.data) throw new Error(data.message || 'Failed to fetch page analytics')
     return data.data
   }
 

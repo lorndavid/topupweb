@@ -219,6 +219,31 @@ export interface Announcement {
   updated_at: string
 }
 
+// ─── Page Analytics ───────────────────────────────────
+export interface PageStatsOverview {
+  total_page_views: number
+  today_page_views: number
+  weekly_page_views: number
+  total_visitors: number
+  today_visitors: number
+}
+
+export interface TopGameEntry {
+  game_code: string
+  count: number
+}
+
+export interface PageAnalyticsData {
+  overview: PageStatsOverview
+  top_games_clicked: TopGameEntry[]
+  top_games_viewed: TopGameEntry[]
+  conversions: {
+    payment_initiated: number
+    payment_completed: number
+    payment_failed: number
+  }
+}
+
 // ─── API Generic ───────────────────────────────────────
 export interface ApiResponse<T = unknown> {
   success: boolean

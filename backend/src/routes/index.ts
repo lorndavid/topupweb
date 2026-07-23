@@ -31,9 +31,8 @@ import {
   getDirectOrderProducts,
   createDirectOrder,
 } from '../controllers/adminOperations.controller';
-import { getAnalytics } from '../controllers/adminAnalytics.controller';
-import {
-  getActiveAnnouncements,
+import { getAnalytics } from '../controllers/adminAnalytics.controller';import { trackEvent, getStats as getAnalyticsStats } from '../controllers/analytics.controller';
+import { getActiveAnnouncements,
   getAllAnnouncements,
   createAnnouncement,
   updateAnnouncement,
@@ -112,6 +111,12 @@ router.get('/push/vapid-key', (_req, res) => {
 });
 
 // Price drops
+// Analytics (public: tracking endpoint — rate limited, unauthenticated)
+router.post('/analytics/track', trackEvent);
+
+// Analytics (admin: aggregated stats — JWT protected)
+router.get('/admin/analytics/stats', verifyToken, getAnalyticsStats);
+
 // Announcements (public)
 router.get('/announcements', getActiveAnnouncements);
 

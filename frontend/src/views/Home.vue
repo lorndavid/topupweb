@@ -6,6 +6,7 @@ import { getCambodiaGames } from '@/services/api'
 import LoadingSkeleton from '@/components/LoadingSkeleton.vue'
 import type { GameCategory } from '@/types'
 import gsap from 'gsap'
+import { useAnalytics } from '@/composables/useAnalytics'
 
 interface BannerSlide {
   src: string
@@ -33,6 +34,7 @@ function observeScrollAnimation(el: HTMLElement, callback: () => void) {
   observer.observe(el)
 }
 const gameStore = useGameStore()
+const analytics = useAnalytics()
 
 const featured = ref<GameCategory[]>([])
 const others = ref<GameCategory[]>([])
@@ -317,6 +319,7 @@ const filteredOthers = computed(() => {
 
 // ─── Navigation ───
 function navigateToGame(gameCode: string) {
+  analytics.trackGameClick(gameCode)
   router.push(`/game/${gameCode}`)
 }
 

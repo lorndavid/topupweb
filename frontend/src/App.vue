@@ -3,6 +3,7 @@ import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useMeta } from '@/composables/useMeta'
 import { useJsonLd } from '@/composables/useJsonLd'
+import { useAnalytics } from '@/composables/useAnalytics'
 import Navbar from '@/components/Navbar.vue'
 import Footer from '@/components/Footer.vue'
 import ToastContainer from '@/components/ToastContainer.vue'
@@ -171,9 +172,17 @@ const { checkSubscription } = usePushNotifications()
 // ─── Dynamic SEO meta tags ──────────────────────────────────
 const { setMeta } = useMeta()
 const { setJsonLd } = useJsonLd()
+
+// ─── Self-hosted analytics ─────────────────────────────────
+const analytics = useAnalytics()
+
 router.afterEach((to) => {
   setMeta(to)
   setJsonLd(to)
+
+  // Auto-track page views
+  const gameCode = to.params.gameCode as string | undefined
+  analytics.trackPageView(to.path, gameCode)
 })
 
 onMounted(() => {

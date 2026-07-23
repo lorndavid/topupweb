@@ -12,7 +12,10 @@ export type AnalyticsEventType =
   | 'payment_initiated'
   | 'payment_completed'
   | 'payment_failed'
-  | 'search';
+  | 'search'
+  // Admin events
+  | 'admin_page_view'
+  | 'admin_order_status_change';
 
 export interface IAnalyticsEvent extends Document {
   /** The type/category of event being tracked */
@@ -51,6 +54,8 @@ const AnalyticsEventSchema = new Schema<IAnalyticsEvent>(
         'payment_completed',
         'payment_failed',
         'search',
+        'admin_page_view',
+        'admin_order_status_change',
       ],
       index: true,
     },

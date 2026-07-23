@@ -61,6 +61,8 @@ const VALID_EVENT_TYPES = new Set<AnalyticsEventType>([
   'payment_completed',
   'payment_failed',
   'search',
+  'admin_page_view',
+  'admin_order_status_change',
 ]);
 
 function isValidEventType(t: string): t is AnalyticsEventType {

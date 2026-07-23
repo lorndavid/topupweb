@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useToastStore } from '@/stores/toast'
 import adminApi from '@/services/api'
 import type { AdminOrder, OrderStatus } from '@/types'
+import { trackOrderStatusChange } from '@/composables/useAdminAnalytics'
 import {
   formatUSD,
   formatDateTime,
@@ -65,8 +66,10 @@ function openStatusUpdate(status: OrderStatus) {
 async function confirmStatusUpdate() {
   if (!selectedOrder.value) return
   updatingStatus.value = true
+  const prevStatus = selectedOrder.value.order_status
   try {
     await adminApi.updateOrderStatus(selectedOrder.value.reference, { status: newStatus.value })
+    trackOrderStatusChange(selectedOrder.value.reference, prevStatus, newStatus.value)
     toast.success('Status updated', `Order ${selectedOrder.value.reference} → ${getStatusLabel(newStatus.value)}`)
     showStatusDialog.value = false
     showDetail.value = false

@@ -4,12 +4,14 @@ import { useRoute } from 'vue-router'
 import { useThemeStore } from '@/stores/theme'
 import DashboardLayout from '@/layouts/DashboardLayout.vue'
 import ToastContainer from '@/components/ui/ToastContainer.vue'
+import { initAdminAnalytics } from '@/composables/useAdminAnalytics'
 
 const route = useRoute()
 const theme = useThemeStore()
 
 onMounted(() => {
   theme.init()
+  initAdminAnalytics()
 })
 </script>
 

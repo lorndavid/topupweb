@@ -130,3 +130,29 @@ export function trackProductPriceChange(
     },
   })
 }
+
+/**
+ * Track an announcement CRUD event.
+ */
+export function trackAnnouncementEvent(
+  action: 'create' | 'update' | 'toggle' | 'delete',
+  data: {
+    announcementId?: string
+    title?: string
+    type?: string
+    wasActive?: boolean
+    newActive?: boolean
+  }
+): void {
+  const eventType = `admin_announcement_${action}` as const
+  trackAdminEvent(eventType, {
+    event_data: {
+      announcement_id: data.announcementId,
+      title: data.title,
+      type: data.type,
+      was_active: data.wasActive,
+      new_active: data.newActive,
+      action,
+    },
+  })
+}

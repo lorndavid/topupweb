@@ -5,6 +5,7 @@ import adminApi from '@/services/api'
 import AppIcon from '@/components/ui/AppIcon.vue'
 import LoadingSkeleton from '@/components/ui/LoadingSkeleton.vue'
 import ConfirmDialog from '@/components/ui/ConfirmDialog.vue'
+import { trackAnnouncementEvent } from '@/composables/useAdminAnalytics'
 
 const toast = useToastStore()
 
@@ -117,9 +118,18 @@ async function handleSave() {
     if (editing.value) {
       await adminApi.updateAnnouncement(editing.value._id, payload)
       toast.success('Announcement updated')
+      trackAnnouncementEvent('update', {
+        announcementId: editing.value._id,
+        title: payload.title,
+        type: payload.type,
+      })
     } else {
       await adminApi.createAnnouncement(payload)
       toast.success('Announcement created')
+      trackAnnouncementEvent('create', {
+        title: payload.title,
+        type: payload.type,
+      })
     }
 
     showForm.value = false
@@ -133,21 +143,36 @@ async function handleSave() {
 }
 
 async function handleToggle(id: string) {
+  const ann = announcements.value.find((a) => a._id === id)
+  const wasActive = ann?.is_active
   try {
     await adminApi.toggleAnnouncement(id)
     await fetchAnnouncements()
     toast.success('Announcement toggled')
+    trackAnnouncementEvent('toggle', {
+      announcementId: id,
+      title: ann?.title,
+      type: ann?.type,
+      wasActive,
+      newActive: !wasActive,
+    })
   } catch (err) {
     toast.error('Failed to toggle announcement', err instanceof Error ? err.message : '')
   }
 }
 
 async function handleDelete(id: string) {
+  const ann = announcements.value.find((a) => a._id === id)
   deleting.value = id
   try {
     await adminApi.deleteAnnouncement(id)
     announcements.value = announcements.value.filter((a) => a._id !== id)
     toast.success('Announcement deleted')
+    trackAnnouncementEvent('delete', {
+      announcementId: id,
+      title: ann?.title,
+      type: ann?.type,
+    })
   } catch (err) {
     toast.error('Failed to delete announcement', err instanceof Error ? err.message : '')
   } finally {

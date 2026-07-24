@@ -106,3 +106,27 @@ export function trackOrderStatusChange(
     event_data: { reference, previous_status: previousStatus, new_status: newStatus },
   })
 }
+
+/**
+ * Track a product price change event.
+ */
+export function trackProductPriceChange(
+  productCode: string,
+  productName: string,
+  gameCode: string,
+  oldPrice: number,
+  newPrice: number,
+  action: 'manual_edit' | 'inline_edit' | 'reset_override'
+): void {
+  trackAdminEvent('admin_product_price_change', {
+    event_data: {
+      product_code: productCode,
+      product_name: productName,
+      game_code: gameCode,
+      old_price: oldPrice,
+      new_price: newPrice,
+      difference: +(newPrice - oldPrice).toFixed(2),
+      action,
+    },
+  })
+}

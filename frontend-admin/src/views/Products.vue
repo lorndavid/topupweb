@@ -5,6 +5,7 @@ import adminApi from '@/services/api'
 import type { AdminProduct } from '@/types'
 import { formatUSD } from '@/utils/formatters'
 import { exportToCsv } from '@/utils/exportCsv'
+import { trackProductPriceChange } from '@/composables/useAdminAnalytics'
 import AppIcon from '@/components/ui/AppIcon.vue'
 import DataTable from '@/components/ui/DataTable.vue'
 import SlideOver from '@/components/ui/SlideOver.vue'
@@ -80,17 +81,27 @@ function openEditProfit(product: AdminProduct) {
 
 async function saveProfit() {
   if (!selectedProduct.value) return
+  const oldPrice = selectedProduct.value.sell_price
+  const newPrice = editSellPrice.value
   savingProfit.value = true
   try {
     const result = await adminApi.updateProductProfit(
       selectedProduct.value.product_code,
-      editSellPrice.value,
+      newPrice,
       selectedProduct.value.game_code
     )
     if (result.success) {
-      toast.success('Price updated', `${selectedProduct.value.name} → ${formatUSD(editSellPrice.value)}`)
+      toast.success('Price updated', `${selectedProduct.value.name} → ${formatUSD(newPrice)}`)
       showEditProfit.value = false
       await fetchProducts()
+      trackProductPriceChange(
+        selectedProduct.value.product_code,
+        selectedProduct.value.name,
+        selectedProduct.value.game_code,
+        oldPrice,
+        newPrice,
+        'manual_edit'
+      )
     } else {
       toast.error('Failed to update', result.message)
     }
@@ -116,13 +127,24 @@ async function saveInlineEdit(product: AdminProduct) {
     return
   }
 
+  const oldPrice = product.sell_price
+  const newPrice = inline.value
+
   savingInline.value = product.product_code
   try {
-    const result = await adminApi.updateProductProfit(product.product_code, inline.value, product.game_code)
+    const result = await adminApi.updateProductProfit(product.product_code, newPrice, product.game_code)
     if (result.success) {
-      toast.success('Price updated', `${product.name} → ${formatUSD(inline.value)}`)
+      toast.success('Price updated', `${product.name} → ${formatUSD(newPrice)}`)
       delete editInline.value[product.product_code]
       await fetchProducts()
+      trackProductPriceChange(
+        product.product_code,
+        product.name,
+        product.game_code,
+        oldPrice,
+        newPrice,
+        'inline_edit'
+      )
     } else {
       toast.error('Failed to update', result.message)
     }
@@ -140,10 +162,25 @@ function cancelInlineEdit(productCode: string) {
 // ─── Reset override ────────────────────────────────────
 
 async function confirmReset(productCode: string) {
+  // Capture the old override price before reset
+  const product = products.value.find((p: AdminProduct) => p.product_code === productCode)
+  const oldPrice = product?.sell_price ?? 0
+  const productName = product?.name ?? productCode
+  const gameCode = product?.game_code ?? ''
+
   try {
     await adminApi.deleteProductOverride(productCode)
     toast.success('Override removed', 'Product will use auto-calculated margin')
     await fetchProducts()
+    const newProduct = products.value.find((p: AdminProduct) => p.product_code === productCode)
+    trackProductPriceChange(
+      productCode,
+      productName,
+      gameCode,
+      oldPrice,
+      newProduct?.sell_price ?? 0,
+      'reset_override'
+    )
   } catch (err) {
     toast.error('Failed to remove override', err instanceof Error ? err.message : '')
   } finally {

@@ -15,7 +15,8 @@ export type AnalyticsEventType =
   | 'search'
   // Admin events
   | 'admin_page_view'
-  | 'admin_order_status_change';
+  | 'admin_order_status_change'
+  | 'admin_product_price_change';
 
 export interface IAnalyticsEvent extends Document {
   /** The type/category of event being tracked */
@@ -56,6 +57,7 @@ const AnalyticsEventSchema = new Schema<IAnalyticsEvent>(
         'search',
         'admin_page_view',
         'admin_order_status_change',
+        'admin_product_price_change',
       ],
       index: true,
     },

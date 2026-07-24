@@ -178,6 +178,7 @@ export async function getStats(
 
     // Determine scope: which event types to include in queries
     const scope = (req.query.scope as string) || 'all';
+    const period = parseInt(req.query.period as string) || 30;
     const publicTypes: AnalyticsEventType[] = ['page_view', 'game_click', 'product_select', 'verify_player', 'payment_initiated', 'payment_completed', 'payment_failed', 'search'];
     const adminTypes: AnalyticsEventType[] = ['admin_page_view', 'admin_order_status_change', 'admin_product_price_change', 'admin_announcement_create', 'admin_announcement_update', 'admin_announcement_toggle', 'admin_announcement_delete'];
 
@@ -196,6 +197,18 @@ export async function getStats(
       clickTypes = ['game_click', ...adminTypes];
     }
 
+    // Determine period filter for game/engagement queries
+    // period=1 → today, period=7 → week, period=30 → month, period=-1 or ∞ → all time
+    let periodStart: Date | null;
+    if (period <= 0) {
+      periodStart = null; // no filter
+    } else if (period === 1) {
+      periodStart = todayStart;
+    } else {
+      periodStart = new Date(todayStart.getTime() - period * 24 * 60 * 60 * 1000);
+    }
+    const timeFilter = periodStart ? { created_at: { $gte: periodStart } } : {};
+
     // Run all queries in parallel for speed
     const [
       totalPageViews,
@@ -205,6 +218,7 @@ export async function getStats(
       todayVisitors,
       gameClicks,
       topGames,
+      dailyViews,
     ] = await Promise.all([
       AnalyticsEventModel.countDocuments({ event_type: { $in: pageViewTypes } }),
       AnalyticsEventModel.countDocuments({
@@ -223,7 +237,7 @@ export async function getStats(
         created_at: { $gte: todayStart },
       }).then((s: string[]) => s.length),
       AnalyticsEventModel.aggregate([
-        { $match: { event_type: { $in: clickTypes }, created_at: { $gte: monthAgo } } },
+        { $match: { event_type: { $in: clickTypes }, ...timeFilter } },
         { $group: { _id: '$game_code', count: { $sum: 1 } } },
         { $sort: { count: -1 } },
         { $limit: 10 },
@@ -234,13 +248,29 @@ export async function getStats(
           $match: {
             event_type: { $in: pageViewTypes },
             game_code: { $nin: [null, ''] },
-            created_at: { $gte: monthAgo },
+            ...timeFilter,
           },
         },
         { $group: { _id: '$game_code', count: { $sum: 1 } } },
         { $sort: { count: -1 } },
         { $limit: 5 },
         { $project: { game_code: '$_id', count: 1, _id: 0 } },
+      ]),
+      // Daily page view time-series
+      AnalyticsEventModel.aggregate([
+        { $match: { event_type: { $in: pageViewTypes }, ...timeFilter } },
+        {
+          $group: {
+            _id: {
+              year: { $year: '$created_at' },
+              month: { $month: '$created_at' },
+              day: { $dayOfMonth: '$created_at' },
+            },
+            date: { $first: '$created_at' },
+            count: { $sum: 1 },
+          },
+        },
+        { $sort: { '_id.year': 1, '_id.month': 1, '_id.day': 1 } },
       ]),
     ]);
 
@@ -252,7 +282,7 @@ export async function getStats(
         event_type: eventType,
         count: await AnalyticsEventModel.countDocuments({
           event_type: eventType,
-          created_at: { $gte: monthAgo },
+          ...timeFilter,
         }),
       }))
     );
@@ -274,6 +304,10 @@ export async function getStats(
         },
         top_games_clicked: gameClicks,
         top_games_viewed: topGames,
+        daily_views: dailyViews.map((d: any) => ({
+          date: d.date,
+          count: d.count,
+        })),
         conversions: conversionCounts,
       },
     });

@@ -16,15 +16,38 @@ const activeTab = ref<'profit' | 'page'>('profit')
 // ─── Profit Analytics ─────────────────────────────────
 const profitLoading = ref(true)
 const analytics = ref<AnalyticsData | null>(null)
-const selectedDays = ref(30)
+const LS_KEY_PROFIT_PERIOD = 'admin_analytics_profit_period'
+const profitPeriod = ref<number>(loadProfitPeriod())
 const chartType = ref<'revenue' | 'orders'>('revenue')
 
-const daysOptions = [7, 30, 90, 365]
+function loadProfitPeriod(): number {
+  try {
+    const saved = localStorage.getItem(LS_KEY_PROFIT_PERIOD)
+    if (saved) {
+      const n = parseInt(saved, 10)
+      if (n === 1 || n === 7 || n === 30 || n === -1) return n
+    }
+  } catch { /* localStorage unavailable */ }
+  return 30
+}
+
+function saveProfitPeriod(period: number) {
+  try {
+    localStorage.setItem(LS_KEY_PROFIT_PERIOD, String(period))
+  } catch { /* localStorage unavailable */ }
+}
+
+const profitPeriodOptions = [
+  { id: 1, label: 'Today' },
+  { id: 7, label: '7D' },
+  { id: 30, label: '30D' },
+  { id: -1, label: 'All Time' },
+]
 
 async function fetchProfitAnalytics() {
   profitLoading.value = true
   try {
-    analytics.value = await adminApi.getAnalytics(selectedDays.value)
+    analytics.value = await adminApi.getAnalytics(profitPeriod.value)
   } catch (err) {
     toast.error('Failed to load analytics', err instanceof Error ? err.message : '')
   } finally {
@@ -77,22 +100,61 @@ const revenueTrend = computed(() => {
   return 'neutral'
 })
 
-const periodLabel = computed(() => {
-  if (selectedDays.value === 7) return 'Last 7 days'
-  if (selectedDays.value === 30) return 'Last 30 days'
-  if (selectedDays.value === 90) return 'Last 90 days'
-  return 'Last 365 days'
+const profitPeriodLabel = computed(() => {
+  const opt = profitPeriodOptions.find(o => o.id === profitPeriod.value)
+  return opt ? opt.label : '30D'
 })
 
 // ─── Page Analytics ──────────────────────────────────
 const pageLoading = ref(true)
 const pageStats = ref<PageAnalyticsData | null>(null)
-const pageScope = ref<'all' | 'public' | 'admin'>('all')
+const LS_KEY_SCOPE = 'admin_analytics_page_scope'
+const LS_KEY_PERIOD = 'admin_analytics_page_period'
+const pageScope = ref<'all' | 'public' | 'admin'>(loadScope())
+const pagePeriod = ref<number>(loadPeriod())
+
+function loadScope(): 'all' | 'public' | 'admin' {
+  try {
+    const saved = localStorage.getItem(LS_KEY_SCOPE)
+    if (saved === 'all' || saved === 'public' || saved === 'admin') return saved
+  } catch { /* localStorage unavailable */ }
+  return 'all'
+}
+
+function saveScope(scope: 'all' | 'public' | 'admin') {
+  try {
+    localStorage.setItem(LS_KEY_SCOPE, scope)
+  } catch { /* localStorage unavailable */ }
+}
+
+function loadPeriod(): number {
+  try {
+    const saved = localStorage.getItem(LS_KEY_PERIOD)
+    if (saved) {
+      const n = parseInt(saved, 10)
+      if (n === 1 || n === 7 || n === 30 || n === -1) return n
+    }
+  } catch { /* localStorage unavailable */ }
+  return 30
+}
+
+function savePeriod(period: number) {
+  try {
+    localStorage.setItem(LS_KEY_PERIOD, String(period))
+  } catch { /* localStorage unavailable */ }
+}
+
+const pagePeriodOptions = [
+  { id: 1, label: 'Today' },
+  { id: 7, label: '7D' },
+  { id: 30, label: '30D' },
+  { id: -1, label: 'All Time' },
+]
 
 async function fetchPageAnalytics() {
   pageLoading.value = true
   try {
-    pageStats.value = await adminApi.getPageAnalyticsStats(pageScope.value)
+    pageStats.value = await adminApi.getPageAnalyticsStats(pageScope.value, pagePeriod.value)
   } catch (err) {
     toast.error('Failed to load page analytics', err instanceof Error ? err.message : '')
   } finally {
@@ -101,6 +163,11 @@ async function fetchPageAnalytics() {
 }
 
 // Conversion rate helpers
+const pagePeriodLabel = computed(() => {
+  const opt = pagePeriodOptions.find(o => o.id === pagePeriod.value)
+  return opt ? opt.label : '30D'
+})
+
 const conversionRate = computed(() => {
   if (!pageStats.value) return 0
   const initiated = pageStats.value.conversions.payment_initiated
@@ -129,9 +196,151 @@ function maxGameCount(entries: TopGameEntry[]): number {
   return Math.max(...entries.map((e) => e.count))
 }
 
+// Daily page views chart data
+const pageChartData = computed(() => {
+  if (!pageStats.value) return { labels: [], values: [] }
+  const data = pageStats.value.daily_views || []
+  const maxPoints = 90
+  const startIdx = data.length > maxPoints ? data.length - maxPoints : 0
+  return {
+    labels: data.slice(startIdx).map((d) =>
+      new Date(d.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+    ),
+    values: data.slice(startIdx).map((d) => d.count),
+  }
+})
+
 // Computed max counts for bar widths
 const maxGameClicks = computed(() => maxGameCount(pageStats.value?.top_games_clicked || []))
 const maxGameViews = computed(() => maxGameCount(pageStats.value?.top_games_viewed || []))
+
+// ─── CSV Export ────────────────────────────────────────
+
+/**
+ * Escape a CSV value (handle commas, quotes, newlines).
+ */
+function csvEscape(val: unknown): string {
+  const str = val == null ? '' : String(val)
+  if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+    return `"${str.replace(/"/g, '""')}"`
+  }
+  return str
+}
+
+/**
+ * Trigger a browser download of CSV content.
+ */
+function downloadCSV(filename: string, headers: string[], rows: string[][]) {
+  const csvContent = [
+    headers.map(csvEscape).join(','),
+    ...rows.map((r) => r.map(csvEscape).join(',')),
+  ].join('\n')
+
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = filename
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+  URL.revokeObjectURL(url)
+}
+
+function exportProfitCSV() {
+  if (!analytics.value) return
+  const a = analytics.value
+  const period = profitPeriodLabel.value
+  const rows: string[][] = []
+
+  // ── Section 1: Daily Trend ──
+  const dailyHeaders = ['Date', 'Revenue (USD)', 'Orders']
+  const dailyRows = a.daily.map((d) => [
+    new Date(d.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+    d.revenue.toFixed(2),
+    String(d.orders),
+  ])
+  rows.push(['=== Daily Trend (' + period + ') ===', '', ''])
+  rows.push(dailyHeaders)
+  rows.push(...dailyRows)
+  rows.push([])
+
+  // ── Section 2: Summary ──
+  rows.push(['=== Summary ===', '', ''])
+  rows.push(['Metric', 'Value', ''])
+  rows.push(['Period Revenue', a.summary.period_revenue.toFixed(2), ''])
+  rows.push(['Period Orders', String(a.summary.period_orders), ''])
+  rows.push(['Avg Order Value', a.summary.avg_order_value.toFixed(2), ''])
+  rows.push(['All Time Revenue', a.summary.total_revenue.toFixed(2), ''])
+  rows.push(['Total Orders', String(a.summary.total_orders), ''])
+  rows.push([])
+
+  // ── Section 3: Game Performance ──
+  const gameHeaders = ['Game', 'Revenue (USD)', 'Orders', 'Avg Order Value', 'Revenue Share (%)']
+  const totalRev = a.by_game.reduce((s, g) => s + g.revenue, 0)
+  const gameRows = a.by_game.map((g) => [
+    g.game_name || g.game_code,
+    g.revenue.toFixed(2),
+    String(g.orders),
+    g.orders > 0 ? (g.revenue / g.orders).toFixed(2) : '0.00',
+    totalRev > 0 ? ((g.revenue / totalRev) * 100).toFixed(1) : '0.0',
+  ])
+  rows.push(['=== Game Performance (' + period + ') ===', '', '', '', ''])
+  rows.push(gameHeaders)
+  rows.push(...gameRows)
+
+  toast.success('Profit analytics exported as CSV')
+  const filename = `profit-analytics-${period.toLowerCase().replace(/\s+/g, '-')}-${new Date().toISOString().slice(0, 10)}.csv`
+  downloadCSV(filename, rows[0] || ['', '', '', '', ''], rows.slice(1))
+}
+
+function exportPageCSV() {
+  if (!pageStats.value) return
+  const s = pageStats.value
+  const period = pagePeriodLabel.value
+  const scope = pageScope.value === 'all' ? 'all-events' : pageScope.value === 'public' ? 'public' : 'admin'
+  const rows: string[][] = []
+
+  // ── Section 1: Overview ──
+  rows.push(['=== Overview ===', '', '', '', ''])
+  rows.push(['Metric', 'Total', 'Today', 'This Week', ''])
+  rows.push(['Page Views', String(s.overview.total_page_views), String(s.overview.today_page_views), String(s.overview.weekly_page_views), ''])
+  rows.push(['Unique Visitors', String(s.overview.total_visitors), String(s.overview.today_visitors), '', ''])
+  rows.push(['Views per Visitor', s.overview.total_visitors > 0 ? (s.overview.total_page_views / s.overview.total_visitors).toFixed(1) : '', '', '', ''])
+  rows.push([])
+
+  // ── Section 2: Top Games Clicked ──
+  rows.push(['=== Top Games (Clicked) — ' + period + ' ===', '', ''])
+  rows.push(['Rank', 'Game Code', 'Clicks'])
+  s.top_games_clicked.forEach((g, i) => {
+    rows.push([String(i + 1), g.game_code, String(g.count)])
+  })
+  if (s.top_games_clicked.length === 0) rows.push(['No data', '', ''])
+  rows.push([])
+
+  // ── Section 3: Top Games Viewed ──
+  rows.push(['=== Top Games (Viewed) — ' + period + ' ===', '', ''])
+  rows.push(['Rank', 'Game Code', 'Views'])
+  s.top_games_viewed.forEach((g, i) => {
+    rows.push([String(i + 1), g.game_code, String(g.count)])
+  })
+  if (s.top_games_viewed.length === 0) rows.push(['No data', '', ''])
+  rows.push([])
+
+  // ── Section 4: Conversion Funnel ──
+  rows.push(['=== Conversion Funnel ===', '', ''])
+  rows.push(['Stage', 'Count', 'Rate (%)'])
+  const initiated = s.conversions.payment_initiated
+  const completed = s.conversions.payment_completed
+  const failed = s.conversions.payment_failed
+  rows.push(['Initiated', String(initiated), '100.0'])
+  rows.push(['Completed', String(completed), initiated > 0 ? ((completed / initiated) * 100).toFixed(1) : '0.0'])
+  rows.push(['Failed', String(failed), initiated > 0 ? ((failed / initiated) * 100).toFixed(1) : '0.0'])
+
+  toast.success('Page analytics exported as CSV')
+  const filename = `page-analytics-${scope}-${period.toLowerCase().replace(/\s+/g, '-')}-${new Date().toISOString().slice(0, 10)}.csv`
+  downloadCSV(filename, rows[0] || ['', '', ''], rows.slice(1))
+}
 
 // Tab switch handler — fetch lazy
 function onTabChange(tab: 'profit' | 'page') {
@@ -159,19 +368,29 @@ onMounted(() => {
       </div>
       <div class="flex items-center gap-2" v-if="activeTab === 'profit'">
         <!-- Period selector -->
-        <div class="flex items-center bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-0.5">
+        <div class="flex items-center gap-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-0.5 shadow-sm">
           <button
-            v-for="days in daysOptions"
-            :key="days"
-            class="px-3 py-1.5 text-xs font-medium rounded-md transition-all duration-150"
-            :class="selectedDays === days
+            v-for="opt in profitPeriodOptions"
+            :key="opt.id"
+            class="relative px-3 py-1.5 text-xs font-medium rounded-md transition-all duration-150"
+            :class="profitPeriod === opt.id
               ? 'bg-primary-500 text-white shadow-sm shadow-primary-500/30'
               : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'"
-            @click="selectedDays = days; fetchProfitAnalytics()"
+            @click="profitPeriod = opt.id; saveProfitPeriod(opt.id); fetchProfitAnalytics()"
           >
-            {{ days }}d
+            {{ opt.label }}
           </button>
         </div>
+        <!-- Export CSV -->
+        <button
+          v-if="analytics"
+          @click="exportProfitCSV()"
+          class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-all duration-150"
+          title="Export CSV"
+        >
+          <AppIcon name="download" :size="14" />
+          Export
+        </button>
       </div>
     </div>
 
@@ -210,7 +429,7 @@ onMounted(() => {
             icon="dollar"
             accent="primary"
             :trend="revenueTrend"
-            :trend-value="periodLabel"
+            :trend-value="profitPeriodLabel"
           />
           <StatsCard
             title="Period Orders"
@@ -218,7 +437,7 @@ onMounted(() => {
             icon="orders"
             accent="info"
             :trend="orderTrend"
-            :trend-value="periodLabel"
+            :trend-value="profitPeriodLabel"
           />
           <StatsCard
             title="Avg Order Value"
@@ -249,7 +468,7 @@ onMounted(() => {
                   {{ chartType === 'revenue' ? 'Revenue Trend' : 'Orders Trend' }}
                 </h3>
                 <div class="flex items-center gap-2">
-                  <span class="text-xs text-slate-400">{{ periodLabel }}</span>
+                  <span class="text-xs text-slate-400">{{ profitPeriodLabel }}</span>
                   <button
                     class="px-2 py-1 text-[10px] font-medium rounded border border-slate-200 dark:border-slate-600 transition-colors"
                     :class="chartType === 'revenue'
@@ -350,7 +569,7 @@ onMounted(() => {
         <div class="card overflow-hidden">
           <div class="card-header">
             <h3 class="text-sm font-semibold text-slate-900 dark:text-white">Game Performance Detail</h3>
-            <span class="text-xs text-slate-400">{{ periodLabel }}</span>
+            <span class="text-xs text-slate-400">{{ profitPeriodLabel }}</span>
           </div>
           <div class="table-container">
             <table class="data-table">
@@ -399,25 +618,54 @@ onMounted(() => {
 
     <!-- ─── Page Analytics Tab ─────────────────────────────── -->
     <template v-if="activeTab === 'page'">
-      <!-- Scope filter toggle -->
+      <!-- Scope + Period filter toggles -->
       <div class="flex flex-wrap items-center justify-between gap-3 mb-6">
-        <div class="flex items-center gap-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-0.5 shadow-sm">
-          <button
-            v-for="opt in ([{ id: 'all' as const, label: 'All Events', desc: 'Public + Admin' }, { id: 'public' as const, label: 'Public Events', desc: 'Customer activity' }, { id: 'admin' as const, label: 'Admin Events', desc: 'Dashboard actions' }])"
-            :key="opt.id"
-            @click="pageScope = opt.id; fetchPageAnalytics()"
-            class="relative px-3 py-1.5 text-xs font-medium rounded-md transition-all duration-150"
-            :class="pageScope === opt.id
-              ? 'bg-primary-500 text-white shadow-sm shadow-primary-500/30'
-              : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'"
-            :title="opt.desc"
-          >
-            {{ opt.label }}
-          </button>
+        <div class="flex flex-wrap items-center gap-2">
+          <!-- Scope filter -->
+          <div class="flex items-center gap-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-0.5 shadow-sm">
+            <button
+              v-for="opt in ([{ id: 'all' as const, label: 'All Events', desc: 'Public + Admin' }, { id: 'public' as const, label: 'Public Events', desc: 'Customer activity' }, { id: 'admin' as const, label: 'Admin Events', desc: 'Dashboard actions' }])"
+              :key="opt.id"
+              @click="pageScope = opt.id; saveScope(opt.id); fetchPageAnalytics()"
+              class="relative px-3 py-1.5 text-xs font-medium rounded-md transition-all duration-150"
+              :class="pageScope === opt.id
+                ? 'bg-primary-500 text-white shadow-sm shadow-primary-500/30'
+                : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'"
+              :title="opt.desc"
+            >
+              {{ opt.label }}
+            </button>
+          </div>
+          <!-- Period filter -->
+          <div class="flex items-center gap-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-0.5 shadow-sm">
+            <button
+              v-for="opt in pagePeriodOptions"
+              :key="opt.id"
+              @click="pagePeriod = opt.id; savePeriod(opt.id); fetchPageAnalytics()"
+              class="relative px-3 py-1.5 text-xs font-medium rounded-md transition-all duration-150"
+              :class="pagePeriod === opt.id
+                ? 'bg-primary-500 text-white shadow-sm shadow-primary-500/30'
+                : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'"
+            >
+              {{ opt.label }}
+            </button>
+          </div>
         </div>
         <span v-if="pageStats" class="text-[10px] text-slate-400 dark:text-slate-500">
           Showing: <span class="font-medium text-slate-500 dark:text-slate-400">{{ pageScope === 'all' ? 'All Events' : pageScope === 'public' ? 'Public Events Only' : 'Admin Events Only' }}</span>
+          ·
+          <span class="font-medium text-slate-500 dark:text-slate-400">{{ pagePeriodOptions.find(o => o.id === pagePeriod)?.label || '30D' }}</span>
         </span>
+        <!-- Export CSV -->
+        <button
+          v-if="pageStats"
+          @click="exportPageCSV()"
+          class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-all duration-150"
+          title="Export CSV"
+        >
+          <AppIcon name="download" :size="14" />
+          Export
+        </button>
       </div>
 
       <!-- Loading -->
@@ -463,11 +711,28 @@ onMounted(() => {
           />
         </div>
 
+        <!-- Daily Page Views Trend Chart -->
+        <div class="mb-6">
+          <RevenueChart
+            :labels="pageChartData.labels"
+            :values="pageChartData.values"
+            prefix=""
+            label="Page Views"
+          >
+            <template #header>
+              <div class="flex items-center justify-between mb-4">
+                <h3 class="text-sm font-semibold text-slate-900 dark:text-white">Daily Page Views — {{ pagePeriodLabel }}</h3>
+                <span class="text-xs text-slate-400">{{ pageStats.overview.total_page_views }} total views</span>
+              </div>
+            </template>
+          </RevenueChart>
+        </div>
+
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
           <!-- Top Games Clicked -->
           <div class="lg:col-span-2">
             <div class="card p-5">
-              <h3 class="text-sm font-semibold text-slate-900 dark:text-white mb-4">Top Games (Clicked) — Last 30 Days</h3>
+              <h3 class="text-sm font-semibold text-slate-900 dark:text-white mb-4">Top Games (Clicked) — {{ pagePeriodLabel }}</h3>
               <div v-if="pageStats.top_games_clicked.length > 0" class="space-y-3">
                 <div
                   v-for="(game, idx) in pageStats.top_games_clicked"
@@ -505,7 +770,7 @@ onMounted(() => {
           <div>
             <div v-if="pageScope !== 'admin'" class="card p-5">
               <h3 class="text-sm font-semibold text-slate-900 dark:text-white mb-4">Conversion Funnel</h3>
-              <p class="text-[10px] text-slate-400 mb-4">Last 30 days — from payment initiation to completion</p>
+              <p class="text-[10px] text-slate-400 mb-4">{{ pagePeriodLabel }} — from payment initiation to completion</p>
 
               <!-- Funnel visual -->
               <div class="space-y-4">

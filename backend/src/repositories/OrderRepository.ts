@@ -199,9 +199,7 @@ export class OrderRepository {
    * Get revenue analytics aggregated by day for a date range.
    * Returns daily revenue, order count, and per-game breakdown.
    */
-  async getRevenueAnalytics(days: number = 30) {
-    const now = new Date();
-    const startDate = new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
+  async getRevenueAnalytics(startDate: Date) {
 
     // ── Daily revenue time series ──
     const dailyPipeline = [

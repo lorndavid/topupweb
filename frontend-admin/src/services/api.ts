@@ -206,17 +206,17 @@ class AdminApiService {
   }
 
   // ─── Analytics ─────────────────────────────────
-  async getAnalytics(days: number = 30): Promise<AnalyticsData> {
+  async getAnalytics(period: number = 30): Promise<AnalyticsData> {
     const { data } = await this.api.get<ApiResponse<AnalyticsData>>('/admin/analytics', {
-      params: { days },
+      params: { period },
     })
     if (!data.success || !data.data) throw new Error(data.message || 'Failed to fetch analytics')
     return data.data
   }
 
-  async getPageAnalyticsStats(scope: 'all' | 'public' | 'admin' = 'all'): Promise<PageAnalyticsData> {
+  async getPageAnalyticsStats(scope: 'all' | 'public' | 'admin' = 'all', period: number = 30): Promise<PageAnalyticsData> {
     const { data } = await this.api.get<ApiResponse<PageAnalyticsData>>('/admin/analytics/stats', {
-      params: { scope },
+      params: { scope, period },
     })
     if (!data.success || !data.data) throw new Error(data.message || 'Failed to fetch page analytics')
     return data.data

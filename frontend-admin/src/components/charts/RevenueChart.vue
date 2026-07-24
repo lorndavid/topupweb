@@ -19,8 +19,10 @@ const props = withDefaults(defineProps<{
   labels: string[]
   values: number[]
   prefix?: string
+  label?: string
 }>(), {
   prefix: '$',
+  label: undefined,
 })
 
 const theme = useThemeStore()
@@ -29,7 +31,7 @@ const chartData = computed(() => ({
   labels: props.labels,
   datasets: [
     {
-      label: props.prefix === '$' ? 'Revenue' : 'Orders',
+      label: props.label || (props.prefix === '$' ? 'Revenue' : 'Orders'),
       data: props.values,
       fill: true,
       tension: 0.4,

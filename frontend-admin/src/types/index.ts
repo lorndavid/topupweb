@@ -237,6 +237,7 @@ export interface PageAnalyticsData {
   overview: PageStatsOverview
   top_games_clicked: TopGameEntry[]
   top_games_viewed: TopGameEntry[]
+  daily_views: { date: string; count: number }[]
   conversions: {
     payment_initiated: number
     payment_completed: number

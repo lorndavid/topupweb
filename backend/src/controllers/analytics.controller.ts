@@ -162,10 +162,11 @@ export async function trackEvent(
  * GET /api/analytics/stats
  *
  * Returns aggregated analytics for the admin dashboard.
+ * Accepts an optional `scope` query param: 'all' (default), 'public', or 'admin'.
  * Protected by JWT auth middleware.
  */
 export async function getStats(
-  _req: Request,
+  req: Request,
   res: Response,
   _next: NextFunction
 ): Promise<void> {
@@ -174,6 +175,26 @@ export async function getStats(
     const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const weekAgo = new Date(todayStart.getTime() - 7 * 24 * 60 * 60 * 1000);
     const monthAgo = new Date(todayStart.getTime() - 30 * 24 * 60 * 60 * 1000);
+
+    // Determine scope: which event types to include in queries
+    const scope = (req.query.scope as string) || 'all';
+    const publicTypes: AnalyticsEventType[] = ['page_view', 'game_click', 'product_select', 'verify_player', 'payment_initiated', 'payment_completed', 'payment_failed', 'search'];
+    const adminTypes: AnalyticsEventType[] = ['admin_page_view', 'admin_order_status_change', 'admin_product_price_change', 'admin_announcement_create', 'admin_announcement_update', 'admin_announcement_toggle', 'admin_announcement_delete'];
+
+    let pageViewTypes: AnalyticsEventType[];
+    let clickTypes: AnalyticsEventType[];
+
+    if (scope === 'public') {
+      pageViewTypes = ['page_view'];
+      clickTypes = ['game_click'];
+    } else if (scope === 'admin') {
+      pageViewTypes = ['admin_page_view'];
+      clickTypes = adminTypes;
+    } else {
+      // 'all' — both public and admin event types
+      pageViewTypes = ['page_view', 'admin_page_view'];
+      clickTypes = ['game_click', ...adminTypes];
+    }
 
     // Run all queries in parallel for speed
     const [
@@ -185,24 +206,24 @@ export async function getStats(
       gameClicks,
       topGames,
     ] = await Promise.all([
-      AnalyticsEventModel.countDocuments({ event_type: 'page_view' }),
+      AnalyticsEventModel.countDocuments({ event_type: { $in: pageViewTypes } }),
       AnalyticsEventModel.countDocuments({
-        event_type: 'page_view',
+        event_type: { $in: pageViewTypes },
         created_at: { $gte: todayStart },
       }),
       AnalyticsEventModel.countDocuments({
-        event_type: 'page_view',
+        event_type: { $in: pageViewTypes },
         created_at: { $gte: weekAgo },
       }),
       AnalyticsEventModel.distinct('session_id', {
-        event_type: 'page_view',
+        event_type: { $in: pageViewTypes },
       }).then((s: string[]) => s.length),
       AnalyticsEventModel.distinct('session_id', {
-        event_type: 'page_view',
+        event_type: { $in: pageViewTypes },
         created_at: { $gte: todayStart },
       }).then((s: string[]) => s.length),
       AnalyticsEventModel.aggregate([
-        { $match: { event_type: 'game_click', created_at: { $gte: monthAgo } } },
+        { $match: { event_type: { $in: clickTypes }, created_at: { $gte: monthAgo } } },
         { $group: { _id: '$game_code', count: { $sum: 1 } } },
         { $sort: { count: -1 } },
         { $limit: 10 },
@@ -211,7 +232,7 @@ export async function getStats(
       AnalyticsEventModel.aggregate([
         {
           $match: {
-            event_type: 'page_view',
+            event_type: { $in: pageViewTypes },
             game_code: { $nin: [null, ''] },
             created_at: { $gte: monthAgo },
           },
@@ -224,6 +245,7 @@ export async function getStats(
     ]);
 
     // Conversion counts (separate to avoid Aggregate type conflicts)
+    // Conversions only make sense for public events, so always use payment types
     const conversionTypes = ['payment_initiated', 'payment_completed', 'payment_failed'] as const;
     const conversionResults = await Promise.all(
       conversionTypes.map(async (eventType) => ({

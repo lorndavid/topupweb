@@ -214,8 +214,10 @@ class AdminApiService {
     return data.data
   }
 
-  async getPageAnalyticsStats(): Promise<PageAnalyticsData> {
-    const { data } = await this.api.get<ApiResponse<PageAnalyticsData>>('/admin/analytics/stats')
+  async getPageAnalyticsStats(scope: 'all' | 'public' | 'admin' = 'all'): Promise<PageAnalyticsData> {
+    const { data } = await this.api.get<ApiResponse<PageAnalyticsData>>('/admin/analytics/stats', {
+      params: { scope },
+    })
     if (!data.success || !data.data) throw new Error(data.message || 'Failed to fetch page analytics')
     return data.data
   }

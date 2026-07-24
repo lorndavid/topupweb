@@ -87,11 +87,12 @@ const periodLabel = computed(() => {
 // ─── Page Analytics ──────────────────────────────────
 const pageLoading = ref(true)
 const pageStats = ref<PageAnalyticsData | null>(null)
+const pageScope = ref<'all' | 'public' | 'admin'>('all')
 
 async function fetchPageAnalytics() {
   pageLoading.value = true
   try {
-    pageStats.value = await adminApi.getPageAnalyticsStats()
+    pageStats.value = await adminApi.getPageAnalyticsStats(pageScope.value)
   } catch (err) {
     toast.error('Failed to load page analytics', err instanceof Error ? err.message : '')
   } finally {
@@ -398,6 +399,27 @@ onMounted(() => {
 
     <!-- ─── Page Analytics Tab ─────────────────────────────── -->
     <template v-if="activeTab === 'page'">
+      <!-- Scope filter toggle -->
+      <div class="flex flex-wrap items-center justify-between gap-3 mb-6">
+        <div class="flex items-center gap-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-0.5 shadow-sm">
+          <button
+            v-for="opt in ([{ id: 'all' as const, label: 'All Events', desc: 'Public + Admin' }, { id: 'public' as const, label: 'Public Events', desc: 'Customer activity' }, { id: 'admin' as const, label: 'Admin Events', desc: 'Dashboard actions' }])"
+            :key="opt.id"
+            @click="pageScope = opt.id; fetchPageAnalytics()"
+            class="relative px-3 py-1.5 text-xs font-medium rounded-md transition-all duration-150"
+            :class="pageScope === opt.id
+              ? 'bg-primary-500 text-white shadow-sm shadow-primary-500/30'
+              : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'"
+            :title="opt.desc"
+          >
+            {{ opt.label }}
+          </button>
+        </div>
+        <span v-if="pageStats" class="text-[10px] text-slate-400 dark:text-slate-500">
+          Showing: <span class="font-medium text-slate-500 dark:text-slate-400">{{ pageScope === 'all' ? 'All Events' : pageScope === 'public' ? 'Public Events Only' : 'Admin Events Only' }}</span>
+        </span>
+      </div>
+
       <!-- Loading -->
       <div v-if="pageLoading" class="space-y-4">
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
@@ -481,7 +503,7 @@ onMounted(() => {
 
           <!-- Conversion Funnel -->
           <div>
-            <div class="card p-5">
+            <div v-if="pageScope !== 'admin'" class="card p-5">
               <h3 class="text-sm font-semibold text-slate-900 dark:text-white mb-4">Conversion Funnel</h3>
               <p class="text-[10px] text-slate-400 mb-4">Last 30 days — from payment initiation to completion</p>
 
@@ -544,6 +566,17 @@ onMounted(() => {
                   <span class="text-slate-500 dark:text-slate-400">Total Initiated</span>
                   <span class="font-semibold text-slate-900 dark:text-white">{{ formatNumber(pageStats.conversions.payment_initiated) }}</span>
                 </div>
+              </div>
+            </div>
+
+            <!-- Admin scope note -->
+            <div v-if="pageScope === 'admin'" class="card p-5">
+              <div class="flex flex-col items-center justify-center py-6 text-center">
+                <AppIcon name="chart" :size="32" class="mb-3 text-slate-300 dark:text-slate-600" />
+                <h3 class="text-sm font-medium text-slate-500 dark:text-slate-400 mb-1">Conversion data not available</h3>
+                <p class="text-[10px] text-slate-400 dark:text-slate-500 max-w-[200px]">
+                  Admin events don't include payment conversion data. Switch to "Public Events" or "All Events" to view the conversion funnel.
+                </p>
               </div>
             </div>
 

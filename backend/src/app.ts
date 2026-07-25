@@ -23,6 +23,7 @@ const allowedOrigins = [
   'http://localhost:4199',   // Admin dashboard (preview)
   'https://topup.lorndavid.online',
   'https://www.topup.lorndavid.online',
+  'https://admintopup.lorndavid.online',
   // Allow Vercel preview deployments (for testing before going live)
   ...(process.env.EXTRA_CORS_ORIGINS ? process.env.EXTRA_CORS_ORIGINS.split(',') : []),
 ].filter(Boolean);

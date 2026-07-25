@@ -53,8 +53,8 @@ async function fetchOrders() {
   }
 }
 
-function openOrderDetail(order: AdminOrder) {
-  selectedOrder.value = order
+function openOrderDetail(order: Record<string, unknown>) {
+  selectedOrder.value = order as unknown as AdminOrder
   showDetail.value = true
 }
 

@@ -64,7 +64,7 @@ const chartOptions = computed(() => ({
       cornerRadius: 12,
       displayColors: false,
       callbacks: {
-        label: (ctx: { parsed: { y: number } }) => props.prefix + ctx.parsed.y.toFixed(2),
+        label: (ctx: { parsed: { y: number | null } }) => props.prefix + (ctx.parsed.y ?? 0).toFixed(2),
       },
     },
   },
@@ -82,7 +82,7 @@ const chartOptions = computed(() => ({
       },
       ticks: {
         color: theme.isDark ? '#64748b' : '#94a3b8',
-        callback: (value: number) => props.prefix + value.toFixed(2),
+        callback: (value: string | number) => props.prefix + (typeof value === 'number' ? value : parseFloat(value)).toFixed(2),
       },
     },
   },

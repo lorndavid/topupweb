@@ -49,7 +49,7 @@ async function handleLookup() {
         username: null,
         region: null,
         gameTitle: null,
-        status: res.data?.status || 'NOT_ALLOW',
+        status: (res.data as any)?.status || 'NOT_ALLOW',
       }
       toast.warning('Player not found', res.message)
     }

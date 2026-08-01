@@ -1,0 +1,131 @@
+# =============================================================================
+# ↩️ Manual Rollback — Emergency Rollback Workflow
+# =============================================================================
+# Trigger: manually via GitHub Actions UI
+# Rolls back frontend, admin, or backend to the previous known-good state
+# =============================================================================
+
+name: ↩️ Manual Rollback
+
+on:
+  workflow_dispatch:
+    inputs:
+      project:
+        description: 'Project to rollback'
+        required: true
+        type: choice
+        options:
+          - frontend
+          - admin
+          - backend
+      reason:
+        description: 'Reason for rollback'
+        required: true
+        default: 'Production issue detected'
+
+env:
+  PROJECT_FRONTEND: 'VidTopUp Frontend'
+  PROJECT_ADMIN: 'VidTopUp Admin'
+  PROJECT_BACKEND: 'VidTopUp Backend'
+
+jobs:
+  rollback:
+    name: ↩️ Rollback ${{ github.event.inputs.project }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      # ── Determine project names ──────────────────────────────────
+      - name: 🔍 Parse project choice
+        id: parse
+        run: |
+          case "${{ github.event.inputs.project }}" in
+            frontend)
+              echo "project_name=${PROJECT_FRONTEND}" >> $GITHUB_OUTPUT
+              echo "deploy_dir=frontend" >> $GITHUB_OUTPUT
+              echo "vercel_token=${{ secrets.VERCEL_TOKEN }}" >> $GITHUB_OUTPUT
+              ;;
+            admin)
+              echo "project_name=${PROJECT_ADMIN}" >> $GITHUB_OUTPUT
+              echo "deploy_dir=frontend-admin" >> $GITHUB_OUTPUT
+              echo "vercel_token=${{ secrets.VERCEL_TOKEN }}" >> $GITHUB_OUTPUT
+              ;;
+            backend)
+              echo "project_name=${PROJECT_BACKEND}" >> $GITHUB_OUTPUT
+              echo "deploy_dir=backend" >> $GITHUB_OUTPUT
+              ;;
+          esac
+
+      # ── Notify rollback started ───────────────────────────────────
+      - name: 📢 Notify Telegram — Rollback started
+        uses: ./.github/actions/telegram-notify
+        with:
+          bot_token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          chat_id: ${{ secrets.TELEGRAM_CHAT_ID }}
+          status: 'started'
+          project: ${{ steps.parse.outputs.project_name }}
+          author: ${{ github.actor }}
+          commit_msg: 'Manual rollback: ${{ github.event.inputs.reason }}'
+
+      # ── Vercel rollback (frontend / admin) ────────────────────────
+      - name: ↩️ Rollback Vercel deployment
+        if: steps.parse.outputs.vercel_token != ''
+        run: |
+          echo "🔄 Rolling back Vercel deployment..."
+          npm install -g vercel@latest
+          npx vercel rollback --token="${{ steps.parse.outputs.vercel_token }}" --yes 2>&1 || \
+          echo "⚠️ Rollback command failed"
+        working-directory: ${{ steps.parse.outputs.deploy_dir }}
+
+      # ── Backend rollback ──────────────────────────────────────────
+      - name: ↩️ Rollback backend (Debian 12)
+        if: github.event.inputs.project == 'backend'
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -p ${{ secrets.SSH_PORT || '22' }} -H ${{ secrets.SSH_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
+
+          ssh -i ~/.ssh/deploy_key -p ${{ secrets.SSH_PORT || '22' }} \
+            ${{ secrets.SSH_USERNAME }}@${{ secrets.SSH_HOST }} \
+            "bash -s" << 'ROLLBACK_SCRIPT'
+            set -e
+            cd /var/www/topup-api/backend
+
+            if [ -d "dist-rollback" ]; then
+              echo "📦 Restoring from rollback backup..."
+              rm -rf dist
+              mv dist-rollback dist
+              echo "✅ Previous build restored"
+
+              echo "🔄 Restarting PM2..."
+              pm2 restart vidtopup-backend
+              pm2 save
+
+              echo "🔍 Checking health..."
+              sleep 3
+              curl -s http://localhost:3001/api/health
+              echo ""
+              echo "✅ Rollback complete"
+            else
+              echo "❌ No rollback backup found"
+              echo "Run 'git log --oneline -5' and manually checkout a previous commit"
+              exit 1
+            fi
+          ROLLBACK_SCRIPT
+        shell: bash
+
+      # ── Notify rollback complete ──────────────────────────────────
+      - name: ✅ Notify Telegram — Rollback complete
+        if: always()
+        uses: ./.github/actions/telegram-notify
+        with:
+          bot_token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          chat_id: ${{ secrets.TELEGRAM_CHAT_ID }}
+          status: 'rollback'
+          project: ${{ steps.parse.outputs.project_name }}
+          author: ${{ github.actor }}
+          commit_msg: 'Manual rollback: ${{ github.event.inputs.reason }}'

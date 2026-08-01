@@ -1,0 +1,245 @@
+# =============================================================================
+# 🚀 Deploy Backend → Debian 12 VM
+# =============================================================================
+# Triggers: push to main touching backend/ files only
+# Actions:   SSH → git pull → install → build → PM2 restart → Telegram notify
+# Rollback:  keeps previous build for instant PM2 revert
+# =============================================================================
+
+name: 🚀 Deploy Backend → Debian 12
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'backend/**'
+      - 'backend/package.json'
+      - 'backend/tsconfig.json'
+      - '.github/workflows/deploy-backend.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-backend-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PROJECT_NAME: 'VidTopUp Backend'
+  DEPLOY_DIR: '/var/www/topup-api'
+  BACKEND_DIR: '/var/www/topup-api/backend'
+  PM2_NAME: 'vidtopup-backend'
+  SSH_HOST: ${{ secrets.SSH_HOST }}
+  SSH_USER: ${{ secrets.SSH_USERNAME }}
+  SSH_PORT: ${{ secrets.SSH_PORT || '22' }}
+
+jobs:
+  validate:
+    name: 🔍 Validate Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: ⚡ Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: backend/package-lock.json
+
+      - name: 📦 Install dependencies
+        run: npm ci
+        working-directory: backend
+
+      - name: 🔍 TypeScript check
+        run: npx tsc --noEmit
+        working-directory: backend
+
+      - name: 🏗️ Build
+        run: npm run build
+        working-directory: backend
+
+  deploy:
+    name: 🚀 Deploy to Debian 12
+    needs: validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      # ── Checkout (needed for composite action) ────────────────────
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      # ── Notify: start ─────────────────────────────────────────────
+      - name: 📢 Notify Telegram — Deploy started
+        uses: ./.github/actions/telegram-notify
+        with:
+          bot_token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          chat_id: ${{ secrets.TELEGRAM_CHAT_ID }}
+          status: 'started'
+          project: ${{ env.PROJECT_NAME }}
+          commit_sha: ${{ github.sha }}
+          commit_msg: ${{ github.event.head_commit.message || 'Manual trigger' }}
+          author: ${{ github.actor }}
+
+      # ── Deploy via SSH ────────────────────────────────────────────
+      - name: 🔑 Setup SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -p ${{ env.SSH_PORT }} -H ${{ env.SSH_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: 🚀 Deploy to production server
+        id: deploy
+        run: |
+          DEPLOY_START=$(date +%s)
+
+          # ── Execute deployment commands on the server ──────────
+          ssh -i ~/.ssh/deploy_key -p ${{ env.SSH_PORT }} \
+            ${{ env.SSH_USER }}@${{ env.SSH_HOST }} \
+            "bash -s" << 'DEPLOY_SCRIPT'
+            set -e
+
+            echo "=========================================="
+            echo "  🚀 VidTopUp Backend Deployment"
+            echo "=========================================="
+
+            # Step 1: Navigate to project
+            cd ${{ env.BACKEND_DIR }} || { echo "❌ Directory not found"; exit 1; }
+            echo "✅ Directory: $(pwd)"
+
+            # Step 2: Save current dist as rollback backup
+            if [ -d "dist" ]; then
+              echo "📦 Backing up current build..."
+              rm -rf dist-rollback
+              cp -r dist dist-rollback
+              echo "✅ Rollback backup saved"
+            fi
+
+            # Step 3: Git pull latest code
+            echo "📥 Pulling latest code..."
+            git pull origin main 2>&1 || { echo "❌ Git pull failed"; exit 1; }
+            echo "✅ Code updated"
+
+            # Step 4: Install dependencies (incl. dev — tsc needed for build)
+            echo "📦 Installing dependencies..."
+            npm install 2>&1 || { echo "❌ npm install failed"; exit 1; }
+            echo "✅ Dependencies installed"
+
+            # Step 5: Build TypeScript
+            echo "🏗️ Building TypeScript..."
+            npm run build 2>&1 || {
+              echo "❌ Build failed — rolling back..."
+              if [ -d "dist-rollback" ]; then
+                rm -rf dist
+                mv dist-rollback dist
+                echo "✅ Rolled back to previous build"
+              fi
+              exit 1
+            }
+            echo "✅ Build successful"
+
+            # Step 6: Restart PM2
+            echo "🔄 Restarting PM2 process..."
+            pm2 restart ${{ env.PM2_NAME }} 2>&1 || {
+              echo "⚠️ PM2 restart failed, trying to start..."
+              pm2 start dist/server.js --name ${{ env.PM2_NAME }} 2>&1 || {
+                echo "❌ PM2 start failed"
+                exit 1
+              }
+            }
+            echo "✅ PM2 restarted"
+
+            # Step 7: Save PM2 process list
+            pm2 save 2>&1 || true
+            echo "✅ PM2 process list saved"
+
+            # Step 8: Health check
+            echo "🔍 Running health check..."
+            sleep 3
+            HEALTH=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:3001/api/health)
+            if [ "$HEALTH" = "200" ]; then
+              echo "✅ Health check passed (HTTP $HEALTH)"
+            else
+              echo "❌ Health check failed (HTTP $HEALTH) — rolling back..."
+              if [ -d "dist-rollback" ]; then
+                rm -rf dist
+                mv dist-rollback dist
+                pm2 restart ${{ env.PM2_NAME }} 2>&1 || true
+                echo "✅ Rolled back to previous build"
+              fi
+              exit 1
+            fi
+
+            # Step 9: Clean up rollback backup on success
+            rm -rf dist-rollback
+            echo "✅ Rollback backup cleaned up"
+
+            # Step 10: Check PM2 status
+            echo ""
+            echo "📊 PM2 Status:"
+            pm2 list 2>&1
+
+            echo ""
+            echo "=========================================="
+            echo "  ✅ Deployment Complete!"
+            echo "=========================================="
+          DEPLOY_SCRIPT
+
+          echo "Deployment script executed successfully"
+          echo "status=success" >> $GITHUB_OUTPUT
+
+      # ── Success notification ──────────────────────────────────────
+      - name: ✅ Notify Telegram — Deploy success
+        if: success()
+        uses: ./.github/actions/telegram-notify
+        with:
+          bot_token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          chat_id: ${{ secrets.TELEGRAM_CHAT_ID }}
+          status: 'success'
+          project: ${{ env.PROJECT_NAME }}
+          commit_sha: ${{ github.sha }}
+          commit_msg: ${{ github.event.head_commit.message || 'Manual trigger' }}
+          author: ${{ github.actor }}
+          deploy_url: 'https://topup-api.lorndavid.online/api/health'
+
+      # ── Failure notification + rollback ───────────────────────────
+      - name: ❌ Notify Telegram — Deploy failed
+        if: failure()
+        uses: ./.github/actions/telegram-notify
+        with:
+          bot_token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          chat_id: ${{ secrets.TELEGRAM_CHAT_ID }}
+          status: 'failed'
+          project: ${{ env.PROJECT_NAME }}
+          commit_sha: ${{ github.sha }}
+          author: ${{ github.actor }}
+          rollback: 'true'
+
+  # ── Post-deployment smoke test ──────────────────────────────────
+  smoke-test:
+    name: 🌡️ Smoke Test
+    needs: deploy
+    if: success()
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: 🌐 Check API health endpoint
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            https://topup-api.lorndavid.online/api/health)
+          if [ "$STATUS" = "200" ]; then
+            echo "✅ API health check passed"
+          else
+            echo "❌ API health check failed (HTTP $STATUS)"
+            exit 1
+          fi
+
+      - name: 🌐 Check API returns correct data
+        run: |
+          RESPONSE=$(curl -s https://topup-api.lorndavid.online/api/health)
+          echo "$RESPONSE" | grep -q '"success":true' && \
+            echo "✅ API response valid" || \
+            (echo "❌ API response invalid" && exit 1)

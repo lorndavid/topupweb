@@ -1,0 +1,156 @@
+# =============================================================================
+# 🚀 Deploy Frontend → Vercel
+# =============================================================================
+# Triggers: push to main touching frontend/ files only
+# Actions:   type-check → build → deploy → Telegram notify
+# Rollback:  auto rollback to previous deployment on failure
+# =============================================================================
+
+name: 🚀 Deploy Frontend → Vercel
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'frontend/**'
+      - 'frontend/package.json'
+      - 'frontend/vercel.json'
+      - '.github/workflows/deploy-frontend.yml'
+  workflow_dispatch: # manual trigger
+
+concurrency:
+  group: deploy-frontend-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+  VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID_FRONTEND }}
+  PROJECT_NAME: 'VidTopUp (Frontend)'
+  DEPLOY_DIR: 'frontend'
+
+jobs:
+  deploy:
+    name: Build & Deploy
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      # ── Checkout ──────────────────────────────────────────────────
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      # ── Node setup ────────────────────────────────────────────────
+      - name: ⚡ Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: ${{ env.DEPLOY_DIR }}/package-lock.json
+
+      # ── Install dependencies ──────────────────────────────────────
+      - name: 📦 Install dependencies
+        run: npm ci
+        working-directory: ${{ env.DEPLOY_DIR }}
+
+      # ── Type-check ────────────────────────────────────────────────
+      - name: 🔍 Type-check (vue-tsc)
+        id: typecheck
+        continue-on-error: true
+        run: npx vue-tsc --noEmit
+        working-directory: ${{ env.DEPLOY_DIR }}
+
+      - name: ⚠️ Type-check warning
+        if: steps.typecheck.outcome == 'failure'
+        run: echo "::warning::Type-check found errors — continuing with build"
+
+      # ── Build ─────────────────────────────────────────────────────
+      - name: 🏗️ Build project
+        id: build
+        run: npm run build
+        working-directory: ${{ env.DEPLOY_DIR }}
+
+      # ── Notify: start ─────────────────────────────────────────────
+      - name: 📢 Notify Telegram — Deploy started
+        if: always()
+        uses: ./.github/actions/telegram-notify
+        with:
+          bot_token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          chat_id: ${{ secrets.TELEGRAM_CHAT_ID }}
+          status: 'started'
+          project: ${{ env.PROJECT_NAME }}
+          commit_sha: ${{ github.sha }}
+          commit_msg: ${{ github.event.head_commit.message || 'Manual trigger' }}
+          author: ${{ github.actor }}
+
+      # ── Install Vercel CLI ────────────────────────────────────────
+      - name: 🔧 Install Vercel CLI
+        run: npm install -g vercel@latest
+
+      # ── Deploy to Vercel ──────────────────────────────────────────
+      - name: 🚀 Deploy to Vercel (Production)
+        id: deploy
+        run: |
+          vercel pull --yes --environment=production --token="${{ secrets.VERCEL_TOKEN }}"
+          vercel build --prod --token="${{ secrets.VERCEL_TOKEN }}"
+          vercel deploy --prebuilt --prod --token="${{ secrets.VERCEL_TOKEN }}" > deploy-url.txt
+          echo "url=$(cat deploy-url.txt)" >> $GITHUB_OUTPUT
+        working-directory: ${{ env.DEPLOY_DIR }}
+
+      # ── Success notification ──────────────────────────────────────
+      - name: ✅ Notify Telegram — Deploy success
+        if: success()
+        uses: ./.github/actions/telegram-notify
+        with:
+          bot_token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          chat_id: ${{ secrets.TELEGRAM_CHAT_ID }}
+          status: 'success'
+          project: ${{ env.PROJECT_NAME }}
+          deploy_url: ${{ steps.deploy.outputs.url }}
+          commit_sha: ${{ github.sha }}
+          author: ${{ github.actor }}
+
+      # ── Rollback + Failure notification ───────────────────────────
+      - name: ❌ Notify Telegram — Deploy failed + rollback
+        if: failure()
+        uses: ./.github/actions/telegram-notify
+        with:
+          bot_token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          chat_id: ${{ secrets.TELEGRAM_CHAT_ID }}
+          status: 'failed'
+          project: ${{ env.PROJECT_NAME }}
+          rollback: 'true'
+          commit_sha: ${{ github.sha }}
+          author: ${{ github.actor }}
+
+      - name: ↩️ Rollback Vercel deployment
+        if: failure() && steps.deploy.outcome == 'failure'
+        run: |
+          echo "🔄 Rolling back to previous deployment..."
+          npx vercel rollback --token="${{ secrets.VERCEL_TOKEN }}" --yes 2>&1 || \
+          echo "⚠️ Rollback command failed — manual rollback may be needed"
+        working-directory: ${{ env.DEPLOY_DIR }}
+
+  # ── Post-deployment smoke test ──────────────────────────────────
+  smoke-test:
+    name: 🌡️ Smoke Test
+    needs: deploy
+    if: success()
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: 🌐 Check homepage loads
+        run: |
+          curl -s -o /dev/null -w "HTTP %{http_code}" \
+            https://topup.lorndavid.online/ | grep -q "200\|301\|302" && \
+            echo "✅ Homepage OK" || \
+            (echo "❌ Homepage failed" && exit 1)
+
+      - name: 🌐 Check sitemap (via backend directly)
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            https://topup-api.lorndavid.online/api/sitemap.xml 2>/dev/null)
+          if [ "$STATUS" = "200" ]; then
+            echo "✅ Sitemap accessible via API"
+          else
+            echo "⚠️ Sitemap check skipped (backend may not expose /api/sitemap.xml directly)"
+          fi

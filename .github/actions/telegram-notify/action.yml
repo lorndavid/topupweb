@@ -1,0 +1,180 @@
+# =============================================================================
+# 📢 Telegram Notification — Reusable Action
+# =============================================================================
+# Sends rich deployment alerts to a Telegram chat with formatted markdown.
+# Supports: started, success, failed (with rollback) statuses.
+# =============================================================================
+
+name: 📢 Telegram Notify
+description: Send deployment status notifications to Telegram
+
+inputs:
+  bot_token:
+    description: Telegram Bot Token
+    required: true
+  chat_id:
+    description: Telegram Chat ID
+    required: true
+  status:
+    description: 'Notification status: started, success, failed, rollback'
+    required: true
+  project:
+    description: Project name (e.g. "VidTopUp Frontend")
+    required: true
+  deploy_url:
+    description: Deployment URL (for success status)
+    required: false
+    default: ''
+  commit_sha:
+    description: Commit SHA
+    required: false
+    default: ''
+  commit_msg:
+    description: Commit message
+    required: false
+    default: ''
+  author:
+    description: Who triggered the deployment
+    required: false
+    default: 'GitHub Actions'
+  rollback:
+    description: 'Whether rollback was triggered: true / false'
+    required: false
+    default: 'false'
+  error_message:
+    description: Error message from the failed step
+    required: false
+    default: ''
+  duration:
+    description: Deployment duration in seconds
+    required: false
+    default: ''
+  version:
+    description: Version tag or build number
+    required: false
+    default: ''
+
+runs:
+  using: composite
+  steps:
+    - name: 📤 Send Telegram message
+      shell: bash
+      env:
+        BOT_TOKEN: ${{ inputs.bot_token }}
+        CHAT_ID: ${{ inputs.chat_id }}
+        STATUS: ${{ inputs.status }}
+        PROJECT: ${{ inputs.project }}
+        DEPLOY_URL: ${{ inputs.deploy_url }}
+        COMMIT_SHA: ${{ inputs.commit_sha }}
+        COMMIT_MSG: ${{ inputs.commit_msg }}
+        AUTHOR: ${{ inputs.author }}
+        ROLLBACK: ${{ inputs.rollback }}
+        ERROR_MSG: ${{ inputs.error_message }}
+        DURATION: ${{ inputs.duration }}
+        VERSION: ${{ inputs.version }}
+        WORKFLOW_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      run: |
+        # ── Build message ──────────────────────────────────────────
+
+        # Header emoji + title
+        case "$STATUS" in
+          started)
+            EMOJI="🚀"
+            TITLE="Deployment Started"
+            COLOR="⬜"
+            ;;
+          success)
+            EMOJI="✅"
+            TITLE="Deployment Successful"
+            COLOR="🟢"
+            ;;
+          failed)
+            EMOJI="❌"
+            TITLE="Deployment Failed"
+            COLOR="🔴"
+            ;;
+          rollback)
+            EMOJI="↩️"
+            TITLE="Rollback Initiated"
+            COLOR="🟡"
+            ;;
+          *)
+            EMOJI="ℹ️"
+            TITLE="Deployment Update"
+            COLOR="🔵"
+            ;;
+        esac
+
+        # Short SHA
+        SHORT_SHA="${COMMIT_SHA:0:7}"
+
+        # Format commit message (first line only)
+        FIRST_LINE="${COMMIT_MSG%%$'\n'*}"
+
+        # Build the message using MarkdownV2 (escape special chars)
+        # Escape: _ * [ ] ( ) ~ ` > # + - = | { } . !
+        escape() {
+          echo "$1" | sed 's/[_*\[\]()~`>#+\-=|{}.!\\]/\\&/g'
+        }
+
+        ESCAPED_PROJECT=$(escape "$PROJECT")
+        ESCAPED_TITLE=$(escape "$TITLE")
+        ESCAPED_AUTHOR=$(escape "$AUTHOR")
+        ESCAPED_FIRST_LINE=$(escape "$FIRST_LINE")
+        ESCAPED_URL=$(escape "$WORKFLOW_URL")
+
+        MSG="${COLOR} *${ESCAPED_PROJECT}* — ${ESCAPED_TITLE}\n\n"
+
+        if [ "$STATUS" = "started" ]; then
+          MSG+="👤 *Author:* ${ESCAPED_AUTHOR}\n"
+          if [ -n "$FIRST_LINE" ]; then
+            MSG+="📝 *Commit:* \`${SHORT_SHA}\` — ${ESCAPED_FIRST_LINE}\n"
+          fi
+          MSG+="\n⏳ Building and deploying...\n"
+        elif [ "$STATUS" = "success" ]; then
+          MSG+="👤 *Author:* ${ESCAPED_AUTHOR}\n"
+          if [ -n "$FIRST_LINE" ]; then
+            MSG+="📝 *Commit:* \`${SHORT_SHA}\` — ${ESCAPED_FIRST_LINE}\n"
+          fi
+          if [ -n "$DEPLOY_URL" ]; then
+            ESCAPED_DEPLOY_URL=$(escape "$DEPLOY_URL")
+            MSG+="🔗 *URL:* ${ESCAPED_DEPLOY_URL}\n"
+          fi
+          if [ -n "$DURATION" ]; then
+            MSG+="⏱ *Duration:* ${DURATION}s\n"
+          fi
+          MSG+="\n[🔍 View Workflow Run](${ESCAPED_URL})\n"
+        elif [ "$STATUS" = "failed" ]; then
+          MSG+="👤 *Author:* ${ESCAPED_AUTHOR}\n"
+          if [ -n "$FIRST_LINE" ]; then
+            MSG+="📝 *Commit:* \`${SHORT_SHA}\` — ${ESCAPED_FIRST_LINE}\n"
+          fi
+          if [ "$ROLLBACK" = "true" ]; then
+            MSG+="\n🔄 *Rollback:* Triggered automatically ⚠️\n"
+          else
+            MSG+="\n⚠️ *Manual rollback may be required*\n"
+          fi
+          if [ -n "$ERROR_MSG" ]; then
+            ESCAPED_ERR=$(escape "$ERROR_MSG")
+            MSG+="📋 *Error:* \`${ESCAPED_ERR}\`\n"
+          fi
+          MSG+="\n[🔍 View Workflow Run](${ESCAPED_URL})\n"
+        elif [ "$STATUS" = "rollback" ]; then
+          MSG+="👤 *Author:* ${ESCAPED_AUTHOR}\n"
+          if [ -n "$FIRST_LINE" ]; then
+            MSG+="📝 *Commit:* \`${SHORT_SHA}\` — ${ESCAPED_FIRST_LINE}\n"
+          fi
+          MSG+="\n⚠️ *Rollback completed* — previous version restored\n"
+          MSG+="\n[🔍 View Workflow Run](${ESCAPED_URL})\n"
+        fi
+
+        # Timestamp footer
+        MSG+="\n🕐 $(TZ='Asia/Phnom_Penh' date '+%Y-%m-%d %H:%M:%S') ICT"
+
+        # ── Send via Telegram Bot API ──────────────────────────────
+        curl -s -X POST "https://api.telegram.org/bot${BOT_TOKEN}/sendMessage" \
+          -d "chat_id=${CHAT_ID}" \
+          -d "text=${MSG}" \
+          -d "parse_mode=MarkdownV2" \
+          -d "disable_web_page_preview=true" > /dev/null 2>&1 || \
+          echo "⚠️ Telegram notification failed (non-blocking)"

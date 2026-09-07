@@ -1,0 +1,41 @@
+# ─────────────────────────────────────────────────────────────
+#  Cloudflare Tunnel Configuration
+#  ─────────────────────────────────────────────────────────────
+#  This config is used by the `cloudflared` container in
+#  docker-compose.vps.yml.  The tunnel token is passed via the
+#  TUNNEL_TOKEN environment variable, and the public hostname
+#  mappings are defined inline below.
+#
+#  To generate a token:
+#    1. Go to https://one.dashflare.com → Networks → Tunnels
+#    2. Create a tunnel (or use existing)
+#    3. Click "Copy token" — it looks like:
+#       eyJhIjoi...
+#    4. Add to your .env file:
+#       CLOUDFLARE_TUNNEL_TOKEN=eyJhIjoi...
+#
+#  Public hostnames are configured in the "ingress" section below.
+#  Update the hostnames to match your actual domains.
+# ─────────────────────────────────────────────────────────────
+
+tunnel: vidtopup-prod
+
+credentials-file: /etc/cloudflared/creds.json
+
+ingress:
+  # Frontend (customer site) → topup.lorndavid.online
+  - hostname: topup.lorndavid.online
+    service: http://frontend:80
+  - hostname: www.topup.lorndavid.online
+    service: http://frontend:80
+
+  # Admin dashboard → admintopup.lorndavid.online
+  - hostname: admintopup.lorndavid.online
+    service: http://admin:80
+
+  # Backend API → topup-api.lorndavid.online
+  - hostname: topup-api.lorndavid.online
+    service: http://backend:3001
+
+  # Default fallback (404)
+  - service: http_status:404

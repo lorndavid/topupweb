@@ -1,0 +1,130 @@
+services:
+  # ─── MongoDB Database ───────────────────────────────────────────────────────
+  mongo:
+    image: mongo:7
+    container_name: topup-mongo
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_DATABASE: ${MONGODB_DB_NAME:-gametopup}
+    volumes:
+      - mongo-data:/data/db
+    networks:
+      - topup-network
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # ─── Backend API (Node.js + Express) ──────────────────────────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: production
+    container_name: topup-backend
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+      MONGODB_URI: mongodb://mongo:27017/${MONGODB_DB_NAME:-gametopup}
+      MONGODB_DB_NAME: ${MONGODB_DB_NAME:-gametopup}
+      # ── Bay2Game ──
+      BAY2GAME_API_URL: ${BAY2GAME_API_URL:-https://api.bay2game.xyz}
+      BAY2GAME_API_KEY: ${BAY2GAME_API_KEY}
+      # ── CutLuy Payment ──
+      CUTLUY_API_KEY: ${CUTLUY_API_KEY}
+      CUTLUY_API_URL: ${CUTLUY_API_URL:-https://cutluy.com/v1}
+      CUTLUY_WEBHOOK_SECRET: ${CUTLUY_WEBHOOK_SECRET}
+      CUTLUY_RETURN_URL: ${CUTLUY_RETURN_URL:-http://localhost:80/payment/success}
+      # ── Frontend URLs ──
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:80}
+      ADMIN_FRONTEND_URL: ${ADMIN_FRONTEND_URL:-http://localhost:81}
+      # ── Notifications ──
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
+      TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID}
+      NOTIFICATION_WEBHOOK_URL: ${NOTIFICATION_WEBHOOK_URL}
+      # ── Push Notifications ──
+      VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY}
+      VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY}
+      VAPID_SUBJECT: ${VAPID_SUBJECT:-mailto:admin@vidtopup.com}
+      # ── Admin Auth ──
+      ADMIN_JWT_SECRET: ${ADMIN_JWT_SECRET}
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin123}
+      # ── Merchant ──
+      MERCHANT_NAME: ${MERCHANT_NAME:-MY SHOP}
+      MERCHANT_CITY: ${MERCHANT_CITY:-Phnom Penh}
+      DEFAULT_CURRENCY: ${DEFAULT_CURRENCY:-USD}
+      # ── Game APIs ──
+      RIOT_API_KEY: ${RIOT_API_KEY}
+      GAMESKINBO_API_KEY: ${GAMESKINBO_API_KEY}
+    depends_on:
+      mongo:
+        condition: service_healthy
+    networks:
+      - topup-network
+    expose:
+      - "3001"
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3001/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+  # ─── Frontend (Customer Site) ──────────────────────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: production
+    container_name: topup-frontend
+    restart: unless-stopped
+    environment:
+      # Vite replaced these at build time, but nginx proxies /api to backend
+      VITE_API_BASE_URL: /api
+    depends_on:
+      - backend
+    networks:
+      - topup-network
+    ports:
+      - "80:80"
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  # ─── Admin Dashboard ────────────────────────────────────────────────────────
+  admin:
+    build:
+      context: ./frontend-admin
+      dockerfile: Dockerfile
+      target: production
+    container_name: topup-admin
+    restart: unless-stopped
+    environment:
+      VITE_API_BASE_URL: /api
+    depends_on:
+      - backend
+    networks:
+      - topup-network
+    ports:
+      - "81:80"
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  mongo-data:
+    name: topup-mongo-data
+
+networks:
+  topup-network:
+    driver: bridge

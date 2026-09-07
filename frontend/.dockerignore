@@ -1,0 +1,42 @@
+# Dependencies
+node_modules
+npm-debug.log*
+
+# Build output
+dist
+.dist
+
+# Environment
+.env
+.env.*
+
+# Docker
+Dockerfile
+docker-compose*.yml
+!.dockerignore
+
+# Git
+.git
+.gitignore
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+logs/
+*.log
+
+# Exclude generated PWA assets from Docker context (regenerate at build time)
+public/pwa-*.png
+public/apple-splash-*.png
+public/*.ico
+
+# Keep source logo for pwa-assets-generator
+# (logo-topup.png is NOT ignored — it's the source image)

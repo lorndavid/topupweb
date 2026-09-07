@@ -1,0 +1,21 @@
+.vercel
+.env
+.env.local
+!important: .env.example
+
+# Docker
+# Per-service .dockerignore files are needed for correct build contexts
+# Only ignore local dev override (has machine-specific volume paths)
+docker-compose.override.yml
+
+# Node
+node_modules
+
+# Build output
+dist
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo

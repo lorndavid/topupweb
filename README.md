@@ -4,6 +4,36 @@ A complete game top-up website for Cambodia. Customers browse games, pay via **K
 
 ---
 
+## 🚀 CI/CD Status
+
+Live deployment status for all three projects — auto-deploys on every push to `main`:
+
+| Project | Target | Status |
+|---------|--------|--------|
+| **Frontend** (customer site) | Vercel | [![Deploy Frontend](https://github.com/lorndavid/topupweb/actions/workflows/deploy-frontend.yml/badge.svg?branch=main)](https://github.com/lorndavid/topupweb/actions/workflows/deploy-frontend.yml) |
+| **Admin** (dashboard) | Vercel | [![Deploy Admin](https://github.com/lorndavid/topupweb/actions/workflows/deploy-admin.yml/badge.svg?branch=main)](https://github.com/lorndavid/topupweb/actions/workflows/deploy-admin.yml) |
+| **Backend** (API) | Debian 12 (PM2) | [![Deploy Backend](https://github.com/lorndavid/topupweb/actions/workflows/deploy-backend.yml/badge.svg?branch=main)](https://github.com/lorndavid/topupweb/actions/workflows/deploy-backend.yml) |
+
+> ⚠️ Badges show **gray/no status** until each workflow has run at least once successfully.
+
+📖 **Need to set up the deploy secrets (SSH keys, Vercel tokens, Telegram)?** See the full step-by-step guide in [DEPLOYMENT.md](DEPLOYMENT.md).
+
+### 🔐 SSH Key Setup (GitHub Actions → Debian 12)
+
+The backend workflow deploys to your Debian VM over SSH. Connect GitHub Actions with **one dedicated key pair** (never reuse your personal SSH key):
+
+| Step | Command / Action |
+|---|---|
+| **1. Generate a CI key pair** (Windows Git Bash) | `ssh-keygen -t ed25519 -C "github-actions-ci" -f ~/.ssh/deploy_key -N ""` — ⚠️ empty passphrase **required** (the workflow can't enter one) |
+| **2. Copy the public key** | `cat ~/.ssh/deploy_key.pub` |
+| **3. Install it on the Debian VM** | `mkdir -p ~/.ssh && chmod 700 ~/.ssh` then `echo "PASTE_PUBLIC_KEY" >> ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys` |
+| **4. Test locally first** | `ssh -i ~/.ssh/deploy_key david@YOUR_VM_IP` — you should get a shell prompt |
+| **5. Add secrets to GitHub** | `SSH_HOST` · `SSH_USERNAME` · `SSH_PRIVATE_KEY` (contents of the **private** key file) · `SSH_PORT` (default `22`) |
+
+> ℹ️ Full walkthrough with verification steps, security notes, and troubleshooting: [DEPLOYMENT.md](DEPLOYMENT.md) → **"🔐 SSH Key Setup"**.
+
+---
+
 ## 📋 Table of Contents
 
 - [System Architecture](#system-architecture)

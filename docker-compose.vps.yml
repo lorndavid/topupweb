@@ -1,0 +1,106 @@
+# ─────────────────────────────────────────────────────────────
+#  VPS / PRODUCTION OVERRIDE
+#  Usage: docker compose -f docker-compose.yml -f docker-compose.vps.yml up -d
+#  Assumes you have already built and pushed the Docker images
+#  to a registry (GitHub Container Registry, Docker Hub, etc.)
+#  OR you build them directly on the VPS before running this.
+# ─────────────────────────────────────────────────────────────
+
+services:
+  # ── Backend (pre-built image) ────────────────────────────
+  backend:
+    image: ${REGISTRY:-ghcr.io}/${GITHUB_REPO:-lorndavid/topupweb}/backend:latest
+    restart: unless-stopped
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      MONGODB_URI: mongodb://mongodb:27017/${MONGODB_DB_NAME:-gametopup}?retryWrites=true&w=majority
+    networks:
+      - backend-net
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3001/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ── Frontend (pre-built image) ───────────────────────────
+  frontend:
+    image: ${REGISTRY:-ghcr.io}/${GITHUB_REPO:-lorndavid/topupweb}/frontend:latest
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    environment:
+      NGINX_UPSTREAM: backend:3001
+    networks:
+      - frontend-net
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ── Admin Frontend (pre-built image) ─────────────────────
+  admin:
+    image: ${REGISTRY:-ghcr.io}/${GITHUB_REPO:-lorndavid/topupweb}/admin:latest
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    environment:
+      NGINX_UPSTREAM: backend:3001
+    networks:
+      - frontend-net
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ── Cloudflare Tunnel (sidecar) ──────────────────────────
+  # Exposes ALL services to the internet via Cloudflare.
+  # No public ports open on the VPS — everything goes through
+  # the tunnel.  This is the recommended way to expose Docker
+  # services without opening firewall ports.
+  cloudflared:
+    image: cloudflare/cloudflared:2025.11.1
+    restart: unless-stopped
+    command: tunnel run
+    env_file:
+      - .env
+    environment:
+      # Pass tunnel config via environment (see cloudflared/config.yml)
+      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN:-}
+    networks:
+      - frontend-net
+      - backend-net
+    depends_on:
+      - frontend
+      - admin
+      - backend
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  mongodb-data:
+  mongo-data:
+
+networks:
+  frontend-net:
+    driver: bridge
+  backend-net:
+    driver: bridge
+    internal: true   # only backend + mongodb can reach it directly

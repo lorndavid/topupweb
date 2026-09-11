@@ -1,0 +1,104 @@
+# ─────────────────────────────────────────────────────────────
+#  BACKEND + MONGODB PRODUCTION STACK (Debian VPS)
+# ─────────────────────────────────────────────────────────────
+#  Frontends live on Vercel — this machine runs:
+#    1. mongo:7        - Local persistent MongoDB
+#    2. backend        - Node.js API server
+#    3. cloudflared    - Cloudflare Tunnel sidecar (api.vidtopup.store)
+#
+#  Usage:
+#    cp .env.example .env   # then edit with real values
+#    docker compose -f docker-compose.backend.yml up -d
+#
+#  Public entry:  Cloudflare Tunnel → api.vidtopup.store → backend:3001
+#  Local entry:   http://127.0.0.1:3001 (bound to localhost only)
+#  Database:      Internal Docker network only (no exposed 27017 port)
+# ─────────────────────────────────────────────────────────────
+
+services:
+  # ── MongoDB Database ─────────────────────────────────────
+  mongo:
+    image: mongo:7
+    container_name: vidtopup-mongo
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_DATABASE: ${MONGODB_DB_NAME:-gametopup}
+    volumes:
+      - mongo-data:/data/db
+    networks:
+      - backend-net
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ── Backend API ──────────────────────────────────────────
+  backend:
+    image: ${BACKEND_IMAGE:-vidtopup-backend:latest}
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: production
+    container_name: vidtopup-backend
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+      MONGODB_URI: ${MONGODB_URI:-mongodb://mongo:27017/gametopup}
+      MONGODB_DB_NAME: ${MONGODB_DB_NAME:-gametopup}
+    depends_on:
+      mongo:
+        condition: service_healthy
+    networks:
+      - backend-net
+    ports:
+      # Bound to localhost only — public requests enter via Cloudflare Tunnel
+      - "127.0.0.1:3001:3001"
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3001/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ── Cloudflare Tunnel (public entry point) ────────────────
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: vidtopup-cloudflared
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN:-}
+    networks:
+      - backend-net
+    depends_on:
+      backend:
+        condition: service_healthy
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  mongo-data:
+    name: topup-mongo-data
+
+networks:
+  backend-net:
+    name: topup-backend-net
+    driver: bridge

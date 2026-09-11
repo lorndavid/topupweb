@@ -163,10 +163,11 @@ export class OrderService {
           };
         }
 
-        // Still pending/scanned — return current status
+        // Still pending — but surface 'scanned' so the UI can swap the QR
+        // for a "confirm in your banking app" panel (CutLuy scanned state).
         return {
           reference: order.reference,
-          payment_status: order.payment_status,
+          payment_status: cutluyResult.status === 'scanned' ? 'scanned' : order.payment_status,
           order_status: order.order_status,
         };
       } catch (error) {
@@ -519,6 +520,19 @@ export class OrderService {
 
     const paymentStatus = cutluyService.mapStatus(event.data.payment.status);
     const cutluyIsPaid = cutluyService.isPaid(event.data.payment.status);
+
+    // 'scanned' is a non-terminal hint — push it to subscribed clients so the
+    // KHQR card can swap the QR for a "confirm in your banking app" panel.
+    // The order in the DB stays 'pending' until the terminal event arrives.
+    if (event.data.payment.status === 'scanned' && order.payment_status === 'pending') {
+      console.log(`👀 CutLuy webhook: QR scanned for ${reference} — awaiting confirmation`);
+      webSocketService.emitPaymentStatus({
+        reference,
+        payment_status: 'scanned',
+        order_status: order.order_status,
+      });
+      return { received: true };
+    }
 
     if (cutluyIsPaid && order.payment_status !== 'paid') {
       console.log(`✅ CutLuy webhook: payment completed for ${reference}`);

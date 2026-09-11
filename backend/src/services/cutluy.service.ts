@@ -68,12 +68,18 @@ export class CutLuyService {
 
   /**
    * Generate a QR code PNG (data URL) from a raw KHQR string.
+   *
+   * Error correction level MUST be 'H' (highest): the UI overlays the KHQR
+   * medallion logo on the centre of the code, which occludes ~7% of the
+   * modules — only ECC H survives that and still scans reliably.
+   * (See https://cutluy.com/docs → "Build your own KHQR card".)
    */
   private async generateQRImage(qrData: string): Promise<string> {
     try {
       return await QRCode.toDataURL(qrData, {
         width: 400,
-        margin: 2,
+        margin: 3, // quiet zone — scanners need the margin around the code
+        errorCorrectionLevel: 'H',
         color: {
           dark: '#000000',
           light: '#ffffff',
@@ -112,6 +118,9 @@ export class CutLuyService {
       const { data } = await cutluyApi.post<CutLuyPaymentResponse>('/payments', {
         amount: params.amount,
         reference_id: params.reference_id,
+        // Idempotency: network-level retries of this request can never
+        // create a second CutLuy payment for the same order reference.
+        idempotency_key: params.reference_id,
         metadata: params.metadata || null,
       });
 
@@ -185,8 +194,12 @@ export class CutLuyService {
    */
   verifyWebhookSignature(rawBody: string, signatureHeader: string): boolean {
     if (!config.cutluy.webhookSecret) {
-      console.warn('⚠️  CutLuy webhook secret not configured — skipping signature verification');
-      return true; // Dev mode: trust all webhooks
+      if (config.isProd) {
+        console.error('❌ CRITICAL: CUTLUY_WEBHOOK_SECRET is not set in production! Rejecting unverified webhook.');
+        return false;
+      }
+      console.warn('⚠️  CutLuy webhook secret not configured — skipping signature verification (dev mode only)');
+      return true;
     }
 
     try {

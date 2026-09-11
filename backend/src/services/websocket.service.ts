@@ -161,7 +161,7 @@ export class WebSocketService {
    * Emit a payment status update to all subscribers of a given reference.
    *
    * This is the PRIMARY method called from order.service.ts whenever
-   * payment status changes (paid, failed, processing, completed).
+   * payment status changes (scanned, paid, failed, processing, completed).
    */
   emitPaymentStatus(data: {
     reference: string;

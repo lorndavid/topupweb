@@ -1,4 +1,6 @@
-/* ═══ Tailwind directives handled via CDN in index.html ═══ */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
 /* ─── Centralized animation timing tokens ─── */
 :root {
@@ -57,7 +59,7 @@
   }
 
   ::selection {
-    background-color: theme('colors.primary.500 / 0.2');
+    background-color: rgba(37, 99, 235, 0.2);
     color: theme('colors.primary.700');
   }
   .dark ::selection {
@@ -95,12 +97,12 @@
     border-radius: 0.5rem;
     box-shadow:
       0 0 0 2px theme('colors.surface.50'),
-      0 0 0 4px theme('colors.primary.500 / 0.5');
+      0 0 0 4px rgba(37, 99, 235, 0.5);
   }
   .dark :focus-visible {
     box-shadow:
       0 0 0 2px theme('colors.surface.950'),
-      0 0 0 4px theme('colors.primary.500 / 0.5');
+      0 0 0 4px rgba(37, 99, 235, 0.5);
   }
 }
 

@@ -14,7 +14,8 @@ export default defineConfig({
     port: 5174,
     proxy: {
       '/api': {
-        target: 'http://localhost:3001',
+        // 127.0.0.1 (not localhost) — avoids Windows ::1 resolution conflicts
+        target: 'http://127.0.0.1:3001',
         changeOrigin: true,
       },
     },

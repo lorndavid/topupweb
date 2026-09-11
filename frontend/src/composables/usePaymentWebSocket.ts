@@ -8,7 +8,7 @@ interface PaymentStatusEvent {
   type: 'payment:status'
   data: {
     reference: string
-    payment_status: string
+    payment_status: string // 'pending' | 'scanned' | 'paid' | 'failed' | 'cancelled'
     order_status: string
     timestamp: string
   }

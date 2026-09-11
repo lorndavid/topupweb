@@ -46,7 +46,7 @@ export const config = {
   push: {
     publicKey: process.env.VAPID_PUBLIC_KEY || '',
     privateKey: process.env.VAPID_PRIVATE_KEY || '',
-    subject: process.env.VAPID_SUBJECT || 'mailto:admin@vidtopup.com',
+    subject: process.env.VAPID_SUBJECT || 'mailto:admin@vidtopup.store',
   },
 
   admin: {

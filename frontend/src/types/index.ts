@@ -61,7 +61,8 @@ export interface BalanceInfo {
 
 export interface PaymentStatus {
   reference: string
-  payment_status: 'pending' | 'paid' | 'failed'
+  /** 'scanned' is a non-terminal CutLuy hint — the QR was scanned, awaiting in-app confirmation */
+  payment_status: 'pending' | 'scanned' | 'paid' | 'failed'
   order_status: string
 }
 

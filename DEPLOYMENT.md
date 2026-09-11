@@ -10,9 +10,9 @@ How the **VidTopUp** system is deployed, how to connect GitHub Actions to your s
 
 | Project | Package | Target | Auto-deploy on push to `main` touching |
 |---|---|---|---|
-| **Frontend** (customer site) | `frontend/` | **Vercel** → `topup.lorndavid.online` | `frontend/**` |
-| **Admin** (dashboard) | `frontend-admin/` | **Vercel** → `admintopup.lorndavid.online` | `frontend-admin/**` |
-| **Backend** (API) | `backend/` | **Docker on Debian 12 VM** → `topup-api.lorndavid.online` | `backend/**` |
+| **Frontend** (customer site) | `frontend/` | **Vercel** → `vidtopup.store` | `frontend/**` |
+| **Admin** (dashboard) | `frontend-admin/` | **Vercel** → `admin.vidtopup.store` | `frontend-admin/**` |
+| **Backend** (API) | `backend/` | **Docker on Debian 12 VM** → `api.vidtopup.store` | `backend/**` |
 
 Workflows live in `.github/workflows/`:
 

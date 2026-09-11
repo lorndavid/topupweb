@@ -41,6 +41,12 @@ import { getActiveAnnouncements,
 } from '../controllers/announcement.controller';
 import { config } from '../config';
 import { pushNotificationService } from '../services/pushNotification.service';
+import {
+  adminLoginLimiter,
+  paymentCreateLimiter,
+  playerVerifyLimiter,
+  analyticsLimiter,
+} from '../middleware/rateLimiter';
 
 const router = Router();
 
@@ -50,13 +56,13 @@ router.get('/cambodia-games', getCambodiaGames);
 router.get('/products/:gameCode', getProductsByGame);
 
 // Player Verification
-router.post('/verify-player', verifyPlayer);
-router.get('/check-id', checkGameId);
+router.post('/verify-player', playerVerifyLimiter, verifyPlayer);
+router.get('/check-id', playerVerifyLimiter, checkGameId);
 
 // Payment (CutLuy / ABA PayWay KHQR)
-router.post('/payment/create', createPayment);
+router.post('/payment/create', paymentCreateLimiter, createPayment);
 router.get('/payment/status/:reference', getPaymentStatus);
-router.post('/payment/manual-confirm/:reference', manualConfirmPayment);
+router.post('/payment/manual-confirm/:reference', verifyToken, manualConfirmPayment);
 
 // CutLuy Webhook (receives payment status updates from CutLuy)
 // IMPORTANT: Must use express.raw() middleware to verify signature
@@ -112,7 +118,7 @@ router.get('/push/vapid-key', (_req, res) => {
 
 // Price drops
 // Analytics (public: tracking endpoint — rate limited, unauthenticated)
-router.post('/analytics/track', trackEvent);
+router.post('/analytics/track', analyticsLimiter, trackEvent);
 
 // Analytics (admin: aggregated stats — JWT protected)
 router.get('/admin/analytics/stats', verifyToken, getAnalyticsStats);
@@ -138,9 +144,9 @@ router.get('/config/new-products', (_req, res) => {
 });
 
 // ─── Admin Dashboard ──────────────────────────────
-// Public: login
-router.post('/admin/login', login);
-router.post('/admin/login/apikey', loginWithApiKey);
+// Public: login (protected by rate limiter against brute force)
+router.post('/admin/login', adminLoginLimiter, login);
+router.post('/admin/login/apikey', adminLoginLimiter, loginWithApiKey);
 
 // Protected: all admin routes below require JWT
 router.get('/admin/dashboard', verifyToken, getDashboardStats);

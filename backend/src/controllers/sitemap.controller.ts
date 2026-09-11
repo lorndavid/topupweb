@@ -1,9 +1,10 @@
 import { Request, Response, NextFunction } from 'express';
 import { bay2gameService } from '../services/bay2game.service';
+import { gameCacheRepository } from '../repositories/GameCacheRepository';
 import { HTTP_STATUS } from '../constants';
 import type { Bay2GameCategory } from '../types';
 
-const SITE_URL = 'https://topup.lorndavid.online';
+const SITE_URL = 'https://vidtopup.store';
 
 /**
  * Static routes that should be included in the sitemap.
@@ -71,13 +72,18 @@ export async function generateSitemap(
   next: NextFunction
 ): Promise<void> {
   try {
-    // Graceful degradation: if Bay2Game API is unavailable, serve
-    // a sitemap with static routes only — never return a 500 to crawlers.
+    // Graceful degradation: if Bay2Game API is unavailable, check MongoDB cache,
+    // then static routes — never return a 500 to crawlers.
     let categories: Bay2GameCategory[] = [];
     try {
       categories = await bay2gameService.getCategories();
     } catch {
-      console.warn('⚠️  Sitemap: Bay2Game API unavailable — serving static routes only');
+      const cached = await gameCacheRepository.getCategories();
+      if (cached && cached.length > 0) {
+        categories = cached;
+      } else {
+        console.warn('⚠️  Sitemap: Bay2Game API and cache unavailable — serving static routes only');
+      }
     }
 
     const today = todayDate();

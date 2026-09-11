@@ -7,6 +7,66 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="description" content="Fast & secure game top-ups in Cambodia. KHQR Payment — Instant Delivery." />
 
+    <!-- Canonical & SEO -->
+    <link rel="canonical" href="https://vidtopup.store/" />
+    <meta name="keywords" content="game top up cambodia, mlbb diamonds cambodia, free fire diamonds, pubg mobile uc, honor of kings tokens, khqr payment, aba payway, bakong topup, vidtopup" />
+    <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1" />
+
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="VidTopUp" />
+    <meta property="og:url" content="https://vidtopup.store/" />
+    <meta property="og:title" content="VidTopUp - Fast & Secure Game Top-Up in Cambodia" />
+    <meta property="og:description" content="Instant top-up for Mobile Legends, Free Fire, PUBG Mobile & more. Scan & pay via KHQR (ABA, ACLEDA, Bakong). 24/7 automated in-game delivery." />
+    <meta property="og:image" content="https://vidtopup.store/logo.png" />
+    <meta property="og:locale" content="en_US" />
+    <meta property="og:locale:alternate" content="km_KH" />
+
+    <!-- Twitter Cards -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="VidTopUp - Fast & Secure Game Top-Up in Cambodia" />
+    <meta name="twitter:description" content="Instant top-up for Mobile Legends, Free Fire, PUBG Mobile & more via KHQR. Instant delivery." />
+    <meta name="twitter:image" content="https://vidtopup.store/logo.png" />
+
+    <!-- Google Structured Data (JSON-LD) -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@graph": [
+        {
+          "@type": "WebSite",
+          "@id": "https://vidtopup.store/#website",
+          "url": "https://vidtopup.store/",
+          "name": "VidTopUp",
+          "description": "Fast & secure game top-ups in Cambodia. KHQR Payment — Instant Delivery.",
+          "potentialAction": {
+            "@type": "SearchAction",
+            "target": {
+              "@type": "EntryPoint",
+              "urlTemplate": "https://vidtopup.store/?q={search_term_string}"
+            },
+            "query-input": "required name=search_term_string"
+          }
+        },
+        {
+          "@type": "OnlineStore",
+          "@id": "https://vidtopup.store/#organization",
+          "name": "VidTopUp",
+          "url": "https://vidtopup.store/",
+          "logo": "https://vidtopup.store/logo.png",
+          "currenciesAccepted": "USD, KHR",
+          "paymentAccepted": "KHQR, ABA PayWay, Bakong, Wing, ACLEDA",
+          "priceRange": "$",
+          "address": {
+            "@type": "PostalAddress",
+            "addressLocality": "Phnom Penh",
+            "addressCountry": "KH"
+          }
+        }
+      ]
+    }
+    </script>
+
     <!-- PWA Meta Tags -->
     <meta name="theme-color" content="#0f172a" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -99,65 +159,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
 
-    <!-- ═══ Tailwind CSS via CDN (development) — switch to PostCSS for production builds ═══ -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-      // ═══ KEEP IN SYNC with frontend/tailwind.config.js ═══
-      tailwind.config = {
-        darkMode: 'class',
-        theme: {
-          extend: {
-            colors: {
-              primary: {
-                50: '#f0f5ff', 100: '#e0ebff', 200: '#b8d4ff', 300: '#85b8ff',
-                400: '#4d96ff', 500: '#2563eb', 600: '#1d4ed8', 700: '#1e40af',
-                800: '#1e3a8a', 900: '#1e3a5f',
-              },
-              surface: {
-                50: '#f8fafc', 100: '#f1f5f9', 200: '#e2e8f0', 300: '#cbd5e1',
-                400: '#94a3b8', 500: '#64748b', 600: '#475569', 700: '#334155',
-                800: '#1e293b', 900: '#0f172a', 950: '#020617',
-              },
-            },
-            fontFamily: {
-              sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
-              heading: ['Space Grotesk', 'Inter', 'system-ui', 'sans-serif'],
-              mono: ['JetBrains Mono', 'monospace'],
-            },
-            animation: {
-              'fade-in': 'fadeIn 0.4s ease-out',
-              'fade-in-up': 'fadeInUp 0.4s ease-out',
-              'slide-up': 'slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1)',
-              'slide-down': 'slideDown 0.4s cubic-bezier(0.16, 1, 0.3, 1)',
-              'float': 'float 3s ease-in-out infinite',
-              'glow': 'glow 2s ease-in-out infinite alternate',
-              'glow-pulse': 'glowPulse 1.5s ease-in-out infinite',
-              'shimmer': 'shimmer 2s linear infinite',
-              'spin-slow': 'spin 3s linear infinite',
-              'scale-in': 'scaleIn 0.4s ease-out',
-              'bounce-gentle': 'bounceGentle 2s ease-in-out infinite',
-              'drift': 'drift 6s ease-in-out infinite',
-              'depth-pulse': 'depthPulse 4s ease-in-out infinite',
-            },
-            keyframes: {
-              fadeIn: { '0%': { opacity: '0' }, '100%': { opacity: '1' } },
-              fadeInUp: { '0%': { opacity: '0', transform: 'translateY(16px)' }, '100%': { opacity: '1', transform: 'translateY(0)' } },
-              slideUp: { '0%': { transform: 'translateY(10px)', opacity: '0' }, '100%': { transform: 'translateY(0)', opacity: '1' } },
-              slideDown: { '0%': { transform: 'translateY(-10px)', opacity: '0' }, '100%': { transform: 'translateY(0)', opacity: '1' } },
-              float: { '0%, 100%': { transform: 'translateY(0)' }, '50%': { transform: 'translateY(-12px)' } },
-              glow: { '0%': { boxShadow: '0 0 20px rgba(37, 99, 235, 0.1)' }, '100%': { boxShadow: '0 0 40px rgba(37, 99, 235, 0.3)' } },
-              glowPulse: { '0%, 100%': { opacity: '0.4' }, '50%': { opacity: '0.8' } },
-              shimmer: { '0%': { transform: 'translateX(-100%)' }, '100%': { transform: 'translateX(100%)' } },
-              scaleIn: { '0%': { transform: 'scale(0.95)', opacity: '0' }, '100%': { transform: 'scale(1)', opacity: '1' } },
-              bounceGentle: { '0%, 100%': { transform: 'translateY(0)' }, '50%': { transform: 'translateY(-4px)' } },
-              drift: { '0%, 100%': { transform: 'translate(0, 0) rotate(0deg)' }, '25%': { transform: 'translate(8px, -8px) rotate(1deg)' }, '50%': { transform: 'translate(-4px, -14px) rotate(-0.5deg)' }, '75%': { transform: 'translate(6px, -6px) rotate(0.5deg)' } },
-              depthPulse: { '0%, 100%': { opacity: '0.15', transform: 'scale(1)' }, '50%': { opacity: '0.25', transform: 'scale(1.05)' } },
-            },
-          },
-        },
-      }
-    </script>
-    <script>if(console.warn&&location.hostname!=='localhost'){const _w=console.warn;console.warn=function(m){if(typeof m==='string'&&m.includes('cdn.tailwindcss.com'))return;_w.apply(console,arguments)}}</script>
+    <!-- ═══ Tailwind CSS — compiled by PostCSS (see postcss.config.js + tailwind.config.js) ═══ -->
 
     <!-- ═══ Splash screen CSS (served from public/) ═══ -->
     <link rel="stylesheet" href="/splash.css" />

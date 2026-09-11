@@ -108,7 +108,11 @@ function navigateAndClose(path: string) {
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <div class="flex items-center justify-between h-16">
         <!-- Logo -->
-        <router-link to="/" class="flex items-center gap-2.5 group" ref="logoRef">
+        <router-link to="/" class="group">
+          <!-- ref lives on a real DOM element — a ref on <router-link> (a
+               component) hands GSAP a Vue proxy and produces
+               "Invalid property ... Missing plugin?" warnings -->
+          <div ref="logoRef" class="flex items-center gap-2.5">
           <!-- Logo image with animated gradient border -->
           <div ref="logoImgRef" class="logo-ring relative w-10 h-10 transition-all duration-500 group-hover:scale-110 group-hover:rotate-[-4deg]">
             <!-- Animated conic gradient border -->
@@ -124,6 +128,7 @@ function navigateAndClose(path: string) {
           </div>
           <!-- Brand name with gradient -->
           <span class="text-lg font-bold font-heading bg-gradient-to-r from-surface-900 to-surface-700 dark:from-white dark:to-surface-300 bg-clip-text text-transparent group-hover:from-primary-600 group-hover:to-primary-400 transition-all duration-300">VidTopUp</span>
+          </div>
         </router-link>
 
         <!-- Desktop Nav -->

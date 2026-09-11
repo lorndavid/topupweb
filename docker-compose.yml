@@ -48,7 +48,7 @@ services:
       # ── Push Notifications ──
       VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY}
       VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY}
-      VAPID_SUBJECT: ${VAPID_SUBJECT:-mailto:admin@vidtopup.com}
+      VAPID_SUBJECT: ${VAPID_SUBJECT:-mailto:admin@vidtopup.store}
       # ── Admin Auth ──
       ADMIN_JWT_SECRET: ${ADMIN_JWT_SECRET}
       ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
@@ -92,7 +92,8 @@ services:
     ports:
       - "80:80"
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost/"]
+      # 127.0.0.1 (not localhost) — busybox wget resolves localhost to ::1 first and fails
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1/"]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -115,7 +116,8 @@ services:
     ports:
       - "81:80"
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost/"]
+      # 127.0.0.1 (not localhost) — busybox wget resolves localhost to ::1 first and fails
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1/"]
       interval: 30s
       timeout: 5s
       retries: 3

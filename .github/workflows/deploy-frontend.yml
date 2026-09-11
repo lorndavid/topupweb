@@ -141,16 +141,16 @@ jobs:
       - name: 🌐 Check homepage loads
         run: |
           curl -s -o /dev/null -w "HTTP %{http_code}" \
-            https://topup.lorndavid.online/ | grep -q "200\|301\|302" && \
+            https://vidtopup.store/ | grep -q "200\|301\|302" && \
             echo "✅ Homepage OK" || \
             (echo "❌ Homepage failed" && exit 1)
 
-      - name: 🌐 Check sitemap (via backend directly)
+      - name: 🌐 Check sitemap (backend, through Cloudflare)
         run: |
           STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
-            https://topup-api.lorndavid.online/api/sitemap.xml 2>/dev/null)
+            https://api.vidtopup.store/sitemap.xml 2>/dev/null)
           if [ "$STATUS" = "200" ]; then
-            echo "✅ Sitemap accessible via API"
+            echo "✅ Sitemap accessible via backend"
           else
-            echo "⚠️ Sitemap check skipped (backend may not expose /api/sitemap.xml directly)"
+            echo "⚠️ Sitemap check skipped (backend/tunnel may not be reachable from Actions)"
           fi

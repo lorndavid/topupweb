@@ -81,4 +81,45 @@ const router = createRouter({
   ],
 })
 
+// ─── Dynamic Titles for SEO & Google Search ──────────────────
+const routeTitles: Record<string, string> = {
+  home: 'VidTopUp - Game Top-Up Cambodia | Instant KHQR Delivery',
+  'order-history': 'My Orders - Track Order History & Status | VidTopUp',
+  checkout: 'Checkout & Order Review | VidTopUp Cambodia',
+  payment: 'Pay with KHQR - Instant ABA PayWay | VidTopUp',
+  'payment-success': 'Payment Successful - Diamonds Delivered | VidTopUp',
+  'order-status': 'Live Order Delivery Status | VidTopUp Cambodia',
+}
+
+const gameCodeNames: Record<string, string> = {
+  mlbb: 'Mobile Legends: Bang Bang Diamonds',
+  mlbb_exclusive: 'MLBB Exclusive Diamonds',
+  mlbb_global: 'MLBB Global Diamonds',
+  freefire_sgmy: 'Free Fire Diamonds (SG/MY)',
+  freefire_global: 'Free Fire Diamonds (Global)',
+  pubgm: 'PUBG Mobile UC',
+  hok: 'Honor of Kings Tokens',
+  genshin: 'Genshin Impact Genesis Crystals',
+}
+
+router.afterEach((to) => {
+  let title = 'VidTopUp - Fast & Secure Game Top-Up Cambodia'
+
+  if (to.name === 'game-detail' && to.params.gameCode) {
+    const code = String(to.params.gameCode)
+    const name = gameCodeNames[code] || code.toUpperCase().replace(/_/g, ' ')
+    title = `Top Up ${name} - Instant KHQR | VidTopUp Cambodia`
+  } else if (to.name && routeTitles[String(to.name)]) {
+    title = routeTitles[String(to.name)]
+  }
+
+  document.title = title
+
+  // Sync OpenGraph title for social previews
+  const ogTitle = document.querySelector('meta[property="og:title"]')
+  if (ogTitle) {
+    ogTitle.setAttribute('content', title)
+  }
+})
+
 export default router

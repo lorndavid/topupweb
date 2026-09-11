@@ -154,11 +154,13 @@ export default defineConfig({
     port: 5173,
     proxy: {
       '/api': {
-        target: 'http://localhost:3001',
+        // 127.0.0.1 (not localhost) — on Windows, `localhost` can resolve to ::1
+        // first, which another dev server may have claimed; IPv4 avoids the hijack.
+        target: 'http://127.0.0.1:3001',
         changeOrigin: true,
       },
       '/ws': {
-        target: 'ws://localhost:3001',
+        target: 'ws://127.0.0.1:3001',
         ws: true,
       },
     },

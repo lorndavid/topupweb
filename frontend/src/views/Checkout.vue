@@ -24,7 +24,7 @@ const paymentRef = ref('')
 const qrImage = ref('')
 const qrLoading = ref(false)
 const qrError = ref<string | null>(null)
-const paymentStatus = ref<'pending' | 'paid' | 'failed'>('pending')
+const paymentStatus = ref<'pending' | 'scanned' | 'paid' | 'failed'>('pending')
 const timeLeft = ref(5 * 60) // 5 minutes
 const checkoutStarted = ref(false)
 const showCancelDialog = ref(false)
@@ -102,7 +102,10 @@ const wsReference = ref<string | null>(null)
 const ws = usePaymentWebSocket(wsReference)
 
 ws.setOnStatusChange((data) => {
-  if (data.payment_status === 'paid') {
+  if (data.payment_status === 'scanned') {
+    // QR was scanned — KHQRCard swaps the QR for a "confirm in your app" panel
+    paymentStatus.value = 'scanned'
+  } else if (data.payment_status === 'paid') {
     paymentStatus.value = 'paid'
     onPaymentReceived()
   } else if (data.payment_status === 'failed') {
@@ -170,7 +173,8 @@ function startPolling() {
     if (!paymentRef.value) return
     try {
       const status = await getPaymentStatus(paymentRef.value)
-      paymentStatus.value = status.payment_status as 'pending' | 'paid' | 'failed'
+      // API may report 'scanned' (CutLuy hint) — only upgrade to terminal states
+      paymentStatus.value = status.payment_status as 'pending' | 'scanned' | 'paid' | 'failed'
 
       if (status.payment_status === 'paid') {
         onPaymentReceived()
@@ -501,6 +505,7 @@ onUnmounted(() => {
           <div class="lg:col-span-3">
             <KHQRCard
               :merchant-name="'VidTopUp Store'"
+              :product-label="order.productName"
               :amount="order.amount"
               :qr-image="qrImage"
               :payment-ref="paymentRef"

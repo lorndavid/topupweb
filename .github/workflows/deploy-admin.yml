@@ -138,9 +138,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 3
     steps:
-      - name: 🌐 Check admin login page loads
+      - name: 🌐 Check admin loads (SPA root serves index.html)
         run: |
           curl -s -o /dev/null -w "HTTP %{http_code}" \
-            https://admintopup.lorndavid.online/login | grep -q "200\|301\|302" && \
-            echo "✅ Admin login page OK" || \
-            (echo "❌ Admin login page failed" && exit 1)
+            https://admin.vidtopup.store/ | grep -q "200\|301\|302" && \
+            echo "✅ Admin OK" || \
+            (echo "❌ Admin failed" && exit 1)

@@ -63,11 +63,11 @@ jobs:
 
             cd /var/www/topup-api
 
-            # Pull new image
-            docker compose pull backend
+            # Backend-only stack (frontends are on Vercel)
+            docker compose -f docker-compose.backend.yml pull backend
 
-            # Restart backend container only (MongoDB stays running)
-            docker compose up -d --no-deps --pull never backend
+            # Restart backend container only
+            docker compose -f docker-compose.backend.yml up -d --no-deps backend
 
             # Health check
             for i in $(seq 1 30); do

@@ -23,18 +23,18 @@ tunnel: vidtopup-prod
 credentials-file: /etc/cloudflared/creds.json
 
 ingress:
-  # Frontend (customer site) → topup.lorndavid.online
-  - hostname: topup.lorndavid.online
+  # Frontend (customer site) → vidtopup.store
+  - hostname: vidtopup.store
     service: http://frontend:80
-  - hostname: www.topup.lorndavid.online
+  - hostname: www.vidtopup.store
     service: http://frontend:80
 
-  # Admin dashboard → admintopup.lorndavid.online
-  - hostname: admintopup.lorndavid.online
+  # Admin dashboard → admin.vidtopup.store
+  - hostname: admin.vidtopup.store
     service: http://admin:80
 
-  # Backend API → topup-api.lorndavid.online
-  - hostname: topup-api.lorndavid.online
+  # Backend API → api.vidtopup.store
+  - hostname: api.vidtopup.store
     service: http://backend:3001
 
   # Default fallback (404)

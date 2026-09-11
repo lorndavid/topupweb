@@ -4,9 +4,20 @@ import { config } from '../config';
 import { HTTP_STATUS } from '../constants';
 import axios from 'axios';
 
+import crypto from 'crypto';
+
 const JWT_SECRET = config.admin?.jwtSecret || 'admin-secret-change-in-production';
 const ADMIN_USERNAME = config.admin?.username || 'admin';
 const ADMIN_PASSWORD = config.admin?.password || 'admin123';
+
+/**
+ * Constant-time string comparison to prevent timing attacks.
+ */
+function safeCompare(a: string, b: string): boolean {
+  const hashA = crypto.createHash('sha256').update(String(a)).digest();
+  const hashB = crypto.createHash('sha256').update(String(b)).digest();
+  return crypto.timingSafeEqual(hashA, hashB);
+}
 
 /**
  * Login with username + password (local admin account)
@@ -22,7 +33,10 @@ export async function login(req: Request, res: Response) {
       });
     }
 
-    if (username !== ADMIN_USERNAME || password !== ADMIN_PASSWORD) {
+    const usernameValid = safeCompare(username, ADMIN_USERNAME);
+    const passwordValid = safeCompare(password, ADMIN_PASSWORD);
+
+    if (!usernameValid || !passwordValid) {
       return res.status(HTTP_STATUS.UNAUTHORIZED).json({
         success: false,
         message: 'Invalid username or password',

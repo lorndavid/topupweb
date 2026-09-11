@@ -64,3 +64,9 @@ export const API_TIMEOUT = 10000; // 10 seconds
 // Stock retry constants
 export const STOCK_RETRY_INTERVAL = 60_000; // Retry awaiting_stock orders every 60 seconds
 export const STOCK_RETRY_MAX = 1440; // Max 1440 retries = ~24 hours before giving up
+
+/**
+ * Retail markup over Bay2Game's real (wholesale) price, in USD.
+ * Every product is sold at: Bay2Game sell_price + this amount.
+ */
+export const PROFIT_MARGIN_USD = 0.05;

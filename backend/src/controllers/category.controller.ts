@@ -1,23 +1,18 @@
 import { Request, Response, NextFunction } from 'express';
 import { bay2gameService } from '../services/bay2game.service';
-import { HTTP_STATUS } from '../constants';
+import { HTTP_STATUS, PROFIT_MARGIN_USD } from '../constants';
 import { priceHistoryRepository } from '../repositories/PriceHistoryRepository';
 import type { Bay2GameProduct } from '../types';
 
 /**
- * Reseller profit margin applied to every product.
- * Bay2Game returns the wholesale price; we add $0.20 for our retail markup.
- */
-const PROFIT_MARGIN = 0.20;
-
-/**
- * Apply the profit margin to a product's sell_price.
+ * Apply the retail markup to a product's real (wholesale) price.
+ * Customer pays: Bay2Game real price + PROFIT_MARGIN_USD ($0.05).
  * Rounds to 2 decimal places (cents).
  */
 function applyProfit(product: Bay2GameProduct): Bay2GameProduct {
   return {
     ...product,
-    sell_price: Math.round((product.sell_price + PROFIT_MARGIN) * 100) / 100,
+    sell_price: Math.round((product.sell_price + PROFIT_MARGIN_USD) * 100) / 100,
   };
 }
 
@@ -92,7 +87,7 @@ export async function getProductsByGame(
     const { gameCode } = req.params;
     const { game, products } = await bay2gameService.getProductsWithGame(gameCode);
 
-    // Apply $0.20 profit margin to each product
+    // Apply the $0.05 retail markup over Bay2Game's real price to each product
     const productsWithMargin = products.map(applyProfit);
 
     // Track price changes (non-blocking — runs in background)

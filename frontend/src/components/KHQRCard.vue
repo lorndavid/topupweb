@@ -11,17 +11,30 @@ function formatCountdown(seconds: number): string {
   return `${m}:${String(s).padStart(2, '0')}`
 }
 
-const props = defineProps<{
-  merchantName: string
-  amount: number
-  qrImage?: string
-  paymentRef?: string
-  loading?: boolean
-  error?: string | null
-  paymentStatus?: 'pending' | 'paid' | 'failed'
-  timeLeft?: number
-  isUrgent?: boolean
-}>()
+const props = withDefaults(
+  defineProps<{
+    merchantName: string
+    productLabel?: string
+    amount: number
+    qrImage?: string
+    paymentRef?: string
+    loading?: boolean
+    error?: string | null
+    paymentStatus?: 'pending' | 'scanned' | 'paid' | 'failed'
+    timeLeft?: number
+    isUrgent?: boolean
+  }>(),
+  {
+    productLabel: '',
+    qrImage: '',
+    paymentRef: '',
+    loading: false,
+    error: null,
+    paymentStatus: 'pending',
+    timeLeft: undefined,
+    isUrgent: false,
+  }
+)
 
 const emit = defineEmits<{
   checkout: []
@@ -36,6 +49,7 @@ const cardRef = ref<HTMLElement | null>(null)
 const khqrCaptureRef = ref<HTMLElement | null>(null)
 const qrContainerRef = ref<HTMLElement | null>(null)
 const checkoutBtnRef = ref<HTMLElement | null>(null)
+const copied = ref(false)
 
 // ─── Mobile detection ───────────────────────────────────────
 const isMobile = ref(window.innerWidth < 640)
@@ -45,12 +59,7 @@ function onResize() {
 onMounted(() => window.addEventListener('resize', onResize))
 onUnmounted(() => window.removeEventListener('resize', onResize))
 
-// ─── Circular progress (header timer ring) ──────────────────
-const progressPercent = computed(() => {
-  if (!props.timeLeft || props.timeLeft <= 0) return 0
-  return Math.round((props.timeLeft / 300) * 100)
-})
-
+// ─── Expiry countdown ───────────────────────────────────────
 const countdownDisplay = computed(() => {
   if (props.timeLeft === undefined || props.timeLeft === null) return null
   return formatCountdown(props.timeLeft)
@@ -59,6 +68,25 @@ const countdownDisplay = computed(() => {
 const isExpired = computed(() => {
   return props.timeLeft !== undefined && props.timeLeft !== null && props.timeLeft <= 0
 })
+
+// Per CutLuy docs: never leave a live QR on screen after it is paid,
+// expired, or scanned — swap the QR for a status panel instead.
+const showQr = computed(() => {
+  return !props.error && props.paymentStatus === 'pending' && !isExpired.value
+})
+
+// ─── Copy reference ─────────────────────────────────────────
+async function copyReference() {
+  if (!props.paymentRef) return
+  try {
+    await navigator.clipboard.writeText(props.paymentRef)
+    copied.value = true
+    toast.success('Reference copied to clipboard')
+    setTimeout(() => (copied.value = false), 2000)
+  } catch {
+    toast.error('Failed to copy')
+  }
+}
 
 // ─── Checkout ───────────────────────────────────────────────
 function handleCheckout() {
@@ -94,12 +122,11 @@ function handleRetry() {
   emit('retry')
 }
 
-// ─── Download success sound ────────────────────────────────
+// ─── Download success chime ────────────────────────────────
 function playDownloadSound() {
   try {
     const ctx = new (window.AudioContext || (window as any).webkitAudioContext)()
     const now = ctx.currentTime
-    // Pleasant ascending chime
     const osc1 = ctx.createOscillator()
     const gain1 = ctx.createGain()
     osc1.type = 'sine'
@@ -110,22 +137,13 @@ function playDownloadSound() {
     gain1.connect(ctx.destination)
     osc1.start(now)
     osc1.stop(now + 0.4)
-
-    const osc2 = ctx.createOscillator()
-    const gain2 = ctx.createGain()
-    osc2.type = 'sine'
-    osc2.frequency.setValueAtTime(1108.73, now + 0.08)
-    gain2.gain.setValueAtTime(0.15, now + 0.08)
-    gain2.gain.exponentialRampToValueAtTime(0.01, now + 0.5)
-    osc2.connect(gain2)
-    gain2.connect(ctx.destination)
-    osc2.start(now + 0.08)
-    osc2.stop(now + 0.5)
-  } catch { /* silent */ }
+  } catch {
+    /* silent */
+  }
 }
 
 // ─── Capture the clean KHQR content (header + merchant/amount + QR) ──
-//     Excludes action buttons (pay/scan/download/cancel) from the output.
+//     Excludes action buttons from the downloaded image.
 async function captureKHQRCanvas(): Promise<HTMLCanvasElement | null> {
   if (!khqrCaptureRef.value) return null
   try {
@@ -134,7 +152,9 @@ async function captureKHQRCanvas(): Promise<HTMLCanvasElement | null> {
       scale: 2,
       backgroundColor: '#ffffff',
     })
-  } catch { return null }
+  } catch {
+    return null
+  }
 }
 
 // ─── Download clean KHQR card as image ───────────────────────
@@ -166,11 +186,12 @@ async function handleDownloadQR() {
         class="group relative overflow-hidden px-10 py-4 bg-gradient-to-r from-red-600 to-red-500 hover:from-red-500 hover:to-red-400 text-white font-bold text-lg rounded-2xl shadow-xl shadow-red-500/20 hover:shadow-red-500/30 transition-all duration-300 active:scale-[0.98]"
       >
         <span class="relative z-10 flex items-center gap-3">
-          <img
-            src="https://checkout.payway.com.kh/images/khqr-icon.svg"
-            alt="KHQR"
-            class="w-6 h-6 brightness-0 invert"
-          />
+          <svg class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="3" width="7" height="7" rx="1.5" />
+            <rect x="14" y="3" width="7" height="7" rx="1.5" />
+            <rect x="3" y="14" width="7" height="7" rx="1.5" />
+            <path d="M14 14h3v3h-3zM17 17h4v4h-4z" />
+          </svg>
           <span>Checkout with KHQR</span>
           <svg class="w-5 h-5 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3" />
@@ -184,226 +205,271 @@ async function handleDownloadQR() {
     </div>
 
     <!-- ─── KHQR CARD (when shown) ─── -->
-      <!-- Mobile: backdrop overlay with fade transition -->
-      <Transition name="khqr-bg">
-        <div
-          v-if="showCard && isMobile"
-          key="backdrop"
-          class="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm"
-          @click="emit('cancel')"
-        ></div>
-      </Transition>
+    <!-- Mobile: backdrop overlay with fade transition -->
+    <Transition name="khqr-bg">
+      <div
+        v-if="showCard && isMobile"
+        key="backdrop"
+        class="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm"
+        @click="emit('cancel')"
+      ></div>
+    </Transition>
 
-      <!-- Card (shared between mobile + desktop) with slide-up transition -->
-      <Transition name="khqr-bs">
+    <!-- Card (shared between mobile + desktop) with slide-up transition -->
+    <Transition name="khqr-bs">
+      <div
+        v-if="showCard"
+        key="card"
+        ref="cardRef"
+        :class="[
+          isMobile
+            ? 'fixed inset-x-0 bottom-0 z-50 flex justify-center'
+            : 'mx-auto w-full max-w-[360px]',
+        ]"
+      >
         <div
-          v-if="showCard"
-          key="card"
-          ref="cardRef"
-          :class="[
-            isMobile
-              ? 'fixed inset-x-0 bottom-0 z-50'
-              : 'mx-auto max-w-sm'
-          ]"
-        >
-        <div
-          class="bg-white overflow-hidden border border-gray-100"
-          :class="isMobile ? 'rounded-t-2xl shadow-2xl pb-[max(0.75rem,env(safe-area-inset-bottom,0.75rem))]' : 'rounded-2xl shadow-2xl'"
+          class="w-full max-w-[360px] overflow-hidden rounded-[2rem] bg-white font-sans shadow-2xl"
+          :class="isMobile ? 'rounded-b-none pb-[max(0.75rem,env(safe-area-inset-bottom,0.75rem))]' : ''"
         >
           <!-- ═══ CAPTURE CONTENT (header + merchant/amount + QR) ═══ -->
-          <!--     This section is captured by html2canvas for download.
-               It contains ONLY the KHQR header, merchant name, amount, and QR code.
-               Action buttons (pay/scan/download/cancel) stay OUTSIDE this ref
-               so they never appear in the downloaded image. -->
-          <div ref="khqrCaptureRef">
-            <!-- Red Header with KHQR icon -->
-            <div class="bg-gradient-to-r from-red-600 to-red-500 px-6 pt-6 pb-5 text-center relative overflow-hidden">
-              <div class="absolute -top-6 -right-6 w-24 h-24 rounded-full bg-white/5"></div>
-              <div class="absolute -bottom-4 -left-4 w-16 h-16 rounded-full bg-white/5"></div>
-              <div class="flex justify-center relative">
-                <img
-                  src="https://checkout.payway.com.kh/images/khqr-icon.svg"
-                  alt="KHQR"
-                  class="w-14 h-14 brightness-0 invert"
-                />
-              </div>
-
-              <!-- Countdown timer display (text + ring) -->
-              <div
-                v-if="countdownDisplay !== null"
-                class="mt-2 flex items-center justify-center gap-2"
+          <div ref="khqrCaptureRef" class="bg-white">
+            <!-- 1. Red KHQR header: centered wordmark + close button -->
+            <div class="relative flex h-14 items-center justify-center bg-[#e41e26] px-6">
+              <button
+                aria-label="Close"
+                class="absolute right-4 flex h-8 w-8 items-center justify-center rounded-full bg-white/20 text-white transition hover:bg-white/30"
+                @click="emit('cancel')"
               >
-                <!-- Circular progress ring (small) -->
-                <div class="relative w-7 h-7 shrink-0">
-                  <svg class="w-7 h-7 -rotate-90" viewBox="0 0 36 36">
-                    <path class="text-white/20" fill="none" stroke="currentColor" stroke-width="3" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-                    <path
-                      :class="isExpired ? 'text-red-300' : isUrgent ? 'text-red-300 animate-pulse' : 'text-white/90'"
-                      fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"
-                      :stroke-dasharray="`${progressPercent}, 100`"
-                      class="transition-all duration-1000 ease-linear"
-                      d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                    />
+                <svg class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
+                  <path d="M18 6 6 18" />
+                  <path d="m6 6 12 12" />
+                </svg>
+              </button>
+              <span class="select-none text-2xl font-black italic tracking-wide text-white drop-shadow-sm">KHQR</span>
+            </div>
+
+            <!-- 2. Merchant/product + amount, dashed "tear" line, folded corner -->
+            <div class="relative border-b border-dashed border-gray-300 px-6 pt-4 pb-3">
+              <div
+                class="absolute -top-px right-0 h-0 w-0 border-t-[24px] border-l-[24px] border-l-transparent border-t-[#e41e26]"
+                aria-hidden="true"
+              ></div>
+              <div class="flex items-center gap-2">
+                <div class="flex h-5 w-5 shrink-0 items-center justify-center rounded-sm bg-gray-900">
+                  <svg class="h-3 w-3 text-white" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
                   </svg>
                 </div>
-
-                <!-- Countdown text -->
-                <span
-                  :class="[
-                    'font-mono font-bold text-sm tracking-wider transition-all duration-500',
-                    isExpired
-                      ? 'text-red-200'
-                      : isUrgent
-                        ? 'text-red-200 animate-pulse'
-                        : 'text-white/90',
-                  ]"
-                >
-                  <template v-if="isExpired">Expired</template>
-                  <template v-else>Expires in {{ countdownDisplay }}</template>
-                </span>
+                <h3 class="truncate text-sm text-slate-700">{{ productLabel || merchantName }}</h3>
+              </div>
+              <div class="flex items-end gap-2">
+                <h2 class="text-2xl font-bold text-gray-800">{{ amount.toFixed(2) }}</h2>
+                <span class="mb-1 text-sm font-medium text-slate-600">USD</span>
               </div>
             </div>
 
-            <!-- Dashed Separator -->
-            <div class="relative px-6">
-              <div class="border-t-2 border-dashed border-gray-200 -mx-6"></div>
-              <div class="absolute -top-2 -left-2 w-4 h-4 rounded-full bg-gray-50"></div>
-              <div class="absolute -top-2 -right-2 w-4 h-4 rounded-full bg-gray-50"></div>
-            </div>
-
-            <!-- White Body: Merchant + Amount + QR -->
-            <div class="px-6 pb-5 pt-4 bg-white">
-              <div class="flex items-center justify-between mb-4">
-                <div class="min-w-0 flex-1">
-                  <p class="text-sm font-bold text-gray-800 truncate">{{ merchantName }}</p>
-                </div>
-                <div class="text-right shrink-0 ml-4">
-                  <p class="text-xl font-extrabold text-gray-900">${{ amount.toFixed(2) }}</p>
-                </div>
-              </div>
-              <div ref="qrContainerRef" class="flex justify-center">
-                <div class="relative p-3 bg-white rounded-xl border border-gray-100 shadow-sm">
-                  <div class="w-52 h-52 flex items-center justify-center">
-                    <template v-if="loading">
+            <!-- 3. QR / status area -->
+            <div class="flex min-h-[240px] flex-col items-center justify-center px-6 pb-8">
+              <div class="flex w-full flex-col items-center">
+                <!-- QR (only while payment is pending & unscanned) -->
+                <div v-if="showQr" ref="qrContainerRef" class="relative mt-5 aspect-square w-full">
+                  <template v-if="loading">
+                    <div class="flex h-full w-full items-center justify-center">
                       <div class="text-center">
-                        <svg class="w-10 h-10 mx-auto text-gray-300 animate-spin" fill="none" viewBox="0 0 24 24">
+                        <svg class="mx-auto h-10 w-10 animate-spin text-gray-300" fill="none" viewBox="0 0 24 24">
                           <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
                           <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                         </svg>
-                        <p class="text-[10px] text-gray-400 mt-2">Generating QR...</p>
+                        <p class="mt-2 text-[10px] text-gray-400">Generating QR...</p>
                       </div>
-                    </template>
-                    <template v-else-if="qrImage">
-                      <img :src="qrImage" alt="KHQR Code" class="w-full h-full object-contain" />
-                    </template>
-                    <template v-else>
-                      <div class="w-full h-full flex items-center justify-center bg-gray-50 rounded-lg">
-                        <img src="https://checkout.payway.com.kh/images/usd-khqr-logo.svg" alt="USD-KHQR" class="w-24 h-24 opacity-30" />
-                      </div>
-                    </template>
-                  </div>
-                  <div v-if="qrImage" class="absolute inset-0 flex items-center justify-center pointer-events-none">
-                    <div class="w-10 h-10 bg-white rounded-lg shadow-sm flex items-center justify-center p-1.5">
-                      <img src="https://checkout.payway.com.kh/images/usd-khqr-logo.svg" alt="USD-KHQR" class="w-full h-full" />
                     </div>
+                  </template>
+                  <template v-else-if="qrImage">
+                    <img :src="qrImage" alt="KHQR Code" class="h-full w-full object-contain" />
+                    <!-- KHQR medallion — only rendered while the QR shows -->
+                    <div class="pointer-events-none absolute inset-0 flex items-center justify-center" aria-hidden="true">
+                      <div class="flex h-9 w-9 items-center justify-center rounded-full border-[3px] border-white bg-gray-900 text-sm font-bold text-white">
+                        $
+                      </div>
+                    </div>
+                  </template>
+                  <template v-else>
+                    <div class="flex h-full w-full items-center justify-center rounded-xl bg-gray-50">
+                      <svg class="h-16 w-16 text-gray-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <rect x="3" y="3" width="7" height="7" rx="1.5" />
+                        <rect x="14" y="3" width="7" height="7" rx="1.5" />
+                        <rect x="3" y="14" width="7" height="7" rx="1.5" />
+                        <path d="M14 14h3v3h-3zM17 17h4v4h-4z" />
+                      </svg>
+                    </div>
+                  </template>
+                </div>
+
+                <!-- Status panels (replace the QR — never show a live QR
+                     after scanned/paid/expired/failed) -->
+                <div v-else class="mt-5 w-full">
+                  <!-- Scanned -->
+                  <div v-if="paymentStatus === 'scanned' && !isExpired" class="rounded-2xl border border-emerald-200 bg-emerald-50 p-6 text-center">
+                    <div class="mb-3 inline-flex h-14 w-14 items-center justify-center rounded-full bg-emerald-500">
+                      <svg class="h-8 w-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" />
+                      </svg>
+                    </div>
+                    <p class="text-base font-bold text-emerald-700">QR Scanned</p>
+                    <p class="mt-1 text-xs text-emerald-600">Confirm the payment in your banking app</p>
+                  </div>
+
+                  <!-- Paid -->
+                  <div v-else-if="paymentStatus === 'paid'" class="rounded-2xl border border-emerald-200 bg-emerald-50 p-6 text-center">
+                    <div class="mb-3 inline-flex h-14 w-14 items-center justify-center rounded-full bg-emerald-500">
+                      <svg class="h-8 w-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" />
+                      </svg>
+                    </div>
+                    <p class="text-base font-bold text-emerald-700">Payment Received</p>
+                    <p class="mt-1 text-xs text-emerald-600">Processing your top-up…</p>
+                  </div>
+
+                  <!-- Expired -->
+                  <div v-else-if="isExpired" class="rounded-2xl border border-orange-200 bg-orange-50 p-6 text-center">
+                    <div class="mb-3 inline-flex h-14 w-14 items-center justify-center rounded-full bg-orange-500">
+                      <svg class="h-8 w-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <circle cx="12" cy="12" r="9" stroke-width="2" />
+                        <path stroke-linecap="round" stroke-width="2" d="M12 7v5l3 3" />
+                      </svg>
+                    </div>
+                    <p class="text-base font-bold text-orange-700">Payment Expired</p>
+                    <p class="mt-1 text-xs text-orange-600">This QR code is no longer valid</p>
+                  </div>
+
+                  <!-- Failed -->
+                  <div v-else-if="paymentStatus === 'failed'" class="rounded-2xl border border-red-200 bg-red-50 p-6 text-center">
+                    <div class="mb-3 inline-flex h-14 w-14 items-center justify-center rounded-full bg-red-500">
+                      <svg class="h-8 w-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </div>
+                    <p class="text-base font-bold text-red-700">Payment Failed</p>
+                    <p class="mt-1 text-xs text-red-600">Something went wrong — please try again</p>
+                  </div>
+
+                  <!-- Error -->
+                  <div v-else-if="error" class="rounded-2xl border border-red-200 bg-red-50 p-6 text-center">
+                    <div class="mb-3 inline-flex h-14 w-14 items-center justify-center rounded-full bg-red-500">
+                      <svg class="h-8 w-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-width="2" d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    </div>
+                    <p class="text-sm font-bold text-red-700">Something went wrong</p>
+                    <p class="mt-1 text-xs text-red-600">{{ error }}</p>
                   </div>
                 </div>
+
+                <!-- Expiry pill (rounded, pulsing green dot) -->
+                <div
+                  v-if="showQr && countdownDisplay !== null"
+                  class="mt-3 flex items-center gap-1.5 rounded-full bg-gray-100 px-3 py-1"
+                >
+                  <div
+                    class="h-1.5 w-1.5 rounded-full bg-green-500"
+                    :class="isUrgent ? 'animate-pulse bg-red-500' : 'animate-pulse'"
+                  ></div>
+                  <span class="text-xs font-medium text-gray-600">
+                    <template v-if="isUrgent">Expires in {{ countdownDisplay }}</template>
+                    <template v-else>Expires in {{ countdownDisplay }}</template>
+                  </span>
+                </div>
+                <div
+                  v-else-if="showQr"
+                  class="mt-3 flex items-center gap-1.5 rounded-full bg-gray-100 px-3 py-1"
+                >
+                  <div class="h-1.5 w-1.5 animate-pulse rounded-full bg-green-500"></div>
+                  <span class="text-xs font-medium text-gray-600">Waiting for payment…</span>
+                </div>
+
+                <!-- Reference + copy -->
+                <button
+                  v-if="paymentRef"
+                  @click="copyReference"
+                  class="group mt-3 flex items-center justify-center gap-1.5 text-[11px] text-gray-400 transition-colors hover:text-gray-600"
+                >
+                  <svg class="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path v-if="!copied" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                    <path v-else stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                  </svg>
+                  <span class="font-mono">{{ paymentRef }}</span>
+                  <span class="underline underline-offset-2 opacity-0 transition-opacity group-hover:opacity-100">
+                    {{ copied ? 'Copied' : 'Copy' }}
+                  </span>
+                </button>
               </div>
-              <!-- Powered By footer (captured) -->
-              <p class="text-center text-[10px] text-gray-400 mt-4 font-medium">
-                Powered by VidTopUp Store
-              </p>
             </div>
+
+            <!-- Powered-by footer (captured) -->
+            <p class="pb-4 text-center text-[10px] font-medium text-gray-400">
+              Powered by VidTopUp Store
+            </p>
           </div>
 
-          <!-- ═══ NON-CAPTURED CONTENT (action buttons only, never in download) ═══ -->
-          <div class="px-6 pb-5 bg-white">
-            <!-- Payment Status Indicator -->
-            <div v-if="paymentStatus && paymentStatus !== 'pending'" class="mb-3">
-              <div v-if="paymentStatus === 'paid'" class="flex items-center justify-center gap-2 p-2.5 bg-emerald-50 rounded-xl border border-emerald-200">
-                <div class="w-6 h-6 rounded-full bg-emerald-500 flex items-center justify-center">
-                  <svg class="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7" />
+          <!-- ═══ NON-CAPTURED CONTENT (action buttons only) ═══ -->
+          <div class="bg-white px-6 pb-5">
+            <!-- Pending actions -->
+            <div v-if="paymentStatus === 'pending' && !isExpired" class="space-y-3 text-center">
+              <p class="text-xs font-medium text-gray-500">Scan with any KHQR-enabled banking app</p>
+              <div class="flex items-center justify-center">
+                <button
+                  @click="handleDownloadQR"
+                  class="group inline-flex items-center gap-2 rounded-xl border-2 border-red-500/20 bg-red-50 px-5 py-2.5 transition-all duration-200 hover:border-red-500/40 hover:bg-red-100"
+                >
+                  <svg class="h-5 w-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                   </svg>
-                </div>
-                <span class="text-sm font-semibold text-emerald-700">Payment Received!</span>
-              </div>
-              <div v-if="paymentStatus === 'failed'" class="flex items-center justify-center gap-2 p-2.5 bg-red-50 rounded-xl border border-red-200">
-                <div class="w-6 h-6 rounded-full bg-red-500 flex items-center justify-center">
-                  <svg class="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </div>
-                <span class="text-sm font-semibold text-red-700">Payment Failed</span>
+                  <span class="text-sm font-semibold text-red-600 transition-colors group-hover:text-red-700">Download QR</span>
+                </button>
               </div>
             </div>
 
-            <!-- Three-row Actions Section (only show when pending, or expired) -->
-            <div v-if="paymentStatus === 'pending' || !paymentStatus" class="text-center space-y-3">
-              <!-- Expired state with retry button -->
-              <template v-if="isExpired">
-                <div class="p-3 bg-red-50 rounded-xl border border-red-200">
-                  <div class="flex items-center justify-center gap-2 mb-2">
-                    <svg class="w-4 h-4 text-red-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    <span class="text-xs font-semibold text-red-700">Payment time expired</span>
-                  </div>
-                  <button
-                    @click="handleRetry"
-                    class="w-full px-4 py-2 bg-red-500 hover:bg-red-600 text-white text-xs font-semibold rounded-lg transition-all duration-200 active:scale-95 inline-flex items-center justify-center gap-1.5"
-                  >
-                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                    </svg>
-                    Try Again
-                  </button>
-                </div>
-              </template>
-
-              <!-- Pending state: Download QR -->
-              <template v-else>
-                <p class="text-xs text-gray-500 font-medium">Pay with any Cambodian banking app</p>
-                <div class="flex items-center justify-center">
-                  <button
-                    @click="handleDownloadQR"
-                    class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl border-2 border-red-500/20 bg-red-50 hover:bg-red-100 hover:border-red-500/40 transition-all duration-200 group"
-                  >
-                    <img
-                      src="https://checkout.payway.com.kh/images/download-icon-khqr.svg"
-                      alt="Download"
-                      class="w-5 h-5 opacity-60 group-hover:opacity-100 transition-opacity"
-                    />
-                    <span class="text-sm font-semibold text-red-600 group-hover:text-red-700 transition-colors">Download QR</span>
-                  </button>
-                </div>
-              </template>
-            </div>
-
-            <!-- Error with Retry -->
-            <div v-if="error" class="mt-3 p-3 bg-red-50 border border-red-200 rounded-xl text-center">
-              <p class="text-xs text-red-600 mb-2">{{ error }}</p>
-              <button @click="handleRetry" class="px-4 py-1.5 bg-red-500 hover:bg-red-600 text-white text-xs font-semibold rounded-lg transition-all duration-200 active:scale-95">
+            <!-- Expired state with retry -->
+            <div v-else-if="isExpired" class="text-center">
+              <button
+                @click="handleRetry"
+                class="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-red-500 px-4 py-2.5 text-sm font-semibold text-white transition-all duration-200 hover:bg-red-600 active:scale-95"
+              >
+                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
                 Try Again
               </button>
             </div>
 
-            <!-- Cancel Button (only when pending) -->
-            <div v-if="paymentStatus === 'pending' && paymentRef" class="mt-3 text-center">
-              <button @click="emit('cancel')" class="text-xs text-gray-400 hover:text-red-500 transition-colors duration-200 underline underline-offset-2">
+            <!-- Failed state with retry -->
+            <div v-else-if="paymentStatus === 'failed'" class="text-center">
+              <button
+                @click="handleRetry"
+                class="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-red-500 px-4 py-2.5 text-sm font-semibold text-white transition-all duration-200 hover:bg-red-600 active:scale-95"
+              >
+                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                Try Again
+              </button>
+            </div>
+
+            <!-- Cancel (only while pending & unscanned) -->
+            <div v-if="paymentStatus === 'pending' && paymentRef && !isExpired" class="mt-3 text-center">
+              <button @click="emit('cancel')" class="text-xs text-gray-400 underline underline-offset-2 transition-colors duration-200 hover:text-red-500">
                 Cancel Order
               </button>
             </div>
           </div>
         </div>
-
       </div>
     </Transition>
 
-      <!-- Mobile: drag handle (outside capture ref) -->
-      <div v-if="showCard && isMobile" class="flex justify-center py-3 bg-white">
-        <div class="w-10 h-1 rounded-full bg-gray-300"></div>
-      </div>
+    <!-- Mobile: drag handle (outside capture ref) -->
+    <div v-if="showCard && isMobile" class="flex justify-center bg-white py-3">
+      <div class="h-1 w-10 rounded-full bg-gray-300"></div>
+    </div>
   </div>
 </template>
 
@@ -434,7 +500,7 @@ async function handleDownloadQR() {
     opacity: 1;
   }
 
-  /* Bottom sheet slide (0.4s, spring easing, includes opacity) */
+  /* Bottom sheet slide (includes opacity) */
   .khqr-bs-enter-active {
     transition: transform var(--anim-enter-duration) var(--anim-enter-ease),
                 opacity var(--anim-enter-duration) var(--anim-enter-ease);
@@ -457,5 +523,5 @@ async function handleDownloadQR() {
   }
 }
 
-/* Desktop: no specific transition needed (GSAP handles it) */
+/* Desktop: GSAP handles the enter animation */
 </style>

@@ -8,7 +8,7 @@ export interface SeoMeta {
   twitterCard?: 'summary' | 'summary_large_image'
 }
 
-const SITE_URL = 'https://topup.lorndavid.online'
+const SITE_URL = 'https://vidtopup.store'
 const DEFAULT_IMAGE = `${SITE_URL}/apple-touch-icon-180x180.png`
 
 /**

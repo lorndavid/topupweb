@@ -12,18 +12,28 @@ const app = express();
 // Validate configuration on startup
 validateConfig();
 
-// Security middleware
-app.use(helmet());
+import { globalApiLimiter } from './middleware/rateLimiter';
+
+// Security middleware with relaxed cross-origin resource policy for API assets
+app.use(
+  helmet({
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
+  })
+);
 // Allow both local dev URL and production frontend URL(s)
 const allowedOrigins = [
   config.frontendUrl,
   'http://localhost:3001',   // Backend (serves frontend or admin)
+  'http://127.0.0.1:3001',   // Backend (IPv4) — also what the Vite dev proxy
+                             // sends as Origin when changeOrigin rewrites it
   'http://localhost:5173',   // Main frontend (dev)
+  'http://127.0.0.1:5173',   // Main frontend (dev, IPv4)
   'http://localhost:5174',   // Admin dashboard (dev)
+  'http://127.0.0.1:5174',   // Admin dashboard (dev, IPv4)
   'http://localhost:4199',   // Admin dashboard (preview)
-  'https://topup.lorndavid.online',
-  'https://www.topup.lorndavid.online',
-  'https://admintopup.lorndavid.online',
+  'https://vidtopup.store',
+  'https://www.vidtopup.store',
+  'https://admin.vidtopup.store',
   // Allow Vercel preview deployments (for testing before going live)
   ...(process.env.EXTRA_CORS_ORIGINS ? process.env.EXTRA_CORS_ORIGINS.split(',') : []),
 ].filter(Boolean);
@@ -37,8 +47,11 @@ app.use(
       if (allowedOrigins.some((o) => origin.startsWith(o))) {
         return callback(null, true);
       }
-      // Deny unknown origins
-      return callback(new Error(`Origin ${origin} not allowed by CORS`));
+      // Unknown origin: respond WITHOUT CORS headers instead of throwing.
+      // Browsers block the response themselves; throwing here produced a
+      // misleading 500 on every cross-origin request.
+      console.warn(`🚫 CORS blocked origin: ${origin}`);
+      return callback(null, false);
     },
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
     allowedHeaders: ['Content-Type', 'Accept', 'Authorization'],
@@ -82,8 +95,8 @@ app.get('/api/health', (_req, res) => {
   });
 });
 
-// API Routes
-app.use('/api', routes);
+// API Routes (rate limited)
+app.use('/api', globalApiLimiter, routes);
 
 // Error handling
 app.use(notFoundHandler);

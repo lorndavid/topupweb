@@ -9,7 +9,6 @@ import Footer from '@/components/Footer.vue'
 import ToastContainer from '@/components/ToastContainer.vue'
 import InstallPrompt from '@/components/InstallPrompt.vue'
 import AnnouncementBanner from '@/components/AnnouncementBanner.vue'
-import MobileBottomNav from '@/components/MobileBottomNav.vue'
 import { usePushNotifications } from '@/composables/usePushNotifications'
 import gsap from 'gsap'
 
@@ -204,7 +203,7 @@ onMounted(() => {
   <!-- Theme crossfade overlay — sits above everything during transitions -->
   <div ref="overlayRef" class="theme-overlay" style="opacity: 0;"></div>
 
-  <div class="min-h-screen flex flex-col pb-16 lg:pb-0">
+  <div class="min-h-screen flex flex-col">
     <Navbar
       :is-dark="isDark"
       :transitioning="transitioning"
@@ -222,10 +221,6 @@ onMounted(() => {
       </router-view>
     </main>
     <Footer />
-    <MobileBottomNav
-      :is-dark="isDark"
-      @toggle-dark="toggleDark"
-    />
     <ToastContainer />
     <InstallPrompt />
   </div>

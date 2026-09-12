@@ -79,7 +79,7 @@ const router = createRouter({
   ],
 })
 
-// ─── Dynamic Titles for SEO & Google Search ──────────────────
+// ─── Dynamic Page Titles ──────────────────
 const routeTitles: Record<string, string> = {
   home: 'VidTopUp - Game Top-Up Cambodia | Instant KHQR Delivery',
   'order-history': 'My Orders - Track Order History & Status | VidTopUp',

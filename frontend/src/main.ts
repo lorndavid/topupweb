@@ -9,11 +9,17 @@ import gsap from 'gsap'
 import { CSSPlugin } from 'gsap/CSSPlugin'
 gsap.registerPlugin(CSSPlugin)
 
+import { setupGoogleAnalytics } from './plugins/googleAnalytics'
+
 const app = createApp(App)
 const pinia = createPinia()
 
 app.use(pinia)
 app.use(router)
+
+// Initialize Google Analytics (activates if VITE_GA_MEASUREMENT_ID is configured)
+setupGoogleAnalytics(router)
+
 app.mount('#app')
 
 // ─── Fade out the splash screen once Vue has mounted ───

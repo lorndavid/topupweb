@@ -1,8 +1,0 @@
-{
-  "name": "topupweb-root",
-  "version": "1.0.0",
-  "private": true,
-  "scripts": {
-    "build": "cd frontend && npm install && npm run build && node -e \"const fs=require('fs'); fs.cpSync('dist', '../dist', {recursive:true})\""
-  }
-}

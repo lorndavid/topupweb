@@ -16,7 +16,7 @@ concurrency:
 jobs:
   deploy:
     name: 🛡️ Build, Deploy & Auto-Rollback
-    runs-on: [self-hosted, linux]
+    runs-on: self-hosted
 
     steps:
       - name: 🚀 Pull, Build & Auto-Rollback on Debian

@@ -70,21 +70,6 @@ Add these in **GitHub repo → Settings → Secrets and variables → Actions**:
 
 ---
 
-## 🛑 How to Prevent Vercel from Building on Backend Commits
-
-In Vercel, you can ensure that commits that only touch `backend/` do not waste Vercel build minutes:
-
-1. In your Vercel Project Settings for **`vidtopup.store`**:
-   - Go to **Settings** → **Git** → **Ignored Build Step**.
-   - Select **Custom** and enter:
-     ```bash
-     git diff --quiet HEAD^ HEAD ./
-     ```
-   - Click **Save**.
-2. Do the exact same for **`admin.vidtopup.store`**.
-
-When a commit only touches `backend/**`, Vercel runs this check, detects 0 changes in the frontend directory, and skips the build automatically!
-
 ## Step 1 — Generate a Dedicated CI Key Pair
 
 Generate the key **on your local Windows machine** (Git Bash or PowerShell). Use a **dedicated key for CI** — never reuse your personal SSH key.

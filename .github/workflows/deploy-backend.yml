@@ -1,104 +1,88 @@
-name: Deploy Backend (Docker)
+name: 🚀 Deploy Backend to Debian VPS
 
 on:
   push:
     branches: [main]
     paths:
       - 'backend/**'
+      - 'docker-compose.backend.yml'
       - '.github/workflows/deploy-backend.yml'
-  workflow_dispatch:
+  workflow_dispatch: # Allows manual trigger from GitHub Actions tab
 
 concurrency:
-  group: deploy-backend
-  cancel-in-progress: true
+  group: deploy-backend-production
+  cancel-in-progress: false
 
 jobs:
-  notify-start:
+  deploy:
+    name: 🛡️ Build, Deploy & Auto-Rollback
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v4
-      - uses: ./.github/actions/telegram-notify
+      - name: 🔐 Execute Safe Deployment on Debian Server
+        uses: appleboy/ssh-action@v1.2.0
         with:
-          bot-token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          chat-id: ${{ secrets.TELEGRAM_CHAT_ID }}
-          status: started
-          repo: topupweb
-          workflow: Deploy Backend
-          commit-sha: ${{ github.sha }}
-
-  build-and-deploy:
-    needs: notify-start
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Login to Docker Hub
-        uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
-
-      - name: Build and push Docker image
-        uses: docker/build-push-action@v5
-        with:
-          context: ./backend
-          file: ./backend/Dockerfile
-          push: true
-          tags: ${{ secrets.DOCKER_USERNAME }}/vidtopup-backend:latest,${{ secrets.DOCKER_USERNAME }}/vidtopup-backend:${{ github.sha }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      - name: Deploy to VPS via SSH
-        uses: appleboy/ssh-action@v1
-        with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USERNAME }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          port: ${{ secrets.SSH_PORT || '22' }}
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER || 'root' }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          port: ${{ secrets.SERVER_PORT || '22' }}
+          script_stop: true
           script: |
-            set -e
-
-            cd /var/www/topup-api
-
-            # Backend-only stack (frontends are on Vercel)
-            docker compose -f docker-compose.backend.yml pull backend
-
-            # Restart backend container only
-            docker compose -f docker-compose.backend.yml up -d --no-deps backend
-
-            # Health check
-            for i in $(seq 1 30); do
-              if curl -sf http://localhost:3001/api/health > /dev/null 2>&1; then
-                echo "✅ Backend healthy"
-                exit 0
+            set -euo pipefail
+            
+            cd /opt/topupweb
+            
+            echo "📌 Recording current healthy commit..."
+            PREV_COMMIT=$(git rev-parse HEAD)
+            echo "Current commit on server: $PREV_COMMIT"
+            
+            # ─── Rollback function if anything fails ─────────────────────────
+            rollback() {
+              echo "🚨 DEPLOYMENT FAILED! Initiating automatic rollback to $PREV_COMMIT..."
+              git reset --hard "$PREV_COMMIT"
+              echo "🔄 Rebuilding previous working backend image..."
+              docker compose -f docker-compose.backend.yml up -d --build --no-deps backend
+              
+              echo "⏳ Verifying service after rollback..."
+              sleep 5
+              if curl -sf http://127.0.0.1:3001/api/health > /dev/null 2>&1; then
+                echo "✅ Successfully rolled back to $PREV_COMMIT! Service is online."
+              else
+                echo "❌ CRITICAL: Service still failing after rollback. Inspect with 'docker logs vidtopup-backend'."
               fi
-              echo "Waiting... ($i/30)"
-              sleep 2
+              exit 1
+            }
+            
+            trap rollback ERR
+            
+            echo "📥 Fetching and syncing latest commit from main..."
+            git fetch origin main
+            git reset --hard origin/main
+            NEW_COMMIT=$(git rev-parse HEAD)
+            echo "Target commit to deploy: $NEW_COMMIT"
+            
+            echo "🏗️ Building and deploying backend container..."
+            # Only rebuilds backend without restarting MongoDB or Cloudflare Tunnel
+            docker compose -f docker-compose.backend.yml up -d --build --no-deps backend
+            
+            echo "🩺 Running health checks (waiting up to 45s)..."
+            HEALTHY=false
+            for i in $(seq 1 15); do
+              sleep 3
+              if curl -sf http://127.0.0.1:3001/api/health > /dev/null 2>&1; then
+                HEALTHY=true
+                echo "✅ Health check passed! (attempt $i/15)"
+                break
+              fi
+              echo "Waiting for backend to be ready... ($i/15)"
             done
-            echo "❌ Health check failed after 60s"
-            exit 1
-
-      - name: Notify success
-        if: success()
-        uses: ./.github/actions/telegram-notify
-        with:
-          bot-token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          chat-id: ${{ secrets.TELEGRAM_CHAT_ID }}
-          status: success
-          repo: topupweb
-          workflow: Deploy Backend
-          commit-sha: ${{ github.sha }}
-
-      - name: Notify failure
-        if: failure()
-        uses: ./.github/actions/telegram-notify
-        with:
-          bot-token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          chat-id: ${{ secrets.TELEGRAM_CHAT_ID }}
-          status: failed
-          repo: topupweb
-          workflow: Deploy Backend
-          commit-sha: ${{ github.sha }}
+            
+            if [ "$HEALTHY" = false ]; then
+              echo "❌ Health check timed out! Releasing failure..."
+              false
+            fi
+            
+            echo "🧹 Cleaning up dangling Docker images..."
+            docker image prune -f > /dev/null 2>&1 || true
+            
+            echo "🎉 Deployment successfully completed! Running commit: $NEW_COMMIT"

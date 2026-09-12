@@ -772,7 +772,6 @@ function selectSavedPlayer(saved: ReturnType<typeof getByGame>[number]) {
   playerRegion.value = saved.region || null
   playerGameTitle.value = saved.gameTitle || null
   verifyError.value = null
-  toast.success(`Welcome back, ${saved.nickname}!`)
 
   // Scroll to show the verified result card
   if (resultRef.value) {

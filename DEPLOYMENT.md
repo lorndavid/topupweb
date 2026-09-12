@@ -1,77 +1,89 @@
-# 🚀 Deployment Guide
+# 🚀 System Architecture & CI/CD Deployment Guide
 
-How the **VidTopUp** system is deployed, how to connect GitHub Actions to your servers, and how to set up every secret needed for auto-deploy on push to `main`.
-
-> 💡 This file is the companion to the CI/CD status badges in [README.md](README.md).
+This document describes the automated deployment architecture for **VidTopUp**, including intelligent path filtering (frontend/admin to Vercel, backend to Debian VPS) and automated rollback safety.
 
 ---
 
-## 📦 Deployment Targets
+## 🏗️ System Architecture & CI/CD Routing
 
-| Project | Package | Target | Auto-deploy on push to `main` touching |
-|---|---|---|---|
-| **Frontend** (customer site) | `frontend/` | **Vercel** → `vidtopup.store` | `frontend/**` |
-| **Admin** (dashboard) | `frontend-admin/` | **Vercel** → `admin.vidtopup.store` | `frontend-admin/**` |
-| **Backend** (API) | `backend/` | **Docker on Debian 12 VM** → `api.vidtopup.store` | `backend/**` |
+```mermaid
+flowchart TD
+    subgraph Git ["GitHub Repository: lorndavid/topupweb"]
+        P[Developer pushes commit to main]
+    end
 
-Workflows live in `.github/workflows/`:
+    subgraph Router ["Intelligent Path Filtering"]
+        P -->|Touches frontend/**| V_FE[Vercel: vidtopup.store]
+        P -->|Touches frontend-admin/**| V_ADM[Vercel: admin.vidtopup.store]
+        P -->|Touches backend/** or compose| GHA[GitHub Actions: deploy-backend.yml]
+    end
 
-- `deploy-frontend.yml` — build → `vercel deploy --prebuilt --prod` → smoke test
-- `deploy-admin.yml` — build → `vercel deploy --prebuilt --prod` → smoke test
-- `deploy-backend.yml` — build Docker image → push to registry → SSH into VM → `docker compose pull` + `up -d` → health check → Telegram notify
-- `rollback.yml` — manual emergency rollback (trigger from the Actions tab)
-- `.github/actions/telegram-notify/action.yml` — reusable deploy alerts (start / success / failed / rollback)
+    subgraph Vercel ["Vercel Edge Platform"]
+        V_FE --> D_FE["Customer Web App\n(vidtopup.store)"]
+        V_ADM --> D_ADM["Admin Dashboard\n(admin.vidtopup.store)"]
+    end
 
----
+    subgraph Debian ["Debian VPS (root@debian:/opt/topupweb)"]
+        GHA --> SSH[SSH Connection via Secrets]
+        SSH --> PREV[Record PREV_COMMIT]
+        PREV --> BUILD[Rebuild Backend Container]
+        BUILD --> HEALTH{Health Check\n/api/health}
+        HEALTH -->|Pass| DONE[Prune Cache & Success ✅]
+        HEALTH -->|Fail| ROLLBACK[Automatic Rollback to PREV_COMMIT 🚨]
+    end
 
-## 🔑 GitHub Actions Secrets (Complete List)
-
-Add these under **GitHub repo → Settings → Secrets and variables → Actions**.
-
-| Secret | Used by | Description |
-|---|---|---|
-| `VERCEL_TOKEN` | frontend, admin | Vercel API token that authenticates every `vercel` CLI command |
-| `VERCEL_ORG_ID` | frontend, admin | Your Vercel team/account ID (`orgId` from `.vercel/project.json`) |
-| `VERCEL_PROJECT_ID_FRONTEND` | frontend | `projectId` from `frontend/.vercel/project.json` |
-| `VERCEL_PROJECT_ID_ADMIN` | admin | `projectId` from `frontend-admin/.vercel/project.json` |
-| `SSH_HOST` | backend | Your Debian VM's IP or hostname |
-| `SSH_USERNAME` | backend | SSH user on the VM (e.g. `david`) |
-| `SSH_PRIVATE_KEY` | backend | **Private** key of the dedicated CI key pair (see below) |
-| `SSH_PORT` | backend | Optional — defaults to `22` if not set |
-| `TELEGRAM_BOT_TOKEN` | all | Bot token from [@BotFather](https://t.me/BotFather) — deploy alerts |
-| `TELEGRAM_CHAT_ID` | all | Chat ID from [@userinfobot](https://t.me/userinfobot) |
-
-> ⚠️ Add secrets **without extra spaces** around the values — trailing whitespace is a common cause of "secret not found" style failures.
-
----
-
-# 🔐 SSH Key Setup: GitHub Actions → Debian 12
-
-This connects the `deploy-backend.yml` workflow to your VM so every push to `main` can deploy the backend via **Docker**. Docker is required on the VM.
-
-## How the Workflow Uses the Key
-
-`deploy-backend-docker.yml` does this on every run:
-
-```bash
-# Connect via SSH, pull the new Docker image, restart the container
-ssh -i ~/.ssh/deploy_key -p ${{ env.SSH_PORT }} \
-  ${{ env.SSH_USERNAME }}@${{ env.SSH_HOST }} "bash -s" << 'DEPLOY_SCRIPT'
-  cd /var/www/topup-api
-  docker compose pull backend
-  docker compose up -d --no-deps backend
-  sleep 10
-  curl -f http://localhost:3001/api/health
-DEPLOY_SCRIPT
+    subgraph Network ["Public Network & Cloudflare"]
+        D_FE -->|API Calls| API_ENTRY["api.vidtopup.store"]
+        D_ADM -->|API Calls| API_ENTRY
+        API_ENTRY --> CFT["Cloudflare Tunnel (vidtopup-api)"]
+        CFT -->|Internal Bridge| BE_CONT["vidtopup-backend:3001"]
+        BE_CONT -->|Internal Network| MONGO["vidtopup-mongo:27017"]
+    end
 ```
 
-What that means for you:
+---
 
-- **GitHub** needs the **private key** → stored as the `SSH_PRIVATE_KEY` secret
-- **Your Debian VM** needs the matching **public key** → in `~/.ssh/authorized_keys`
-- **`SSH_USERNAME`** must be the user the workflow logs in as (e.g. `david`)
-- **Docker + Docker Compose must be installed and running** on the VM
-- The VM needs `docker-compose.yml` + `.env` at `/var/www/topup-api/`
+## 📦 Deployment Matrix & Path Rules
+
+| Component | Target Location | Trigger Path | Deployment Method | Safety / Rollback |
+|---|---|---|---|---|
+| **Customer Frontend** | Vercel (`vidtopup.store`) | `frontend/**` | Native Vercel Git Integration | Instant rollback via Vercel Dashboard |
+| **Admin Dashboard** | Vercel (`admin.vidtopup.store`) | `frontend-admin/**` | Native Vercel Git Integration | Instant rollback via Vercel Dashboard |
+| **Backend API** | Debian VPS (`api.vidtopup.store`) | `backend/**`<br>`docker-compose.backend.yml` | GitHub Actions SSH Runner | **Automatic rollback to previous healthy commit** on healthcheck timeout |
+
+> 💡 **Intelligent Isolation**:
+> - If you modify **only** frontend code, the Debian server is **never touched**.
+> - If you modify **only** backend code, GitHub Actions deploys the VPS and Vercel builds are skipped.
+
+---
+
+## 🔑 GitHub Actions Secrets for Debian VPS
+
+Add these in **GitHub repo → Settings → Secrets and variables → Actions**:
+
+| Secret Name | Accepted Fallbacks | Description |
+|---|---|---|
+| **`SERVER_HOST`** | `SSH_HOST` | Debian VPS Public IP (e.g. `175.100.79.44`) |
+| **`SERVER_USER`** | `SSH_USERNAME` | SSH user on Debian (defaults to `root`) |
+| **`SERVER_SSH_KEY`** | `SSH_KEY`, `SSH_PRIVATE_KEY` | Private SSH key for GitHub Actions login |
+| **`SERVER_PORT`** | `SSH_PORT` | SSH port (defaults to `22`) |
+
+---
+
+## 🛑 How to Prevent Vercel from Building on Backend Commits
+
+In Vercel, you can ensure that commits that only touch `backend/` do not waste Vercel build minutes:
+
+1. In your Vercel Project Settings for **`vidtopup.store`**:
+   - Go to **Settings** → **Git** → **Ignored Build Step**.
+   - Select **Custom** and enter:
+     ```bash
+     git diff --quiet HEAD^ HEAD ./
+     ```
+   - Click **Save**.
+2. Do the exact same for **`admin.vidtopup.store`**.
+
+When a commit only touches `backend/**`, Vercel runs this check, detects 0 changes in the frontend directory, and skips the build automatically!
 
 ## Step 1 — Generate a Dedicated CI Key Pair
 

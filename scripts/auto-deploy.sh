@@ -13,11 +13,10 @@ set -u
 REPO_DIR="/opt/topupweb"
 cd "$REPO_DIR" || exit 1
 
-# Load environment variables (for Telegram bot keys)
+# Load environment variables (supports existing TELEGRAM_BOT_TOKEN or dedicated DEPLOY_TELEGRAM_BOT_TOKEN)
 if [ -f "$REPO_DIR/.env" ]; then
-  # Export only TELEGRAM variables safely
-  export TELEGRAM_BOT_TOKEN=$(grep -E '^TELEGRAM_BOT_TOKEN=' "$REPO_DIR/.env" | cut -d '=' -f2- | tr -d '\r"' || true)
-  export TELEGRAM_CHAT_ID=$(grep -E '^TELEGRAM_CHAT_ID=' "$REPO_DIR/.env" | cut -d '=' -f2- | tr -d '\r"' || true)
+  export TELEGRAM_BOT_TOKEN=$(grep -E '^(DEPLOY_TELEGRAM_BOT_TOKEN|TELEGRAM_BOT_TOKEN)=' "$REPO_DIR/.env" | head -n 1 | cut -d '=' -f2- | tr -d '\r"' || true)
+  export TELEGRAM_CHAT_ID=$(grep -E '^(DEPLOY_TELEGRAM_CHAT_ID|TELEGRAM_CHAT_ID)=' "$REPO_DIR/.env" | head -n 1 | cut -d '=' -f2- | tr -d '\r"' || true)
 fi
 
 send_telegram() {

@@ -43,18 +43,31 @@ app.use(
     origin: (origin, callback) => {
       // Allow requests with no origin (e.g., mobile apps, curl, server-to-server)
       if (!origin) return callback(null, true);
-      // Allow any of the configured origins (exact match or subdomain match)
-      if (allowedOrigins.some((o) => origin.startsWith(o))) {
-        return callback(null, true);
+      try {
+        const { hostname } = new URL(origin);
+        // Allow all *.vercel.app deployments, vidtopup.store and its subdomains, and local dev
+        if (
+          hostname === 'localhost' ||
+          hostname === '127.0.0.1' ||
+          hostname === 'vidtopup.store' ||
+          hostname.endsWith('.vidtopup.store') ||
+          hostname.endsWith('.vercel.app') ||
+          allowedOrigins.some((o) => origin.startsWith(o))
+        ) {
+          return callback(null, true);
+        }
+      } catch {
+        // In case of non-standard URL, fallback to allowedOrigins check
+        if (allowedOrigins.some((o) => origin.startsWith(o))) {
+          return callback(null, true);
+        }
       }
-      // Unknown origin: respond WITHOUT CORS headers instead of throwing.
-      // Browsers block the response themselves; throwing here produced a
-      // misleading 500 on every cross-origin request.
       console.warn(`🚫 CORS blocked origin: ${origin}`);
       return callback(null, false);
     },
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
-    allowedHeaders: ['Content-Type', 'Accept', 'Authorization'],
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Accept', 'Authorization', 'X-Requested-With'],
   })
 );
 

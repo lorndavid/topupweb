@@ -1,6 +1,6 @@
 {
   "name": "topup-backend",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Game Top-up Backend API",
   "main": "dist/server.js",
   "scripts": {

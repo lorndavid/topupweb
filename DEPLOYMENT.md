@@ -23,9 +23,9 @@ flowchart TD
         V_ADM --> D_ADM["Admin Dashboard\n(admin.vidtopup.store)"]
     end
 
-    subgraph Debian ["Debian VPS (root@debian:/opt/topupweb)"]
-        GHA --> SSH[SSH Connection via Secrets]
-        SSH --> PREV[Record PREV_COMMIT]
+    subgraph Debian ["Debian VPS (Self-Hosted Runner)"]
+        GHA --> RUNNER["GitHub Actions Runner\n(Outbound HTTPS - Zero Open Ports)"]
+        RUNNER --> PREV[Record PREV_COMMIT]
         PREV --> BUILD[Rebuild Backend Container]
         BUILD --> HEALTH{Health Check\n/api/health}
         HEALTH -->|Pass| DONE[Prune Cache & Success ✅]

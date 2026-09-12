@@ -1461,13 +1461,14 @@ onUnmounted(() => {
           role="dialog"
           aria-modal="true"
           aria-labelledby="khqr-dialog-title"
-          class="fixed top-[50%] left-[50%] z-50 grid max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 rounded-lg border-none bg-transparent p-0 shadow-none outline-none w-[calc(100%-2rem)] sm:max-w-[360px] pointer-events-auto duration-200 ease-out"
+          class="fixed top-[50%] left-[50%] z-50 grid max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-lg border duration-200 ease-out outline-none w-[calc(100%-2rem)] border-none bg-transparent p-0 shadow-none sm:max-w-[360px] pointer-events-auto"
           tabindex="-1"
+          style="pointer-events: auto;"
         >
           <h2 id="khqr-dialog-title" class="text-lg leading-none font-semibold sr-only">Checkout</h2>
 
           <!-- Redesigned Clean KHQR Card -->
-          <div class="mx-auto w-full max-w-[360px] overflow-hidden rounded-[2rem] bg-white font-sans shadow-2xl border border-gray-100/60">
+          <div class="mx-auto w-full max-w-[360px] overflow-hidden rounded-[2rem] bg-white font-sans shadow-2xl">
             
             <!-- Red Header with Close Button and KHQR Logo -->
             <div class="relative flex h-14 items-center justify-center px-6 bg-[#e41e26]">
@@ -1515,11 +1516,11 @@ onUnmounted(() => {
             </div>
 
             <!-- QR Code and Scanning Body -->
-            <div class="flex min-h-[240px] flex-col items-center justify-center px-6 pb-6 pt-2">
+            <div class="flex min-h-[240px] flex-col items-center justify-center px-6 pb-8">
               <div class="flex w-full flex-col items-center">
                 
                 <!-- QR Code Box -->
-                <div class="relative mt-3 aspect-square w-full max-w-[240px] flex items-center justify-center">
+                <div class="relative mt-5 aspect-square w-full flex items-center justify-center">
                   <!-- Loading State -->
                   <div v-if="mobileQrLoading" class="flex flex-col items-center justify-center py-10">
                     <svg class="w-10 h-10 text-[#e41e26] animate-spin" fill="none" viewBox="0 0 24 24">
@@ -1569,26 +1570,27 @@ onUnmounted(() => {
                 <!-- Instruction Subtitle -->
                 <p class="mt-3 text-xs text-gray-400 text-center">Scan with any KHQR-enabled banking app</p>
 
-                <!-- Deep Link Button for Mobile or ABA PayWay -->
-                <div v-if="mobileCheckoutUrl" class="w-full mt-3">
-                  <a
-                    :href="mobileCheckoutUrl"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    class="flex items-center justify-center gap-2 w-full py-2.5 px-4 bg-[#e41e26] hover:bg-red-700 text-white font-semibold text-xs rounded-xl shadow-md shadow-red-500/20 hover:shadow-red-500/30 transition-all active:scale-[0.98]"
-                  >
-                    <span>Open in ABA Mobile</span>
-                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                    </svg>
-                  </a>
-                </div>
+                <!-- Deep Link Button for Mobile or ABA App -->
+                <a
+                  v-if="mobileCheckoutUrl"
+                  :href="mobileCheckoutUrl"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-[#0d6087] py-3.5 text-sm font-semibold text-white transition hover:bg-[#0b5075] active:scale-[0.98] shadow-md shadow-[#0d6087]/20"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-external-link h-4 w-4">
+                    <path d="M15 3h6v6"></path>
+                    <path d="M10 14 21 3"></path>
+                    <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+                  </svg>
+                  Open ABA App
+                </a>
 
                 <!-- Payment Reference with Copy Action -->
                 <div
                   v-if="mobilePaymentRef"
                   @click="copyPaymentRef"
-                  class="mt-2.5 flex items-center gap-1 text-[11px] text-gray-400 hover:text-gray-600 cursor-pointer select-none transition-colors"
+                  class="mt-3 flex items-center gap-1 text-[11px] text-gray-400 hover:text-gray-600 cursor-pointer select-none transition-colors"
                   title="Click to copy payment reference"
                 >
                   <span>Ref: {{ mobilePaymentRef }}</span>

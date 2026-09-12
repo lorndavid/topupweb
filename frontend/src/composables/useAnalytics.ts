@@ -118,7 +118,8 @@ export function useAnalytics() {
     const batch = buffer.splice(0)
     try {
       const blob = new Blob([JSON.stringify(batch)], { type: 'application/json' })
-      navigator.sendBeacon('/api/analytics/track', blob)
+      const endpoint = `${api.defaults.baseURL || '/api'}/analytics/track`
+      navigator.sendBeacon(endpoint, blob)
     } catch {
       // Silently drop
     }

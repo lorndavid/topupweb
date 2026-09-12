@@ -10,7 +10,14 @@
  * endpoint is unauthenticated, but the admin API interceptor will
  * attach the token if available).
  */
-const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api'
+function getBaseUrl(): string {
+  const envUrl = import.meta.env.VITE_API_BASE_URL
+  if (!envUrl) return '/api'
+  const trimmed = envUrl.replace(/\/+$/, '')
+  return trimmed.endsWith('/api') ? trimmed : `${trimmed}/api`
+}
+
+const API_BASE = getBaseUrl()
 
 let initialized = false
 

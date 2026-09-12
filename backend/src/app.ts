@@ -62,8 +62,8 @@ app.use(
 // IMPORTANT: Capture raw body for CutLuy webhook signature verification BEFORE JSON parsing.
 // We use express.raw() for just the CutLuy route, which preserves the raw Buffer.
 // Then we manually parse it as JSON so the route handler gets both req.body and req.rawBody.
-app.use('/api/webhooks/cutluy', express.raw({ type: '*/*', limit: '1mb' }));
-app.use('/api/webhooks/cutluy', (req, _res, next) => {
+app.use(['/api/webhooks/cutluy', '/webhooks/cutluy'], express.raw({ type: '*/*', limit: '1mb' }));
+app.use(['/api/webhooks/cutluy', '/webhooks/cutluy'], (req, _res, next) => {
   try {
     // Save the raw body as string for signature verification
     (req as any).rawBody = (req.body as Buffer).toString('utf8');
@@ -87,7 +87,7 @@ if (config.isDev) {
 app.get('/sitemap.xml', generateSitemap);
 
 // Health check
-app.get('/api/health', (_req, res) => {
+app.get(['/api/health', '/health'], (_req, res) => {
   res.json({
     success: true,
     message: 'Server is running',
@@ -96,7 +96,9 @@ app.get('/api/health', (_req, res) => {
 });
 
 // API Routes (rate limited)
+// Mounted on both /api and / to handle client requests seamlessly with or without /api prefix
 app.use('/api', globalApiLimiter, routes);
+app.use('/', globalApiLimiter, routes);
 
 // Error handling
 app.use(notFoundHandler);

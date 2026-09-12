@@ -1,4 +1,4 @@
-name: 🚀 Deploy Backend to Debian VPS
+name: 🚀 Deploy Backend & Health Check
 
 on:
   push:
@@ -7,75 +7,43 @@ on:
       - 'backend/**'
       - 'docker-compose.backend.yml'
       - '.github/workflows/deploy-backend.yml'
-  workflow_dispatch: # Allows manual trigger from GitHub Actions tab
+  workflow_dispatch:
 
 concurrency:
   group: deploy-backend-production
   cancel-in-progress: false
 
 jobs:
-  deploy:
-    name: 🛡️ Build, Deploy & Auto-Rollback
-    runs-on: self-hosted
+  verify:
+    name: 🛡️ Verify Production Health & Auto-Rollback
+    runs-on: ubuntu-latest
 
     steps:
-      - name: 🚀 Pull, Build & Auto-Rollback on Debian
+      - name: ⏳ Wait for Debian VPS to Auto-Deploy & Sync
         run: |
-          set -euo pipefail
-          
-          cd /opt/topupweb
-            
-            echo "📌 Recording current healthy commit..."
-            PREV_COMMIT=$(git rev-parse HEAD)
-            echo "Current commit on server: $PREV_COMMIT"
-            
-            # ─── Rollback function if anything fails ─────────────────────────
-            rollback() {
-              echo "🚨 DEPLOYMENT FAILED! Initiating automatic rollback to $PREV_COMMIT..."
-              git reset --hard "$PREV_COMMIT"
-              echo "🔄 Rebuilding previous working backend image..."
-              docker compose -f docker-compose.backend.yml up -d --build --no-deps backend
-              
-              echo "⏳ Verifying service after rollback..."
-              sleep 5
-              if curl -sf http://127.0.0.1:3001/api/health > /dev/null 2>&1; then
-                echo "✅ Successfully rolled back to $PREV_COMMIT! Service is online."
-              else
-                echo "❌ CRITICAL: Service still failing after rollback. Inspect with 'docker logs vidtopup-backend'."
-              fi
-              exit 1
-            }
-            
-            trap rollback ERR
-            
-            echo "📥 Fetching and syncing latest commit from main..."
-            git fetch origin main
-            git reset --hard origin/main
-            NEW_COMMIT=$(git rev-parse HEAD)
-            echo "Target commit to deploy: $NEW_COMMIT"
-            
-            echo "🏗️ Building and deploying backend container..."
-            # Only rebuilds backend without restarting MongoDB or Cloudflare Tunnel
-            docker compose -f docker-compose.backend.yml up -d --build --no-deps backend
-            
-            echo "🩺 Running health checks (waiting up to 45s)..."
-            HEALTHY=false
-            for i in $(seq 1 15); do
-              sleep 3
-              if curl -sf http://127.0.0.1:3001/api/health > /dev/null 2>&1; then
-                HEALTHY=true
-                echo "✅ Health check passed! (attempt $i/15)"
-                break
-              fi
-              echo "Waiting for backend to be ready... ($i/15)"
-            done
-            
-            if [ "$HEALTHY" = false ]; then
-              echo "❌ Health check timed out! Releasing failure..."
-              false
+          echo "Waiting 30s for Debian auto-deploy daemon to pull and rebuild..."
+          sleep 30
+
+      - name: 🩺 Check Production API Health
+        run: |
+          echo "Verifying live endpoint: https://api.vidtopup.store/api/health"
+          HEALTHY=false
+          for i in $(seq 1 12); do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://api.vidtopup.store/api/health || true)
+            if [ "$STATUS" = "200" ]; then
+              HEALTHY=true
+              echo "✅ Health check passed with HTTP 200! (attempt $i/12)"
+              break
             fi
-            
-            echo "🧹 Cleaning up dangling Docker images..."
-            docker image prune -f > /dev/null 2>&1 || true
-            
-            echo "🎉 Deployment successfully completed! Running commit: $NEW_COMMIT"
+            echo "Waiting for live API... HTTP status: $STATUS ($i/12)"
+            sleep 5
+          done
+
+          if [ "$HEALTHY" = false ]; then
+            echo "❌ Production API health check failed!"
+            exit 1
+          fi
+
+      - name: 🎉 Deployment Verified
+        run: |
+          echo "✅ Backend production API is healthy and operational!"

@@ -1,0 +1,17 @@
+[Unit]
+Description=VidTopUp Automated Deployment & Rollback Service
+After=network.target docker.service
+Requires=docker.service
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/topupweb
+ExecStart=/bin/bash -c "while true; do /bin/bash /opt/topupweb/scripts/auto-deploy.sh; sleep 20; done"
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

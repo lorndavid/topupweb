@@ -140,10 +140,13 @@ jobs:
     steps:
       - name: 🌐 Check homepage loads
         run: |
-          curl -s -o /dev/null -w "HTTP %{http_code}" \
-            https://vidtopup.store/ | grep -q "200\|301\|302" && \
-            echo "✅ Homepage OK" || \
-            (echo "❌ Homepage failed" && exit 1)
+          HTTP_CODE=$(curl -s -L -o /dev/null -w "%{http_code}" https://vidtopup.store/)
+          echo "Homepage returned HTTP $HTTP_CODE"
+          if [[ "$HTTP_CODE" =~ ^(200|301|302|307|308)$ ]]; then
+            echo "✅ Homepage OK"
+          else
+            echo "❌ Homepage failed (HTTP $HTTP_CODE)" && exit 1
+          fi
 
       - name: 🌐 Check sitemap (backend, through Cloudflare)
         run: |

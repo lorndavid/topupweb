@@ -140,7 +140,10 @@ jobs:
     steps:
       - name: 🌐 Check admin loads (SPA root serves index.html)
         run: |
-          curl -s -o /dev/null -w "HTTP %{http_code}" \
-            https://admin.vidtopup.store/ | grep -q "200\|301\|302" && \
-            echo "✅ Admin OK" || \
-            (echo "❌ Admin failed" && exit 1)
+          HTTP_CODE=$(curl -s -L -o /dev/null -w "%{http_code}" https://admin.vidtopup.store/)
+          echo "Admin returned HTTP $HTTP_CODE"
+          if [[ "$HTTP_CODE" =~ ^(200|301|302|307|308)$ ]]; then
+            echo "✅ Admin OK"
+          else
+            echo "❌ Admin failed (HTTP $HTTP_CODE)" && exit 1
+          fi

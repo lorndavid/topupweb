@@ -16,21 +16,14 @@ concurrency:
 jobs:
   deploy:
     name: 🛡️ Build, Deploy & Auto-Rollback
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux]
 
     steps:
-      - name: 🔐 Execute Safe Deployment on Debian Server
-        uses: appleboy/ssh-action@v1.2.0
-        with:
-          host: ${{ secrets.SERVER_HOST || secrets.SSH_HOST }}
-          username: ${{ secrets.SERVER_USER || secrets.SSH_USERNAME || 'root' }}
-          key: ${{ secrets.SERVER_SSH_KEY || secrets.SSH_KEY || secrets.SSH_PRIVATE_KEY }}
-          port: ${{ secrets.SERVER_PORT || secrets.SSH_PORT || '22' }}
-          script_stop: true
-          script: |
-            set -euo pipefail
-            
-            cd /opt/topupweb
+      - name: 🚀 Pull, Build & Auto-Rollback on Debian
+        run: |
+          set -euo pipefail
+          
+          cd /opt/topupweb
             
             echo "📌 Recording current healthy commit..."
             PREV_COMMIT=$(git rev-parse HEAD)

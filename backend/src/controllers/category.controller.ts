@@ -36,6 +36,7 @@ export async function getCategories(
 ): Promise<void> {
   try {
     const categories = await bay2gameService.getCategories();
+    res.set('Cache-Control', 'public, max-age=180, stale-while-revalidate=600');
     res.status(HTTP_STATUS.OK).json({
       success: true,
       message: 'Categories fetched successfully',
@@ -64,6 +65,7 @@ export async function getCambodiaGames(
       (g) => !FEATURED_GAME_CODES.includes(g.game_code)
     );
 
+    res.set('Cache-Control', 'public, max-age=180, stale-while-revalidate=600');
     res.status(HTTP_STATUS.OK).json({
       success: true,
       message: 'All games fetched successfully',
@@ -93,6 +95,7 @@ export async function getProductsByGame(
     // Track price changes (non-blocking — runs in background)
     trackPricesAsync(gameCode, productsWithMargin);
 
+    res.set('Cache-Control', 'public, max-age=180, stale-while-revalidate=600');
     res.status(HTTP_STATUS.OK).json({
       success: true,
       message: 'Products fetched successfully',

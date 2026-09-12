@@ -8,6 +8,7 @@ import Navbar from '@/components/Navbar.vue'
 import Footer from '@/components/Footer.vue'
 import ToastContainer from '@/components/ToastContainer.vue'
 import InstallPrompt from '@/components/InstallPrompt.vue'
+import AppUpdateBanner from '@/components/AppUpdateBanner.vue'
 import AnnouncementBanner from '@/components/AnnouncementBanner.vue'
 import { usePushNotifications } from '@/composables/usePushNotifications'
 import gsap from 'gsap'
@@ -223,6 +224,7 @@ onMounted(() => {
     <Footer />
     <ToastContainer />
     <InstallPrompt />
+    <AppUpdateBanner />
   </div>
 </template>
 

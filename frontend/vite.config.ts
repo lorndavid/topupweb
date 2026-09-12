@@ -7,7 +7,7 @@ export default defineConfig({
   plugins: [
     vue(),
     VitePWA({
-      registerType: 'autoUpdate',
+      registerType: 'prompt',
       includeAssets: ['apple-splash-*.png', 'apple-touch-icon-*.png', 'maskable-icon-*.png', 'pwa-*.png', 'favicon.ico'],
       strategies: 'injectManifest',
       srcDir: 'src',

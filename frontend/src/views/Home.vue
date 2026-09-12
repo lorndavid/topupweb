@@ -2,9 +2,10 @@
 import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useGameStore } from '@/stores/game'
-import { getCambodiaGames } from '@/services/api'
+import { getCambodiaGames, getProducts } from '@/services/api'
+import { clientCache } from '@/utils/clientCache'
 import LoadingSkeleton from '@/components/LoadingSkeleton.vue'
-import type { GameCategory } from '@/types'
+import type { GameCategory, CambodiaGamesResponse } from '@/types'
 import gsap from 'gsap'
 import { useAnalytics } from '@/composables/useAnalytics'
 
@@ -323,19 +324,62 @@ function navigateToGame(gameCode: string) {
   router.push(`/game/${gameCode}`)
 }
 
-// ─── Data fetching ───
-async function fetchData() {
-  loading.value = true
+// ─── Data fetching (with Instant 0ms SWR Client Cache) ───
+async function fetchData(forceRefresh: boolean | unknown = false) {
+  const isForced = typeof forceRefresh === 'boolean' ? forceRefresh : false
+  // 1. Check client cache first for 0ms instant display
+  const cached = clientCache.get<CambodiaGamesResponse>('cambodia_games')
+  if (cached && !isForced) {
+    featured.value = cached.data.featured
+    others.value = cached.data.others
+    gameStore.categories = [...cached.data.featured, ...cached.data.others]
+    loading.value = false
+
+    // Pre-warm top games products in background during idle time
+    warmTopGamesCache()
+
+    // If cache is fresh, skip network call entirely to protect server
+    if (!cached.isStale) return
+  } else if (!featured.value.length && !others.value.length) {
+    loading.value = true
+  }
+
   error.value = null
   try {
     const data = await getCambodiaGames()
     featured.value = data.featured
     others.value = data.others
     gameStore.categories = [...data.featured, ...data.others]
+    clientCache.set('cambodia_games', data, 15 * 60 * 1000) // 15 mins TTL
+    warmTopGamesCache()
   } catch (err) {
-    error.value = err instanceof Error ? err.message : 'Failed to load games'
+    if (!featured.value.length && !others.value.length) {
+      error.value = err instanceof Error ? err.message : 'Failed to load games'
+    }
   } finally {
     loading.value = false
+  }
+}
+
+// Pre-warm product catalog for top games so clicking on them loads instantly
+function warmTopGamesCache() {
+  if (typeof window === 'undefined') return
+  const topGames = ['mlbb', 'freefire_sgmy', 'pubgm']
+  const runWarm = async () => {
+    for (const code of topGames) {
+      const cached = clientCache.get(`products_${code}`)
+      if (!cached || cached.isStale) {
+        try {
+          const res = await getProducts(code)
+          clientCache.set(`products_${code}`, res, 10 * 60 * 1000)
+        } catch { /* silent background warming */ }
+      }
+    }
+  }
+  if ('requestIdleCallback' in window) {
+    window.requestIdleCallback(() => setTimeout(runWarm, 1000))
+  } else {
+    setTimeout(runWarm, 1500)
   }
 }
 

@@ -35,6 +35,7 @@ export async function getActiveAnnouncements(
       .sort({ created_at: -1 })
       .lean();
 
+    res.set('Cache-Control', 'public, max-age=120, stale-while-revalidate=300');
     return res.json({
       success: true,
       message: 'Active announcements fetched',

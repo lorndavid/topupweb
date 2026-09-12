@@ -423,12 +423,7 @@ function closeBalanceDialog() {
 /** Called after user confirms eligibility in the dialog */
 function proceedWithBalanceCheck() {
   showBalanceDialog.value = false
-  // Resume whichever flow was interrupted
-  if (isMobileFlow.value) {
-    executeMobileCheckout()
-  } else {
-    executeProceedToCheckout()
-  }
+  executePayNow()
 }
 
 const isMobileFlow = ref(false)
@@ -614,20 +609,48 @@ function playSuccessSound() {
   } catch { /* silent */ }
 }
 
-async function handleMobileCheckout() {
-  if (!selectedProduct.value || !playerId.value.trim() || !verified.value) return
+async function copyPaymentRef() {
+  if (!mobilePaymentRef.value) return
+  try {
+    await navigator.clipboard.writeText(mobilePaymentRef.value)
+    toast.success('Payment reference copied to clipboard!')
+  } catch {
+    toast.error('Failed to copy')
+  }
+}
+
+async function handlePayNow() {
+  if (!selectedProduct.value) {
+    toast.warning(i18n.t('detail.toast.selectPackage'))
+    return
+  }
+  if (!playerId.value.trim()) {
+    toast.warning(i18n.t('detail.toast.enterPlayerId'))
+    return
+  }
+  if (!verified.value) {
+    toast.warning(i18n.t('verify.mustVerify'))
+    return
+  }
+  if (needsServerId.value && !serverId.value.trim()) {
+    toast.warning(i18n.t('detail.toast.enterServerId'))
+    return
+  }
 
   // If this package requires balance confirmation, show the dialog first
   if (selectedNeedsBalanceCheck.value) {
-    isMobileFlow.value = true
     openBalanceDialog()
     return
   }
 
-  await executeMobileCheckout()
+  await executePayNow()
 }
 
-async function executeMobileCheckout() {
+// Aliases for template callers
+const handleMobileCheckout = handlePayNow
+const proceedToCheckout = handlePayNow
+
+async function executePayNow() {
   if (!selectedProduct.value || !playerId.value.trim() || !verified.value) return
 
   // Set the order in store first
@@ -682,6 +705,9 @@ async function executeMobileCheckout() {
     mobileQrLoading.value = false
   }
 }
+
+const executeMobileCheckout = executePayNow
+const executeProceedToCheckout = executePayNow
 
 function startMobilePolling() {
   mobilePollInterval = setInterval(async () => {
@@ -779,56 +805,7 @@ function selectSavedPlayer(saved: ReturnType<typeof getByGame>[number]) {
   }
 }
 
-function proceedToCheckout() {
-  if (!selectedProduct.value) {
-    toast.warning(i18n.t('detail.toast.selectPackage'))
-    return
-  }
-  if (!playerId.value.trim()) {
-    toast.warning(i18n.t('detail.toast.enterPlayerId'))
-    return
-  }
-  if (!verified.value) {
-    toast.warning(i18n.t('verify.mustVerify'))
-    return
-  }
-  if (needsServerId.value && !serverId.value.trim()) {
-    toast.warning(i18n.t('detail.toast.enterServerId'))
-    return
-  }
-
-  // If this package requires balance confirmation, show the dialog first
-  if (selectedNeedsBalanceCheck.value) {
-    isMobileFlow.value = false
-    openBalanceDialog()
-    return
-  }
-
-  executeProceedToCheckout()
-}
-
-function executeProceedToCheckout() {
-  if (!selectedProduct.value) return
-
-  gameStore.setOrder({
-    gameName: gameDisplayName.value,
-    gameCode: gameCode.value,
-    productName: selectedProduct.value.name,
-    productCode: selectedProduct.value.product_code,
-    amount: selectedProduct.value.sell_price,
-    playerId: playerId.value.trim(),
-    serverId: serverId.value.trim() || undefined,
-    verifyProvider: verifyProvider.value || undefined,
-  })
-
-  analytics.trackPayment('initiated', {
-    game_code: gameCode.value,
-    product_code: selectedProduct.value.product_code,
-    amount: selectedProduct.value.sell_price,
-  })
-
-  router.push('/checkout')
-}
+// ─── Desktop & Mobile checkout unified into handlePayNow ───
 
 // ─── Lifecycle ───────────────────────────────────────────────
 onMounted(() => {
@@ -1341,20 +1318,26 @@ onUnmounted(() => {
                 </div>
               </Transition>
 
-              <!-- Desktop Proceed to Checkout (hidden on mobile) -->
+              <!-- Desktop Proceed to Pay Now (Unified) -->
               <Transition name="proceed-btn">
                 <button
                   ref="proceedBtnRef"
                   v-if="canProceed"
-                  @click="proceedToCheckout"
-                  class="hidden lg:flex w-full items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-primary-500 to-primary-600 hover:from-primary-600 hover:to-primary-700 text-white font-semibold rounded-xl shadow-lg shadow-primary-500/20 hover:shadow-primary-500/30 transition-all duration-300 active:scale-[0.98] group"
+                  @click="handlePayNow"
+                  class="hidden lg:flex w-full items-center justify-center gap-2 px-6 py-3.5 bg-gradient-to-r from-red-600 to-[#e41e26] hover:from-red-700 hover:to-red-600 text-white font-bold rounded-xl shadow-lg shadow-red-500/25 hover:shadow-red-500/35 transition-all duration-300 active:scale-[0.98] group relative overflow-hidden"
                 >
-                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                  <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="3" y="3" width="7" height="7" rx="1.5" />
+                    <rect x="14" y="3" width="7" height="7" rx="1.5" />
+                    <rect x="3" y="14" width="7" height="7" rx="1.5" />
+                    <path d="M14 14h3v3h-3zM17 17h4v4h-4z" />
                   </svg>
-                  <span>{{ i18n.t('detail.continueCheckout') }}</span>
-                  <svg class="w-4 h-4 group-hover:translate-x-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                  <span>Pay Now</span>
+                  <span v-if="selectedProduct" class="opacity-90 font-semibold text-sm">
+                    • {{ formatPrice(selectedProduct.sell_price).formatted }} {{ gameCurrency }}
+                  </span>
+                  <svg class="w-4 h-4 group-hover:translate-x-1 transition-transform ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3" />
                   </svg>
                   <span class="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-700 bg-gradient-to-r from-transparent via-white/20 to-transparent"></span>
                 </button>
@@ -1428,12 +1411,14 @@ onUnmounted(() => {
           <div class="shrink-0 ml-3">
             <button
               v-if="canProceed"
-              @click="handleMobileCheckout"
-              class="px-6 py-2.5 bg-gradient-to-r from-primary-500 to-primary-600 hover:from-primary-600 hover:to-primary-700 text-white font-semibold rounded-2xl shadow-lg shadow-primary-500/30 active:scale-[0.97] transition-all duration-200 text-sm flex items-center gap-2"
+              @click="handlePayNow"
+              class="px-6 py-2.5 bg-gradient-to-r from-red-600 to-[#e41e26] hover:from-red-700 hover:to-red-600 text-white font-bold rounded-2xl shadow-lg shadow-red-500/30 active:scale-[0.97] transition-all duration-200 text-sm flex items-center gap-2"
             >
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="3" y="3" width="7" height="7" rx="1.5" />
+                <rect x="14" y="3" width="7" height="7" rx="1.5" />
+                <rect x="3" y="14" width="7" height="7" rx="1.5" />
+                <path d="M14 14h3v3h-3zM17 17h4v4h-4z" />
               </svg>
               Pay Now
             </button>
@@ -1456,153 +1441,167 @@ onUnmounted(() => {
     <!-- Spacer for mobile floating bar -->
     <div v-if="gameStore.selectedGame && !mobileCheckoutActive" class="h-20 lg:hidden"></div>
 
-    <!-- ═══ Mobile KHQR Bottom Sheet ═══ -->
+    <!-- ═══ KHQR Payment Modal Dialog (Responsive: Desktop & Mobile) ═══ -->
     <Teleport to="body">
-      <!-- Backdrop with fade transition -->
+      <!-- Backdrop with smooth fade transition -->
       <Transition name="khqr-backdrop">
         <div
           v-if="mobileCheckoutActive"
           key="backdrop"
-          class="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm"
+          class="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm"
           @click="closeMobileCheckout"
         ></div>
       </Transition>
 
-      <!-- Bottom Sheet with spring slide-up transition -->
-      <Transition name="khqr-sheet">          <div
-            v-if="mobileCheckoutActive"
-            key="sheet"
-            class="fixed bottom-0 left-0 right-0 z-50 bg-white dark:bg-surface-900 rounded-t-2xl shadow-2xl max-h-[90vh] overflow-y-auto pb-[max(0.5rem,env(safe-area-inset-bottom,0.5rem))]"
+      <!-- Centered KHQR Modal Dialog -->
+      <Transition name="khqr-modal">
+        <div
+          v-if="mobileCheckoutActive"
+          key="modal"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="khqr-dialog-title"
+          class="fixed top-[50%] left-[50%] z-50 grid max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 rounded-lg border-none bg-transparent p-0 shadow-none outline-none w-[calc(100%-2rem)] sm:max-w-[360px] pointer-events-auto duration-200 ease-out"
+          tabindex="-1"
         >
-        <!-- Handle bar -->
-        <div class="flex justify-center pt-3 pb-1">
-          <div class="w-10 h-1 rounded-full bg-surface-300 dark:bg-surface-600"></div>
-        </div>
+          <h2 id="khqr-dialog-title" class="text-lg leading-none font-semibold sr-only">Checkout</h2>
 
-        <!-- Close button -->
-        <button
-          @click="closeMobileCheckout"
-          class="absolute top-4 right-4 w-8 h-8 rounded-full bg-surface-100 dark:bg-surface-800 flex items-center justify-center text-surface-400 hover:text-surface-600 dark:hover:text-surface-300 transition-colors"
-        >
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-          </svg>
-        </button>
-
-        <!-- Red KHQR Header with download icon -->
-        <div class="bg-red-600 px-6 py-3 flex items-center justify-between">
-          <div class="flex items-center gap-2">
-            <svg class="w-5 h-5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <rect x="3" y="3" width="18" height="18" rx="2" />
-              <circle cx="9" cy="9" r="1.5" fill="currentColor" />
-              <circle cx="15" cy="9" r="1.5" fill="currentColor" />
-              <circle cx="9" cy="15" r="1.5" fill="currentColor" />
-              <circle cx="15" cy="15" r="1.5" fill="currentColor" />
-            </svg>
-            <span class="text-white font-bold text-base tracking-wide">KHQR</span>
-          </div>
-          <div
-            class="flex items-center gap-2 bg-white/20 hover:bg-white/30 transition-colors rounded-full px-3 py-1.5 cursor-pointer"
-            @click.stop="downloadQrImage"
-          >
-            <img
-              src="https://checkout.payway.com.kh/images/download-icon-khqr.svg"
-              alt="Download QR"
-              class="w-4 h-4"
-            />
-            <span class="text-[11px] font-semibold text-white">Download</span>
-          </div>
-        </div>
-
-        <div class="px-6 pb-8">
-          <!-- Game + Amount info -->
-          <div class="flex items-center justify-between px-4 py-3 bg-surface-50 dark:bg-surface-800/50 rounded-xl mt-4 mb-4">
-            <div class="min-w-0 flex-1">
-              <p class="text-xs text-surface-400 dark:text-surface-500 truncate">{{ gameDisplayName }}</p>
-              <p v-if="playerNickname" class="text-sm font-semibold text-surface-900 dark:text-surface-100 mt-0.5 truncate">{{ playerNickname }}</p>
+          <!-- Redesigned Clean KHQR Card -->
+          <div class="mx-auto w-full max-w-[360px] overflow-hidden rounded-[2rem] bg-white font-sans shadow-2xl border border-gray-100/60">
+            
+            <!-- Red Header with Close Button and KHQR Logo -->
+            <div class="relative flex h-14 items-center justify-center px-6 bg-[#e41e26]">
+              <button
+                @click="closeMobileCheckout"
+                aria-label="Close"
+                class="absolute right-4 flex h-8 w-8 items-center justify-center rounded-full bg-white/20 text-white transition hover:bg-white/30 cursor-pointer"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-x h-4 w-4">
+                  <path d="M18 6 6 18"></path>
+                  <path d="m6 6 12 12"></path>
+                </svg>
+              </button>
+              <img alt="KHQR" class="h-6 object-contain select-none" src="/khqr.png">
             </div>
-            <div class="text-right shrink-0 ml-3">
-              <p class="text-lg font-bold text-primary-600 dark:text-primary-400">
-                {{ formatPrice(selectedProduct?.sell_price || 0).formatted }}
-              </p>
-              <p class="text-[10px] text-surface-400 uppercase">{{ gameCurrency }}</p>
-            </div>
-          </div>
 
-          <!-- QR Code -->
-          <div class="flex justify-center mb-4">
-            <div class="relative p-3 bg-white dark:bg-surface-800 rounded-xl border border-surface-100 dark:border-surface-700 shadow-sm">
-              <div class="w-52 h-52 flex items-center justify-center">
-                <!-- Loading -->
-                <template v-if="mobileQrLoading">
-                  <div class="text-center">
-                    <svg class="w-10 h-10 mx-auto text-surface-300 animate-spin" fill="none" viewBox="0 0 24 24">
+            <!-- Receipt & Order Summary with Corner Fold -->
+            <div class="relative border-b border-dashed border-gray-300 px-6 pt-4 pb-3">
+              <div class="absolute -top-px right-0 h-0 w-0 border-t-[24px] border-l-[24px] border-l-transparent border-t-[#e41e26]" aria-hidden="true"></div>
+              <div class="flex items-center gap-2">
+                <img
+                  v-if="gameStore.selectedGame?.image_url"
+                  :src="gameStore.selectedGame.image_url"
+                  :alt="gameDisplayName"
+                  class="size-5 rounded-sm object-cover"
+                />
+                <img
+                  v-else
+                  alt=""
+                  class="size-5 rounded-sm object-contain invert"
+                  src="/logo.svg"
+                />
+                <h3 class="text-sm font-medium text-slate-700 truncate">{{ gameDisplayName }} · {{ selectedProduct?.name }}</h3>
+              </div>
+              <div class="flex items-end gap-2 mt-1">
+                <h2 class="text-2xl font-bold text-gray-800">
+                  {{ formatPrice(selectedProduct?.sell_price || 0).formatted }}
+                </h2>
+                <span class="mb-1 text-sm font-medium text-slate-600">{{ gameCurrency || 'USD' }}</span>
+              </div>
+              <div v-if="playerNickname || playerId" class="text-[11px] text-slate-500 truncate mt-0.5">
+                Player: <span class="font-semibold text-slate-700">{{ playerNickname || playerId }}</span>
+                <span v-if="serverId" class="ml-1 text-slate-400">({{ serverId }})</span>
+              </div>
+            </div>
+
+            <!-- QR Code and Scanning Body -->
+            <div class="flex min-h-[240px] flex-col items-center justify-center px-6 pb-6 pt-2">
+              <div class="flex w-full flex-col items-center">
+                
+                <!-- QR Code Box -->
+                <div class="relative mt-3 aspect-square w-full max-w-[240px] flex items-center justify-center">
+                  <!-- Loading State -->
+                  <div v-if="mobileQrLoading" class="flex flex-col items-center justify-center py-10">
+                    <svg class="w-10 h-10 text-[#e41e26] animate-spin" fill="none" viewBox="0 0 24 24">
                       <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
                       <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                     </svg>
-                    <p class="text-[10px] text-surface-400 mt-2">Generating QR...</p>
+                    <p class="text-xs text-gray-500 font-medium mt-3">Generating KHQR...</p>
                   </div>
-                </template>
-                <!-- QR Image -->
-                <template v-else-if="mobileQrImage">
-                  <img :src="mobileQrImage" alt="KHQR Code" class="w-full h-full object-contain" />
-                </template>
-                <!-- Error -->
-                <template v-else-if="mobileQrError">
-                  <div class="text-center">
-                    <p class="text-xs text-red-500 mb-2">{{ mobileQrError }}</p>
-                    <button @click="handleMobileCheckout" class="text-xs text-primary-500 underline">Retry</button>
+
+                  <!-- Error State -->
+                  <div v-else-if="mobileQrError" class="text-center py-6">
+                    <p class="text-xs text-red-500 font-medium mb-3">{{ mobileQrError }}</p>
+                    <button
+                      @click="executePayNow"
+                      class="px-4 py-1.5 bg-red-50 hover:bg-red-100 text-[#e41e26] font-medium text-xs rounded-full transition-colors"
+                    >
+                      Retry Payment
+                    </button>
                   </div>
-                </template>
-              </div>
-              <!-- USD-KHQR overlay logo -->
-              <div v-if="mobileQrImage" class="absolute inset-0 flex items-center justify-center pointer-events-none">
-                <div class="w-9 h-9 bg-white rounded-lg shadow-sm flex items-center justify-center p-1.5">
-                  <img src="https://checkout.payway.com.kh/images/usd-khqr-logo.svg" alt="USD-KHQR" class="w-full h-full" />
+
+                  <!-- QR Code with Centered $ Badge -->
+                  <template v-else-if="mobileQrImage">
+                    <img
+                      :src="mobileQrImage"
+                      alt="KHQR Code"
+                      class="w-full h-full object-contain rounded-lg"
+                    />
+                    <div class="pointer-events-none absolute inset-0 flex items-center justify-center" aria-hidden="true">
+                      <div class="flex h-9 w-9 items-center justify-center rounded-full border-[3px] border-white bg-gray-900 text-sm font-bold text-white shadow-md">
+                        $
+                      </div>
+                    </div>
+                  </template>
                 </div>
+
+                <!-- Expiration Countdown Pill -->
+                <div
+                  v-if="mobilePaymentStatus === 'pending' && mobileTimeLeft > 0"
+                  class="mt-3 flex items-center gap-1.5 rounded-full bg-gray-100 px-3 py-1"
+                >
+                  <div class="h-1.5 w-1.5 animate-pulse rounded-full bg-green-500"></div>
+                  <span class="text-xs font-medium text-gray-600">
+                    Expires in {{ Math.floor(mobileTimeLeft / 60) }}:{{ String(mobileTimeLeft % 60).padStart(2, '0') }}
+                  </span>
+                </div>
+
+                <!-- Instruction Subtitle -->
+                <p class="mt-3 text-xs text-gray-400 text-center">Scan with any KHQR-enabled banking app</p>
+
+                <!-- Deep Link Button for Mobile or ABA PayWay -->
+                <div v-if="mobileCheckoutUrl" class="w-full mt-3">
+                  <a
+                    :href="mobileCheckoutUrl"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="flex items-center justify-center gap-2 w-full py-2.5 px-4 bg-[#e41e26] hover:bg-red-700 text-white font-semibold text-xs rounded-xl shadow-md shadow-red-500/20 hover:shadow-red-500/30 transition-all active:scale-[0.98]"
+                  >
+                    <span>Open in ABA Mobile</span>
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                    </svg>
+                  </a>
+                </div>
+
+                <!-- Payment Reference with Copy Action -->
+                <div
+                  v-if="mobilePaymentRef"
+                  @click="copyPaymentRef"
+                  class="mt-2.5 flex items-center gap-1 text-[11px] text-gray-400 hover:text-gray-600 cursor-pointer select-none transition-colors"
+                  title="Click to copy payment reference"
+                >
+                  <span>Ref: {{ mobilePaymentRef }}</span>
+                  <svg class="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                  </svg>
+                </div>
+
               </div>
             </div>
-          </div>
-
-          <!-- Pay with ABA PayWay CTA button (opens CutLuy hosted checkout) -->
-          <div v-if="mobileCheckoutUrl" class="mb-3">
-            <a
-              :href="mobileCheckoutUrl"
-              target="_blank"
-              rel="noopener noreferrer"
-              class="flex items-center justify-center gap-2 w-full py-3 px-4 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white font-bold rounded-xl shadow-lg shadow-red-500/20 hover:shadow-red-500/30 transition-all duration-300 active:scale-[0.98] group"
-            >
-              <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <circle cx="12" cy="12" r="10" />
-                <path d="M12 6v6l4 2" />
-              </svg>
-              <span>Pay with ABA PayWay</span>
-              <svg class="w-4 h-4 group-hover:translate-x-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-              </svg>
-            </a>
-          </div>
-
-          <!-- Timer ring -->
-          <div v-if="mobilePaymentStatus === 'pending' && mobileTimeLeft > 0" class="flex justify-center mb-4">
-            <div class="flex items-center gap-2 text-xs text-surface-400 dark:text-surface-500">
-              <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <circle cx="12" cy="12" r="10" />
-                <path d="M12 6v6l4 2" />
-              </svg>
-              <span>{{ Math.floor(mobileTimeLeft / 60) }}:{{ String(mobileTimeLeft % 60).padStart(2, '0') }} remaining</span>
-            </div>
-          </div>
-
-          <!-- Footer hint -->
-          <div class="text-center">
-            <p class="text-[10px] text-surface-400 dark:text-surface-500">
-              Scan QR with any banking app or click to pay with ABA PayWay
-            </p>
           </div>
         </div>
-    </div>
-  </Transition>
+      </Transition>
     </Teleport>
 
     <!-- Success overlay (mobile) -->
@@ -1991,24 +1990,23 @@ onUnmounted(() => {
   opacity: 1;
 }
 
-/* ─── KHQR bottom sheet slide-up (unified 0.4s with spring easing) ─── */.khqr-sheet-enter-active {
-  transition: transform var(--anim-enter-duration) var(--anim-enter-ease),
-               opacity var(--anim-enter-duration) var(--anim-enter-ease);
+/* ─── KHQR Centered Modal Transition (Smooth scale-fade) ─── */
+.khqr-modal-enter-active {
+  transition: opacity var(--anim-enter-duration, 0.3s) ease-out,
+              transform var(--anim-enter-duration, 0.3s) cubic-bezier(0.16, 1, 0.3, 1);
 }
-.khqr-sheet-leave-active {
-  transition: transform var(--anim-leave-duration) var(--anim-leave-ease),
-               opacity var(--anim-leave-duration) var(--anim-leave-ease);
+.khqr-modal-leave-active {
+  transition: opacity var(--anim-leave-duration, 0.2s) var(--anim-leave-ease, ease-in),
+              transform var(--anim-leave-duration, 0.2s) ease-in;
 }
-.khqr-sheet-enter-from {
-  transform: translateY(100%);
+.khqr-modal-enter-from,
+.khqr-modal-leave-to {
+  transform: translate(-50%, -48%) scale(0.95);
   opacity: 0;
 }
-.khqr-sheet-leave-to {
-  transform: translateY(100%);
-  opacity: 0;
-}
-.khqr-sheet-enter-to {
-  transform: translateY(0);
+.khqr-modal-enter-to,
+.khqr-modal-leave-from {
+  transform: translate(-50%, -50%) scale(1);
   opacity: 1;
 }
 

@@ -45,9 +45,7 @@ const router = createRouter({
     },
     {
       path: '/checkout',
-      name: 'checkout',
-      component: () => import('@/views/Checkout.vue'),
-      meta: { transition: 'slide-up' },
+      redirect: '/',
     },
     {
       path: '/payment',

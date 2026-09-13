@@ -17,8 +17,21 @@ import type {
 } from '@/types'
 
 function getBaseUrl(): string {
+  // If running in browser on vidtopup.store, use same-origin '/api' (proxied by Vercel edge)
+  // or directly https://api.vidtopup.store/api
+  if (typeof window !== 'undefined') {
+    const host = window.location.hostname
+    if (host.includes('vidtopup.store') || host.endsWith('.vercel.app')) {
+      return '/api'
+    }
+  }
+
   const envUrl = import.meta.env.VITE_API_BASE_URL
-  if (!envUrl) return '/api'
+  // Safety guard: if empty or pointing to the decommissioned lorndavid.online domain,
+  // always use the active production VPS endpoint.
+  if (!envUrl || envUrl.includes('lorndavid.online')) {
+    return 'https://api.vidtopup.store/api'
+  }
   const trimmed = envUrl.replace(/\/+$/, '')
   return trimmed.endsWith('/api') ? trimmed : `${trimmed}/api`
 }
@@ -45,14 +58,28 @@ api.interceptors.request.use(
   }
 )
 
-// ─── Response interceptor: track in-flight API calls + error handling ──
+// ─── Response interceptor: track in-flight API calls + error handling + fallback retry ──
 api.interceptors.response.use(
   (response) => {
     decrementApiRequest()
     return response
   },
-  (error) => {
+  async (error) => {
     decrementApiRequest()
+    const originalRequest = error.config
+    // If request failed on network error and hasn't retried yet, auto-retry with direct API
+    if (originalRequest && !originalRequest.__isRetry && (!error.response || error.code === 'ERR_NETWORK')) {
+      originalRequest.__isRetry = true
+      if (originalRequest.baseURL === '/api') {
+        originalRequest.baseURL = 'https://api.vidtopup.store/api'
+      }
+      try {
+        await new Promise((resolve) => setTimeout(resolve, 600))
+        return await api(originalRequest)
+      } catch {
+        // Fall through to standard error handling
+      }
+    }
     if (error.response) {
       const message = error.response.data?.message || 'An error occurred'
       return Promise.reject(new Error(message))

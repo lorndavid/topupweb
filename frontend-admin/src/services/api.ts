@@ -17,8 +17,17 @@ import type {
 } from '@/types'
 
 function getBaseUrl(): string {
+  if (typeof window !== 'undefined') {
+    const host = window.location.hostname
+    if (host.includes('vidtopup.store') || host.endsWith('.vercel.app')) {
+      return '/api'
+    }
+  }
+
   const envUrl = import.meta.env.VITE_API_BASE_URL
-  if (!envUrl) return '/api'
+  if (!envUrl || envUrl.includes('lorndavid.online')) {
+    return 'https://api.vidtopup.store/api'
+  }
   const trimmed = envUrl.replace(/\/+$/, '')
   return trimmed.endsWith('/api') ? trimmed : `${trimmed}/api`
 }

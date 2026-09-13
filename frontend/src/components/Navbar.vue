@@ -25,11 +25,12 @@ const logoImgRef = ref<HTMLElement | null>(null)
 
 // ─── Animate logo: entrance on mount, pulse on every navigation ───
 function animateLogoEntrance() {
-  if (!logoRef.value) return
+  const el = logoRef.value
+  if (!el || !(el instanceof Element)) return
   gsap.fromTo(
-    logoRef.value,
-    { opacity: 0, y: -10, scale: 0.85, rotate: -5 },
-    { opacity: 1, y: 0, scale: 1, rotate: 0, duration: ANIM_TIMING.enterDuration, ease: 'back.out(1.7)', delay: 0.15 }
+    el,
+    { opacity: 0, y: -10, scale: 0.85, rotation: -5 },
+    { opacity: 1, y: 0, scale: 1, rotation: 0, duration: ANIM_TIMING.enterDuration, ease: 'back.out(1.7)', delay: 0.15 }
   )
 }
 
@@ -61,7 +62,9 @@ onMounted(() => {
   window.addEventListener('scroll', scrollHandler, { passive: true })
 
   // Entrance animation on first load
-  animateLogoEntrance()
+  nextTick(() => {
+    animateLogoEntrance()
+  })
 })
 
 onUnmounted(() => {

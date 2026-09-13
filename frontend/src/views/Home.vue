@@ -346,7 +346,14 @@ async function fetchData(forceRefresh: boolean | unknown = false) {
 
   error.value = null
   try {
-    const data = await getCambodiaGames()
+    let data: CambodiaGamesResponse
+    try {
+      data = await getCambodiaGames()
+    } catch {
+      // Automatic silent retry after 500ms for mobile / Telegram webviews
+      await new Promise((resolve) => setTimeout(resolve, 500))
+      data = await getCambodiaGames()
+    }
     featured.value = data.featured
     others.value = data.others
     gameStore.categories = [...data.featured, ...data.others]

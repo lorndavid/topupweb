@@ -41,8 +41,8 @@ const allowedOrigins = [
 app.use(
   cors({
     origin: (origin, callback) => {
-      // Allow requests with no origin (e.g., mobile apps, curl, server-to-server)
-      if (!origin) return callback(null, true);
+      // Allow requests with no origin or null origin (e.g., mobile webviews, Telegram in-app browser, curl)
+      if (!origin || origin === 'null') return callback(null, true);
       try {
         const { hostname } = new URL(origin);
         // Allow all *.vercel.app deployments, vidtopup.store and its subdomains, and local dev

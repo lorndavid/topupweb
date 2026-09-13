@@ -6,6 +6,10 @@
   "installCommand": "npm install",
   "rewrites": [
     {
+      "source": "/api/:path*",
+      "destination": "https://api.vidtopup.store/api/:path*"
+    },
+    {
       "source": "/((?!api).*)",
       "destination": "/index.html"
     }

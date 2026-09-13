@@ -1570,13 +1570,13 @@ onUnmounted(() => {
                 <!-- Instruction Subtitle -->
                 <p class="mt-3 text-xs text-gray-400 text-center">Scan with any KHQR-enabled banking app</p>
 
-                <!-- Deep Link Button for Mobile or ABA App -->
+                <!-- Deep Link Button (Mobile Phones Only, Hidden on Desktop) -->
                 <a
                   v-if="mobileCheckoutUrl"
                   :href="mobileCheckoutUrl"
                   target="_blank"
                   rel="noopener noreferrer"
-                  class="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-[#0d6087] py-3.5 text-sm font-semibold text-white transition hover:bg-[#0b5075] active:scale-[0.98] shadow-md shadow-[#0d6087]/20"
+                  class="mt-4 flex sm:hidden w-full items-center justify-center gap-2 rounded-xl bg-[#0d6087] py-3.5 text-sm font-semibold text-white transition hover:bg-[#0b5075] active:scale-[0.98] shadow-md shadow-[#0d6087]/20"
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-external-link h-4 w-4">
                     <path d="M15 3h6v6"></path>
@@ -1585,19 +1585,6 @@ onUnmounted(() => {
                   </svg>
                   Open ABA App
                 </a>
-
-                <!-- Payment Reference with Copy Action -->
-                <div
-                  v-if="mobilePaymentRef"
-                  @click="copyPaymentRef"
-                  class="mt-3 flex items-center gap-1 text-[11px] text-gray-400 hover:text-gray-600 cursor-pointer select-none transition-colors"
-                  title="Click to copy payment reference"
-                >
-                  <span>Ref: {{ mobilePaymentRef }}</span>
-                  <svg class="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                  </svg>
-                </div>
 
               </div>
             </div>

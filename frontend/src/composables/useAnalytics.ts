@@ -135,6 +135,18 @@ export function useAnalytics() {
     window.removeEventListener('beforeunload', handleBeforeUnload)
   }
 
+  // ─── Forward events to Google Analytics (gtag.js) ───────────
+
+  function forwardToGtag(eventName: string, params: Record<string, unknown>): void {
+    if (typeof window !== 'undefined' && typeof (window as any).gtag === 'function') {
+      try {
+        ;(window as any).gtag('event', eventName, params)
+      } catch {
+        // Silently ignore
+      }
+    }
+  }
+
   // ─── Public API ───────────────────────────────────────────
 
   /**
@@ -160,6 +172,13 @@ export function useAnalytics() {
       game_code: extra?.game_code,
       product_code: extra?.product_code,
     })
+
+    forwardToGtag(event_type, {
+      ...(extra?.event_data || {}),
+      page_path: extra?.page,
+      game_code: extra?.game_code,
+      product_code: extra?.product_code,
+    })
   }
 
   /**
@@ -173,6 +192,11 @@ export function useAnalytics() {
       page,
       ...(gameCode ? { game_code: gameCode } : {}),
     })
+
+    forwardToGtag('page_view', {
+      page_path: page,
+      ...(gameCode ? { game_code: gameCode } : {}),
+    })
   }
 
   /**
@@ -184,6 +208,11 @@ export function useAnalytics() {
       session_id: sessionId,
       game_code: gameCode,
       page: '/',
+    })
+
+    forwardToGtag('select_content', {
+      content_type: 'game',
+      item_id: gameCode,
     })
   }
 
@@ -206,6 +235,27 @@ export function useAnalytics() {
       game_code: extra.game_code,
       product_code: extra.product_code,
     })
+
+    if (status === 'completed') {
+      forwardToGtag('purchase', {
+        transaction_id: extra.reference,
+        value: extra.amount,
+        currency: 'USD',
+        items: [{ item_id: extra.product_code, item_name: extra.game_code }],
+      })
+    } else if (status === 'initiated') {
+      forwardToGtag('begin_checkout', {
+        value: extra.amount,
+        currency: 'USD',
+        items: [{ item_id: extra.product_code, item_name: extra.game_code }],
+      })
+    } else {
+      forwardToGtag('payment_failed', {
+        transaction_id: extra.reference,
+        value: extra.amount,
+        currency: 'USD',
+      })
+    }
   }
 
   // ─── Lifecycle ────────────────────────────────────────────

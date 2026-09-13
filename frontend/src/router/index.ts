@@ -118,6 +118,15 @@ router.afterEach((to) => {
   if (ogTitle) {
     ogTitle.setAttribute('content', title)
   }
+
+  // Sync route change to Google Analytics (gtag.js)
+  if (typeof window !== 'undefined' && typeof (window as any).gtag === 'function') {
+    ;(window as any).gtag('event', 'page_view', {
+      page_title: title,
+      page_location: window.location.href,
+      page_path: to.fullPath,
+    })
+  }
 })
 
 export default router

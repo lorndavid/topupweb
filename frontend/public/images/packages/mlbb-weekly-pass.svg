@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <defs>
+    <linearGradient id="wp-card" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0f2b60"/>
+      <stop offset="50%" stop-color="#1e3a8a"/>
+      <stop offset="100%" stop-color="#0284c7"/>
+    </linearGradient>
+    <linearGradient id="wp-gold" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fef08a"/>
+      <stop offset="50%" stop-color="#eab308"/>
+      <stop offset="100%" stop-color="#b45309"/>
+    </linearGradient>
+    <filter id="wp-shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="#000" flood-opacity="0.3"/>
+    </filter>
+  </defs>
+  <!-- Card Container with Metallic Border -->
+  <rect x="6" y="8" width="52" height="48" rx="8" fill="url(#wp-card)" stroke="url(#wp-gold)" stroke-width="2" filter="url(#wp-shadow)"/>
+  <!-- Subtle Card Lines -->
+  <path d="M12 16H52" stroke="#60a5fa" stroke-width="0.75" opacity="0.3"/>
+  <path d="M12 48H52" stroke="#60a5fa" stroke-width="0.75" opacity="0.3"/>
+  <!-- Top Gold Crown -->
+  <path d="M25 15L28 19L32 14L36 19L39 15L37 23H27Z" fill="url(#wp-gold)"/>
+  <!-- Center Big MLBB Diamond -->
+  <polygon points="26,27 38,27 42,34 22,34" fill="#7df9ff"/>
+  <polygon points="22,34 32,34 32,44" fill="#0284c7"/>
+  <polygon points="32,34 42,34 32,44" fill="#bae6fd"/>
+  <!-- "WEEKLY" Banner at bottom -->
+  <rect x="14" y="44" width="36" height="8" rx="4" fill="url(#wp-gold)"/>
+  <text x="32" y="50" font-family="system-ui, sans-serif" font-size="5.5" font-weight="900" fill="#1e293b" text-anchor="middle" letter-spacing="0.5">WEEKLY</text>
+  <!-- 7 Days Indicator Dots/Stars -->
+  <circle cx="16" cy="24" r="1.5" fill="#fef08a"/>
+  <circle cx="48" cy="24" r="1.5" fill="#fef08a"/>
+</svg>

@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <defs>
+    <linearGradient id="ff-m-bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#450a0a"/><stop offset="50%" stop-color="#7f1d1d"/><stop offset="100%" stop-color="#18181b"/>
+    </linearGradient>
+    <linearGradient id="ff-flame-gold" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fef08a"/><stop offset="50%" stop-color="#f97316"/><stop offset="100%" stop-color="#dc2626"/>
+    </linearGradient>
+  </defs>
+  <!-- Card Base -->
+  <rect x="6" y="8" width="52" height="48" rx="8" fill="url(#ff-m-bg)" stroke="url(#ff-flame-gold)" stroke-width="2"/>
+  <!-- Royal Laurels -->
+  <circle cx="32" cy="27" r="12" stroke="url(#ff-flame-gold)" stroke-width="1.5" stroke-dasharray="2 3" opacity="0.6"/>
+  <!-- Flaming Center Diamond -->
+  <polygon points="32,20 42,28 32,40 22,28" fill="#06b6d4"/>
+  <polygon points="32,20 37,28 32,40" fill="#e0f2fe"/>
+  <!-- "MONTHLY VIP" Ribbon -->
+  <rect x="10" y="44" width="44" height="8" rx="4" fill="url(#ff-flame-gold)"/>
+  <text x="32" y="50" font-family="system-ui, sans-serif" font-size="4.8" font-weight="900" fill="#450a0a" text-anchor="middle" letter-spacing="0.5">MONTHLY VIP</text>
+</svg>

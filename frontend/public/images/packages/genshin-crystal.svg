@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <defs>
+    <linearGradient id="gen-blue" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#a5f3fc"/><stop offset="50%" stop-color="#38bdf8"/><stop offset="100%" stop-color="#6366f1"/>
+    </linearGradient>
+    <filter id="gen-glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="0" stdDeviation="4" flood-color="#38bdf8" flood-opacity="0.6"/>
+    </filter>
+  </defs>
+  <g filter="url(#gen-glow)">
+    <!-- 4-pointed Celestial Crystal Star -->
+    <path d="M32 6L37 26L57 32L37 38L32 58L27 38L7 32L27 26Z" fill="url(#gen-blue)"/>
+    <path d="M32 14L35 28L49 32L35 36L32 50L29 36L15 32L29 28Z" fill="#ffffff" opacity="0.6"/>
+    <circle cx="32" cy="32" r="3" fill="#ffffff"/>
+  </g>
+</svg>

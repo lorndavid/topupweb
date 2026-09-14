@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <defs>
+    <linearGradient id="ff-w-bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#18181b"/><stop offset="50%" stop-color="#27272a"/><stop offset="100%" stop-color="#09090b"/>
+    </linearGradient>
+    <linearGradient id="ff-gold-metal" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fef08a"/><stop offset="50%" stop-color="#eab308"/><stop offset="100%" stop-color="#ca8a04"/>
+    </linearGradient>
+  </defs>
+  <!-- Metallic VIP Card -->
+  <rect x="6" y="8" width="52" height="48" rx="8" fill="url(#ff-w-bg)" stroke="url(#ff-gold-metal)" stroke-width="2"/>
+  <!-- VIP Crown -->
+  <path d="M23 18L26 23L32 17L38 23L41 18L39 27H25Z" fill="url(#ff-gold-metal)"/>
+  <!-- Center FF Cyan Diamond -->
+  <polygon points="32,26 40,32 32,42 24,32" fill="#22d3ee"/>
+  <polygon points="32,26 36,32 32,42" fill="#cffafe"/>
+  <!-- "WEEKLY VIP" Ribbon -->
+  <rect x="12" y="44" width="40" height="8" rx="4" fill="url(#ff-gold-metal)"/>
+  <text x="32" y="50" font-family="system-ui, sans-serif" font-size="5" font-weight="900" fill="#09090b" text-anchor="middle" letter-spacing="0.5">WEEKLY VIP</text>
+</svg>

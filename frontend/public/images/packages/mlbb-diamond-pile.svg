@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <defs>
+    <radialGradient id="pile-aura" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#00d2ff" stop-opacity="0.35"/>
+      <stop offset="100%" stop-color="#00d2ff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <circle cx="32" cy="36" r="26" fill="url(#pile-aura)"/>
+  <!-- Diamond Pile Group -->
+  <g transform="translate(2, 6)">
+    <!-- Base diamonds -->
+    <polygon points="8,38 20,38 14,52" fill="#0284c7"/>
+    <polygon points="18,34 32,34 25,50" fill="#0369a1"/>
+    <polygon points="38,36 52,36 45,52" fill="#0284c7"/>
+    <polygon points="28,38 42,38 35,54" fill="#075985"/>
+    <!-- Middle tier -->
+    <polygon points="14,24 30,24 22,40" fill="#38bdf8"/>
+    <polygon points="30,24 46,24 38,40" fill="#7df9ff"/>
+    <polygon points="22,28 38,28 30,46" fill="#bae6fd"/>
+    <!-- Top Apex Diamond -->
+    <polygon points="20,12 38,12 44,22 14,22" fill="#e0f2fe"/>
+    <polygon points="14,22 24,22 29,38" fill="#38bdf8"/>
+    <polygon points="24,22 36,22 29,38" fill="#ffffff"/>
+    <polygon points="36,22 44,22 29,38" fill="#0284c7"/>
+    <!-- Sparkles -->
+    <path d="M12 18L13.5 15L15 18L18 19.5L15 21L13.5 24L12 21L9 19.5Z" fill="#ffffff"/>
+    <path d="M46 14L47.5 11L49 14L52 15.5L49 17L47.5 20L46 17L43 15.5Z" fill="#ffffff"/>
+    <circle cx="30" cy="8" r="1.5" fill="#ffffff"/>
+  </g>
+</svg>

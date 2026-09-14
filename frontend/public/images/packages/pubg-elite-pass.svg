@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <defs>
+    <linearGradient id="rp-gold" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fef08a"/><stop offset="50%" stop-color="#eab308"/><stop offset="100%" stop-color="#b45309"/>
+    </linearGradient>
+    <linearGradient id="rp-dark" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#1e293b"/><stop offset="100%" stop-color="#0f172a"/>
+    </linearGradient>
+  </defs>
+  <!-- Military Shield Base -->
+  <path d="M12 14L32 8L52 14V34C52 46 32 56 32 56C32 56 12 46 12 34Z" fill="url(#rp-dark)" stroke="url(#rp-gold)" stroke-width="2.5"/>
+  <!-- Gold Wing Accents -->
+  <path d="M18 20C24 24 28 28 32 30C36 28 40 24 46 20" stroke="url(#rp-gold)" stroke-width="1.5"/>
+  <!-- Large Embossed RP -->
+  <text x="32" y="38" font-family="'Impact', sans-serif" font-size="16" font-weight="900" fill="url(#rp-gold)" text-anchor="middle" letter-spacing="1">RP</text>
+  <!-- ELITE banner -->
+  <rect x="18" y="44" width="28" height="6.5" rx="3" fill="#dc2626"/>
+  <text x="32" y="49" font-family="system-ui, sans-serif" font-size="4.5" font-weight="900" fill="#ffffff" text-anchor="middle">ELITE</text>
+</svg>

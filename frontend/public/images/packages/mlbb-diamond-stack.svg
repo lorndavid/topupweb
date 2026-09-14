@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <defs>
+    <linearGradient id="ml-blue-1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#7df9ff"/><stop offset="100%" stop-color="#0284c7"/>
+    </linearGradient>
+    <linearGradient id="ml-blue-2" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#38bdf8"/><stop offset="100%" stop-color="#0369a1"/>
+    </linearGradient>
+    <filter id="stack-glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#00d2ff" flood-opacity="0.5"/>
+    </filter>
+  </defs>
+  <g filter="url(#stack-glow)">
+    <!-- Back Left Diamond -->
+    <g transform="translate(-4, 4) scale(0.7)">
+      <polygon points="18,14 46,14 56,26 8,26" fill="#38bdf8" opacity="0.85"/>
+      <polygon points="8,26 24,26 32,54" fill="#0284c7" opacity="0.85"/>
+      <polygon points="24,26 40,26 32,54" fill="#7df9ff" opacity="0.85"/>
+      <polygon points="40,26 56,26 32,54" fill="#0369a1" opacity="0.85"/>
+    </g>
+    <!-- Back Right Diamond -->
+    <g transform="translate(20, 2) scale(0.72)">
+      <polygon points="18,14 46,14 56,26 8,26" fill="#7df9ff" opacity="0.9"/>
+      <polygon points="8,26 24,26 32,54" fill="#0284c7" opacity="0.9"/>
+      <polygon points="24,26 40,26 32,54" fill="#bae6fd" opacity="0.9"/>
+      <polygon points="40,26 56,26 32,54" fill="#0369a1" opacity="0.9"/>
+    </g>
+    <!-- Center Front Big Diamond -->
+    <g transform="translate(6, 10) scale(0.85)">
+      <polygon points="18,14 46,14 56,26 8,26" fill="url(#ml-blue-1)"/>
+      <polygon points="8,26 24,26 32,54" fill="#0369a1"/>
+      <polygon points="24,26 40,26 32,54" fill="#e0f2fe"/>
+      <polygon points="40,26 56,26 32,54" fill="url(#ml-blue-2)"/>
+      <!-- Sparkle -->
+      <path d="M22 17L24 13L26 17L30 19L26 21L24 25L22 21L18 19Z" fill="#ffffff"/>
+    </g>
+  </g>
+</svg>

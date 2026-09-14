@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <rect x="8" y="12" width="48" height="40" rx="6" fill="#1e293b" stroke="#38bdf8" stroke-width="2"/>
+  <circle cx="32" cy="28" r="8" fill="#38bdf8"/>
+  <polygon points="32,22 34,26 38,27 35,30 36,34 32,32 28,34 29,30 26,27 30,26" fill="#ffffff"/>
+  <rect x="16" y="41" width="32" height="6" rx="3" fill="#38bdf8"/>
+  <text x="32" y="46" font-family="system-ui, sans-serif" font-size="4" font-weight="900" fill="#0f172a" text-anchor="middle">BATTLE PASS</text>
+</svg>

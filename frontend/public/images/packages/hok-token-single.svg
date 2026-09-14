@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <defs>
+    <linearGradient id="hok-gold" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fef08a"/><stop offset="50%" stop-color="#f59e0b"/><stop offset="100%" stop-color="#b45309"/>
+    </linearGradient>
+    <radialGradient id="hok-gem" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#67e8f9"/><stop offset="100%" stop-color="#0e7490"/>
+    </radialGradient>
+    <filter id="hok-glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#f59e0b" flood-opacity="0.5"/>
+    </filter>
+  </defs>
+  <g filter="url(#hok-glow)">
+    <!-- Golden Imperial Medallion -->
+    <circle cx="32" cy="32" r="24" fill="url(#hok-gold)"/>
+    <circle cx="32" cy="32" r="20" fill="#78350f"/>
+    <!-- Dragon Wing / Crest Carvings -->
+    <path d="M22 24C28 20 36 20 42 24C40 28 36 30 32 30C28 30 24 28 22 24Z" fill="url(#hok-gold)"/>
+    <!-- Central Cyan Dragon Gem -->
+    <circle cx="32" cy="32" r="8" fill="url(#hok-gem)" stroke="#fef08a" stroke-width="1.5"/>
+    <circle cx="30" cy="30" r="1.5" fill="#ffffff"/>
+  </g>
+</svg>

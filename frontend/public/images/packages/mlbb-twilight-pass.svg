@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <defs>
+    <linearGradient id="tw-bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#2e1065"/><stop offset="50%" stop-color="#581c87"/><stop offset="100%" stop-color="#7e22ce"/>
+    </linearGradient>
+    <linearGradient id="tw-gold" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fef08a"/><stop offset="100%" stop-color="#d97706"/>
+    </linearGradient>
+  </defs>
+  <!-- Pass Shield/Card -->
+  <rect x="6" y="8" width="52" height="48" rx="8" fill="url(#tw-bg)" stroke="url(#tw-gold)" stroke-width="2"/>
+  <!-- Celestial Wings -->
+  <path d="M12 28C18 20 26 24 32 30C38 24 46 20 52 28C44 32 38 34 32 40C26 34 20 32 12 28Z" fill="#c084fc" opacity="0.4"/>
+  <!-- Violet/Magenta Star Prism -->
+  <polygon points="26,22 38,22 43,30 21,30" fill="#f472b6"/>
+  <polygon points="21,30 32,30 32,42" fill="#9333ea"/>
+  <polygon points="32,30 43,30 32,42" fill="#e879f9"/>
+  <!-- TWILIGHT Banner -->
+  <rect x="12" y="44" width="40" height="8" rx="4" fill="url(#tw-gold)"/>
+  <text x="32" y="50" font-family="system-ui, sans-serif" font-size="5" font-weight="900" fill="#2e1065" text-anchor="middle" letter-spacing="0.5">TWILIGHT</text>
+</svg>

@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <defs>
+    <linearGradient id="pubg-red" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#dc2626"/><stop offset="100%" stop-color="#991b1b"/>
+    </linearGradient>
+    <linearGradient id="pubg-blue" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#2563eb"/><stop offset="100%" stop-color="#1e3a8a"/>
+    </linearGradient>
+  </defs>
+  <!-- Airdrop Crate (Iconic Red Top & Blue Bottom) -->
+  <!-- Blue base -->
+  <rect x="10" y="30" width="44" height="26" rx="3" fill="url(#pubg-blue)" stroke="#1e293b" stroke-width="1.5"/>
+  <!-- Red Top / Cover -->
+  <rect x="8" y="24" width="48" height="10" rx="2" fill="url(#pubg-red)" stroke="#1e293b" stroke-width="1.5"/>
+  <!-- Black Straps -->
+  <rect x="20" y="24" width="4" height="32" fill="#0f172a"/>
+  <rect x="40" y="24" width="4" height="32" fill="#0f172a"/>
+  <!-- Glowing UC coins bursting out of top -->
+  <ellipse cx="32" cy="22" rx="14" ry="5" fill="#fef08a"/>
+  <text x="32" y="24" font-family="'Impact', sans-serif" font-size="6" font-weight="bold" fill="#713f12" text-anchor="middle">UC</text>
+  <circle cx="18" cy="14" r="2.5" fill="#fef08a"/>
+  <circle cx="46" cy="12" r="3" fill="#fef08a"/>
+</svg>

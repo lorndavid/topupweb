@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <defs>
+    <linearGradient id="hok-w-bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#064e3b"/><stop offset="50%" stop-color="#047857"/><stop offset="100%" stop-color="#065f46"/>
+    </linearGradient>
+    <linearGradient id="hok-card-gold" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fde047"/><stop offset="100%" stop-color="#b45309"/>
+    </linearGradient>
+  </defs>
+  <!-- Jade & Gold Imperial Card -->
+  <rect x="6" y="8" width="52" height="48" rx="8" fill="url(#hok-w-bg)" stroke="url(#hok-card-gold)" stroke-width="2"/>
+  <!-- Dragon Icon -->
+  <circle cx="32" cy="27" r="10" fill="url(#hok-card-gold)"/>
+  <circle cx="32" cy="27" r="7" fill="#064e3b"/>
+  <circle cx="32" cy="27" r="3" fill="#34d399"/>
+  <!-- WEEKLY Banner -->
+  <rect x="12" y="43" width="40" height="8" rx="4" fill="url(#hok-card-gold)"/>
+  <text x="32" y="49" font-family="system-ui, sans-serif" font-size="5" font-weight="900" fill="#064e3b" text-anchor="middle" letter-spacing="0.5">WEEKLY CARD</text>
+</svg>

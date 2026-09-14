@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <defs>
+    <linearGradient id="uc-g2" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fef08a"/><stop offset="100%" stop-color="#ca8a04"/>
+    </linearGradient>
+  </defs>
+  <!-- Coin 1 (bottom) -->
+  <ellipse cx="26" cy="42" rx="16" ry="7" fill="#713f12"/>
+  <ellipse cx="26" cy="40" rx="16" ry="6" fill="url(#uc-g2)"/>
+  <!-- Coin 2 (mid) -->
+  <ellipse cx="26" cy="36" rx="16" ry="7" fill="#713f12"/>
+  <ellipse cx="26" cy="34" rx="16" ry="6" fill="url(#uc-g2)"/>
+  <!-- Coin 3 (top) -->
+  <ellipse cx="38" cy="30" rx="18" ry="8" fill="#713f12"/>
+  <ellipse cx="38" cy="27" rx="18" ry="7" fill="url(#uc-g2)"/>
+  <text x="38" y="30" font-family="'Impact', sans-serif" font-size="10" font-weight="bold" fill="#713f12" text-anchor="middle">UC</text>
+  <!-- Sparkles -->
+  <circle cx="16" cy="20" r="2" fill="#fef08a"/>
+  <circle cx="48" cy="14" r="2.5" fill="#fef08a"/>
+</svg>

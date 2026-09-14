@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <defs>
+    <linearGradient id="mp-bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1e1b4b"/><stop offset="100%" stop-color="#4338ca"/>
+    </linearGradient>
+    <linearGradient id="mp-gold" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fde047"/><stop offset="100%" stop-color="#ca8a04"/>
+    </linearGradient>
+  </defs>
+  <!-- Package Box with Ribbon -->
+  <rect x="12" y="24" width="40" height="32" rx="6" fill="url(#mp-bg)" stroke="url(#mp-gold)" stroke-width="2"/>
+  <!-- Vertical & Horizontal Ribbons -->
+  <rect x="29" y="24" width="6" height="32" fill="url(#mp-gold)"/>
+  <rect x="12" y="38" width="40" height="5" fill="url(#mp-gold)"/>
+  <!-- Bow on top with glowing diamond -->
+  <circle cx="32" cy="18" r="8" fill="#38bdf8" opacity="0.3"/>
+  <polygon points="26,14 38,14 42,20 22,20" fill="#7df9ff"/>
+  <polygon points="22,20 32,20 32,28" fill="#0284c7"/>
+  <polygon points="32,20 42,20 32,28" fill="#bae6fd"/>
+  <!-- MONTHLY text -->
+  <rect x="16" y="46" width="32" height="7" rx="3.5" fill="#fef08a"/>
+  <text x="32" y="51.5" font-family="system-ui, sans-serif" font-size="4.5" font-weight="900" fill="#1e1b4b" text-anchor="middle">MONTHLY</text>
+</svg>

@@ -11,6 +11,7 @@ import type { GameProduct } from '@/types'
 import { useSavedPlayers } from '@/composables/useSavedPlayers'
 import { formatPrice } from '@/composables/useCurrency'
 import { getGameCurrency, extractAmount } from '@/utils/gameCurrency'
+import { getPackageVisual } from '@/utils/packageVisuals'
 import { usePaymentWebSocket } from '@/composables/usePaymentWebSocket'
 import ReceiptCard from '@/components/ReceiptCard.vue'
 import { useScrollToTop } from '@/composables/useScrollToTop'
@@ -91,6 +92,10 @@ const savedChipsRef = ref<HTMLElement | null>(null)
 const { showScrollTop, scrollToTop } = useScrollToTop(productsContainerRef, 100)
 
 const selectedProduct = ref<GameProduct | null>(null)
+const selectedVisual = computed(() => {
+  if (!selectedProduct.value) return null
+  return getPackageVisual(gameCode.value, selectedProduct.value.name, selectedProduct.value.product_code)
+})
 const playerId = ref('')
 const serverId = ref('')
 const skipAutoVerify = ref(false)
@@ -1334,7 +1339,7 @@ onUnmounted(() => {
                   </svg>
                   <span>Pay Now</span>
                   <span v-if="selectedProduct" class="opacity-90 font-semibold text-sm">
-                    • {{ formatPrice(selectedProduct.sell_price).formatted }} {{ gameCurrency }}
+                    • {{ formatPrice(selectedProduct.sell_price).formatted }}
                   </span>
                   <svg class="w-4 h-4 group-hover:translate-x-1 transition-transform ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3" />
@@ -1394,16 +1399,30 @@ onUnmounted(() => {
                 Select a package below
               </p>
             </template>
-            <!-- Verified + package selected: show total -->
+            <!-- Verified + package selected: show package + total -->
             <template v-else>
-              <p class="text-[10px] text-surface-400 dark:text-surface-500 uppercase tracking-wider font-medium">Total</p>
-              <p class="text-xl font-bold text-surface-900 dark:text-white">
-                {{ formatPrice(selectedProduct.sell_price).formatted }}
-                <span class="text-xs text-surface-400 font-normal ml-0.5">{{ gameCurrency }}</span>
-              </p>
-              <p v-if="playerNickname" class="text-[11px] text-surface-400 dark:text-surface-500 mt-0.5 truncate">
-                {{ playerNickname }}
-              </p>
+              <div class="flex items-center gap-2 max-w-[200px] sm:max-w-xs">
+                <img
+                  v-if="selectedVisual"
+                  :src="selectedVisual.imageUrl"
+                  :alt="selectedVisual.displayTitle"
+                  class="w-8 h-8 object-contain rounded-lg p-0.5 bg-surface-100 dark:bg-surface-800 shrink-0"
+                  @error="(e: Event) => { (e.target as HTMLImageElement).src = gameImageUrl }"
+                />
+                <div class="min-w-0">
+                  <p class="text-xs font-bold text-surface-900 dark:text-white truncate">
+                    <template v-if="selectedVisual?.isPass">
+                      {{ selectedVisual.displayTitle }}
+                    </template>
+                    <template v-else>
+                      {{ selectedVisual?.displayTitle }} {{ selectedVisual?.displayCurrency }}
+                    </template>
+                  </p>
+                  <p class="text-sm font-extrabold text-primary-600 dark:text-primary-400 leading-tight">
+                    {{ formatPrice(selectedProduct.sell_price).formatted }}
+                  </p>
+                </div>
+              </div>
             </template>
           </div>
 
@@ -1488,26 +1507,40 @@ onUnmounted(() => {
             <!-- Receipt & Order Summary with Corner Fold -->
             <div class="relative border-b border-dashed border-gray-300 px-6 pt-4 pb-3">
               <div class="absolute -top-px right-0 h-0 w-0 border-t-[24px] border-l-[24px] border-l-transparent border-t-[#e41e26]" aria-hidden="true"></div>
-              <div class="flex items-center gap-2">
+              <div class="flex items-center gap-2.5">
                 <img
-                  v-if="gameStore.selectedGame?.image_url"
+                  v-if="selectedVisual"
+                  :src="selectedVisual.imageUrl"
+                  :alt="selectedVisual.displayTitle"
+                  class="size-7 rounded-lg object-contain p-0.5 bg-slate-100 shrink-0"
+                  @error="(e: Event) => { (e.target as HTMLImageElement).src = (gameStore.selectedGame?.image_url || '/logo.svg') }"
+                />
+                <img
+                  v-else-if="gameStore.selectedGame?.image_url"
                   :src="gameStore.selectedGame.image_url"
                   :alt="gameDisplayName"
-                  class="size-5 rounded-sm object-cover"
+                  class="size-6 rounded-sm object-cover"
                 />
                 <img
                   v-else
                   alt=""
-                  class="size-5 rounded-sm object-contain invert"
+                  class="size-6 rounded-sm object-contain invert"
                   src="/logo.svg"
                 />
-                <h3 class="text-sm font-medium text-slate-700 truncate">{{ gameDisplayName }} · {{ selectedProduct?.name }}</h3>
+                <div class="min-w-0">
+                  <h3 class="text-sm font-bold text-slate-800 truncate">
+                    {{ gameDisplayName }} · {{ selectedVisual?.isPass ? selectedVisual.displayTitle : `${selectedVisual?.displayTitle} ${selectedVisual?.displayCurrency}` }}
+                  </h3>
+                  <div v-if="selectedVisual?.subLabel" class="text-[10px] font-semibold text-emerald-600">
+                    {{ selectedVisual.subLabel }}
+                  </div>
+                </div>
               </div>
-              <div class="flex items-end gap-2 mt-1">
-                <h2 class="text-2xl font-bold text-gray-800">
+              <div class="flex items-baseline gap-1.5 mt-1.5">
+                <h2 class="text-2xl font-extrabold text-gray-900">
                   {{ formatPrice(selectedProduct?.sell_price || 0).formatted }}
                 </h2>
-                <span class="mb-1 text-sm font-medium text-slate-600">{{ gameCurrency || 'USD' }}</span>
+                <span class="text-xs font-medium text-slate-500 uppercase">{{ formatPrice(selectedProduct?.sell_price || 0).code }}</span>
               </div>
               <div v-if="playerNickname || playerId" class="text-[11px] text-slate-500 truncate mt-0.5">
                 Player: <span class="font-semibold text-slate-700">{{ playerNickname || playerId }}</span>

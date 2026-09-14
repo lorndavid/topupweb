@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <defs>
+    <linearGradient id="gold-trim" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fef08a"/><stop offset="50%" stop-color="#eab308"/><stop offset="100%" stop-color="#a16207"/>
+    </linearGradient>
+    <linearGradient id="wood-chest" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#451a03"/><stop offset="100%" stop-color="#1e1b4b"/>
+    </linearGradient>
+  </defs>
+  <!-- Chest Body -->
+  <rect x="10" y="32" width="44" height="24" rx="4" fill="url(#wood-chest)" stroke="url(#gold-trim)" stroke-width="2"/>
+  <rect x="29" y="38" width="6" height="8" rx="1.5" fill="url(#gold-trim)"/>
+  <!-- Gold Bands -->
+  <line x1="18" y1="32" x2="18" y2="56" stroke="url(#gold-trim)" stroke-width="2.5"/>
+  <line x1="46" y1="32" x2="46" y2="56" stroke="url(#gold-trim)" stroke-width="2.5"/>
+  <!-- Open Lid / Glow Overflow -->
+  <path d="M6 30C12 18 52 18 58 30Z" fill="#00d2ff" opacity="0.3"/>
+  <!-- Overflowing Diamonds -->
+  <polygon points="16,22 28,22 22,34" fill="#00d2ff"/>
+  <polygon points="26,14 40,14 33,28" fill="#7df9ff"/>
+  <polygon points="36,20 48,20 42,32" fill="#38bdf8"/>
+  <polygon points="22,26 34,26 28,38" fill="#bae6fd"/>
+  <!-- Sparkles -->
+  <path d="M33 8L35 4L37 8L41 10L37 12L35 16L33 12L29 10Z" fill="#ffffff"/>
+  <circle cx="16" cy="14" r="2" fill="#7df9ff"/>
+  <circle cx="50" cy="18" r="1.5" fill="#fef08a"/>
+</svg>

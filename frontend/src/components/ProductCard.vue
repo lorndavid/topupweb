@@ -1,7 +1,8 @@
 <script setup lang="ts">
+import { ref, computed, watch } from 'vue'
 import type { GameProduct } from '@/types'
 import { useFormattedPrice } from '@/composables/useCurrency'
-import { getGameCurrency, extractAmount } from '@/utils/gameCurrency'
+import { getPackageVisual } from '@/utils/packageVisuals'
 
 type ProductBadge = 'best-value' | 'most-popular' | 'new' | 'price-drop' | 'balance-check' | null
 
@@ -46,26 +47,50 @@ const emit = defineEmits<{
 }>()
 
 const khrPrice = useFormattedPrice(props.product.sell_price)
-const currency = props.gameCode ? getGameCurrency(props.gameCode) : 'Currency'
-const amount = extractAmount(props.product.name)
+
+const visual = computed(() =>
+  getPackageVisual(props.gameCode || '', props.product.name, props.product.product_code)
+)
+
+const imageFailed = ref(false)
+watch(
+  () => visual.value.imageUrl,
+  () => {
+    imageFailed.value = false
+  }
+)
+
+const iconSrc = computed(() => {
+  if (imageFailed.value && props.gameImageUrl) {
+    return props.gameImageUrl
+  }
+  return visual.value.imageUrl
+})
+
+function onImageError() {
+  imageFailed.value = true
+}
 </script>
 
 <template>
   <button
     @click="emit('select')"
     :class="[
-      'relative flex items-center gap-3 p-2.5 sm:p-3 rounded-xl border-2 transition-all duration-300 text-left w-full group overflow-hidden',
+      'relative flex items-center justify-between gap-2.5 sm:gap-3 p-2.5 sm:p-3.5 rounded-xl border-2 transition-all duration-300 text-left w-full group overflow-hidden',
       selected
-        ? 'border-primary-500 bg-gradient-to-r from-primary-50 to-blue-50 dark:from-primary-900/20 dark:to-blue-900/20 shadow-lg shadow-primary-500/10 scale-[1.02]'
-        : 'border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-900 hover:border-primary-300 dark:hover:border-primary-700 hover:shadow-lg hover:shadow-primary-500/5 hover:-translate-y-0.5'
+        ? 'border-primary-500 bg-gradient-to-r from-primary-50/90 to-blue-50/90 dark:from-primary-950/40 dark:to-blue-950/30 shadow-lg shadow-primary-500/15 scale-[1.02]'
+        : visual.isPass
+          ? 'border-amber-400/40 dark:border-amber-500/30 bg-gradient-to-br from-amber-500/[0.04] to-surface-50 dark:from-amber-500/[0.06] dark:to-surface-900 hover:border-amber-400 hover:shadow-lg hover:shadow-amber-500/10 hover:-translate-y-0.5'
+          : 'border-surface-200 dark:border-surface-700/80 bg-white dark:bg-surface-900 hover:border-primary-300 dark:hover:border-primary-600 hover:shadow-lg hover:shadow-primary-500/5 hover:-translate-y-0.5'
     ]"
   >
     <!-- Badge ribbon (top-left corner) -->
     <div
-      v-if="badge"
+      v-if="badge || (visual.isPass && visual.passBadge)"
       class="absolute -top-0.5 -left-0.5 z-10"
     >
       <div
+        v-if="badge"
         :class="[
           'inline-flex items-center gap-1 px-1.5 py-0.5 rounded-br-lg text-[9px] font-bold text-white bg-gradient-to-r shadow-lg',
           badgeConfig[badge].bg
@@ -75,6 +100,16 @@ const amount = extractAmount(props.product.name)
           <path :d="badgeConfig[badge].icon" />
         </svg>
         {{ badgeConfig[badge].label }}
+      </div>
+      <!-- Pass badge if no other badge active -->
+      <div
+        v-else-if="visual.isPass && visual.passBadge"
+        class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-br-lg text-[9px] font-extrabold text-amber-900 dark:text-amber-100 bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-500 shadow-md shadow-amber-500/20 uppercase tracking-wider"
+      >
+        <svg class="w-2.5 h-2.5 text-amber-900" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+        </svg>
+        {{ visual.passBadge }}
       </div>
     </div>
 
@@ -94,33 +129,55 @@ const amount = extractAmount(props.product.name)
       </svg>
     </div>
 
-    <!-- Left: amount + currency + price -->
-    <div class="flex-1 min-w-0">
-      <p :class="[
-        'text-xs sm:text-sm font-bold transition-colors duration-200',
-        selected ? 'text-primary-700 dark:text-primary-300' : 'text-surface-900 dark:text-surface-100'
-      ]">
-        <span class="tabular-nums">{{ amount }}</span>
-        <span class="font-medium ml-1">{{ currency }}</span>
+    <!-- Left: Amount/Title + SubLabel + Price -->
+    <div class="flex-1 min-w-0 pr-1">
+      <!-- Title row -->
+      <p
+        :class="[
+          'text-xs sm:text-sm font-bold transition-colors duration-200 truncate',
+          selected ? 'text-primary-700 dark:text-primary-300' : 'text-surface-900 dark:text-surface-100'
+        ]"
+      >
+        <template v-if="visual.isPass">
+          {{ visual.displayTitle }}
+        </template>
+        <template v-else>
+          <span class="tabular-nums text-sm sm:text-base font-extrabold">{{ visual.displayTitle }}</span>
+          <span class="font-medium text-xs ml-1 text-surface-600 dark:text-surface-300">{{ visual.displayCurrency }}</span>
+        </template>
       </p>
+
+      <!-- Bonus / SubLabel row if available -->
+      <div v-if="visual.subLabel" class="mt-0.5 flex items-center gap-1">
+        <span class="inline-flex items-center text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/50 px-1 py-0.2 rounded border border-emerald-500/20 truncate">
+          {{ visual.subLabel }}
+        </span>
+      </div>
+
+      <!-- KHR Price -->
       <p :class="[
-        'text-[11px] sm:text-xs font-semibold mt-0.5 transition-colors duration-200',
-        selected ? 'text-primary-500 dark:text-primary-400' : 'text-surface-400 dark:text-surface-500'
+        'text-xs sm:text-sm font-extrabold mt-1 transition-colors duration-200 tabular-nums',
+        selected ? 'text-primary-600 dark:text-primary-400' : 'text-primary-600 dark:text-primary-400'
       ]">
         {{ khrPrice.formatted }}
       </p>
     </div>
 
-    <!-- Right: game icon -->
+    <!-- Right: Authentic package visual icon -->
     <div
-      v-if="gameImageUrl"
-      class="shrink-0 w-9 h-9 sm:w-10 sm:h-10 rounded-lg overflow-hidden ring-1 ring-surface-200 dark:ring-surface-700"
+      class="shrink-0 w-11 h-11 sm:w-12 sm:h-12 rounded-xl p-1 flex items-center justify-center transition-all duration-300 group-hover:scale-110 group-hover:rotate-1"
+      :class="[
+        visual.isPass
+          ? 'bg-gradient-to-br from-amber-500/10 to-yellow-500/10 ring-1 ring-amber-400/30'
+          : 'bg-surface-100/80 dark:bg-surface-800/80 ring-1 ring-surface-200/80 dark:ring-surface-700/80'
+      ]"
     >
       <img
-        :src="gameImageUrl"
-        :alt="currency"
-        class="w-full h-full object-cover"
+        :src="iconSrc"
+        :alt="visual.displayTitle"
+        class="w-full h-full object-contain filter drop-shadow-sm select-none"
         loading="lazy"
+        @error="onImageError"
       />
     </div>
   </button>

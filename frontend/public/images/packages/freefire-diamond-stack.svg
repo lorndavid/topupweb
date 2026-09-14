@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <defs>
+    <linearGradient id="ff-c1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#a5f3fc"/><stop offset="100%" stop-color="#0891b2"/>
+    </linearGradient>
+  </defs>
+  <!-- Back Left -->
+  <g transform="translate(6, 12) scale(0.65)">
+    <polygon points="32,10 52,24 32,54 12,24" fill="#0e7490" opacity="0.8"/>
+    <polygon points="32,10 40,24 32,54" fill="#67e8f9" opacity="0.8"/>
+    <polygon points="32,10 24,24 32,54" fill="#a5f3fc" opacity="0.8"/>
+  </g>
+  <!-- Back Right -->
+  <g transform="translate(24, 8) scale(0.7)">
+    <polygon points="32,10 52,24 32,54 12,24" fill="#0891b2" opacity="0.9"/>
+    <polygon points="32,10 40,24 32,54" fill="#cffafe" opacity="0.9"/>
+    <polygon points="32,10 24,24 32,54" fill="#67e8f9" opacity="0.9"/>
+  </g>
+  <!-- Front Big Diamond -->
+  <g transform="translate(8, 12) scale(0.8)">
+    <polygon points="32,10 52,24 32,54 12,24" fill="#0e7490"/>
+    <polygon points="32,10 40,24 32,54" fill="url(#ff-c1)"/>
+    <polygon points="32,10 24,24 32,54" fill="#ffffff"/>
+    <polygon points="12,24 24,24 32,54" fill="#0891b2"/>
+    <polygon points="52,24 40,24 32,54" fill="#155e75"/>
+    <!-- Fire Sparkle -->
+    <path d="M44 14L46 11L48 14L51 15.5L48 17L46 20L44 17L41 15.5Z" fill="#f97316"/>
+  </g>
+</svg>

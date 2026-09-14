@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <rect x="6" y="8" width="52" height="48" rx="8" fill="#18181b" stroke="#38bdf8" stroke-width="2"/>
+  <!-- Train Badge / Cosmos -->
+  <circle cx="32" cy="26" r="10" fill="#0284c7"/>
+  <path d="M26 30L32 20L38 30Z" fill="#ffffff"/>
+  <rect x="12" y="44" width="40" height="7" rx="3.5" fill="#38bdf8"/>
+  <text x="32" y="49.5" font-family="system-ui, sans-serif" font-size="4.5" font-weight="900" fill="#0f172a" text-anchor="middle">SUPPLY PASS</text>
+</svg>

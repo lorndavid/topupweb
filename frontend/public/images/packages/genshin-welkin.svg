@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <defs>
+    <linearGradient id="wel-bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1e1b4b"/><stop offset="100%" stop-color="#312e81"/>
+    </linearGradient>
+  </defs>
+  <rect x="6" y="8" width="52" height="48" rx="8" fill="url(#wel-bg)" stroke="#fcd34d" stroke-width="2"/>
+  <!-- Crescent Moon -->
+  <path d="M38 18C28 20 22 28 26 38C20 32 20 24 26 18C30 14 35 15 38 18Z" fill="#fde047"/>
+  <!-- Star -->
+  <polygon points="40,24 42,27 45,28 42,29 40,32 38,29 35,28 38,27" fill="#ffffff"/>
+  <!-- WELKIN text -->
+  <rect x="12" y="44" width="40" height="7" rx="3.5" fill="#fcd34d"/>
+  <text x="32" y="49.5" font-family="system-ui, sans-serif" font-size="4.5" font-weight="900" fill="#1e1b4b" text-anchor="middle">WELKIN MOON</text>
+</svg>

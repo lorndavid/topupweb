@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <defs>
+    <linearGradient id="hsr-prismatic" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#67e8f9"/><stop offset="50%" stop-color="#c084fc"/><stop offset="100%" stop-color="#f43f5e"/>
+    </linearGradient>
+  </defs>
+  <!-- Astral Shard -->
+  <polygon points="32,8 50,22 40,54 24,54 14,22" fill="#1e1b4b" stroke="url(#hsr-prismatic)" stroke-width="2"/>
+  <polygon points="32,8 40,24 32,54 24,24" fill="url(#hsr-prismatic)"/>
+  <polygon points="32,8 50,22 40,24" fill="#a5f3fc"/>
+  <polygon points="32,8 14,22 24,24" fill="#fbcfe8"/>
+  <circle cx="32" cy="24" r="2.5" fill="#ffffff"/>
+</svg>
